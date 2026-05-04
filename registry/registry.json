@@ -218,6 +218,7 @@
     {
       "name": "transitions-scale",
       "type": "hyperframes:block"
-    }
+    },
+    { "name": "experimental-orbit-theater", "type": "hyperframes:block" }
   ]
 }

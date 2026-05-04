@@ -1,0 +1,21 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/registry-item.json",
+  "name": "experimental-orbit-theater",
+  "type": "hyperframes:block",
+  "title": "Orbit Theater",
+  "description": "Cinematic 3D spatial UI showcase. Live HTML panels float in WebGL space with depth of field, bloom, glass reflections, and volumetric lighting. Requires Chrome/Brave with CanvasDrawElement flag.",
+  "stability": "experimental",
+  "dimensions": {
+    "width": 1920,
+    "height": 1080
+  },
+  "duration": 20,
+  "tags": ["html-in-canvas", "webgl", "3d", "spatial", "cinematic", "product-showcase"],
+  "files": [
+    {
+      "path": "experimental-orbit-theater.html",
+      "target": "compositions/experimental-orbit-theater.html",
+      "type": "hyperframes:composition"
+    }
+  ]
+}
