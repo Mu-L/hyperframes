@@ -7,7 +7,9 @@
  * Routes:
  *   POST /render         — blocking render, returns JSON
  *   POST /render/stream  — SSE streaming render with progress
+ *   POST /render/audio   — render audio track only
  *   GET  /render/queue   — current render queue status
+ *   POST /probe          — probe composition metadata (frames, duration, etc.)
  *   POST /lint           — blocking Hyperframe lint
  *   GET  /health         — health check
  *   GET  /outputs/:token — download rendered MP4
@@ -34,6 +36,8 @@ import {
   createRenderJob,
   executeRenderJob,
 } from "./services/renderOrchestrator.js";
+import { compileForRender } from "./services/htmlCompiler.js";
+import { processCompositionAudio } from "./services/audioMixer.js";
 import { prepareHyperframeLintBody, runHyperframeLint } from "./services/hyperframeLint.js";
 import { resolveRenderPaths } from "./utils/paths.js";
 import { defaultLogger, type ProducerLogger } from "./logger.js";
@@ -75,6 +79,9 @@ interface RenderInput {
   useGpu: boolean;
   debug: boolean;
   entryFile?: string;
+  startFrame?: number;
+  endFrame?: number;
+  skipAudio?: boolean;
 }
 
 interface PreparedRenderInput {
@@ -106,7 +113,25 @@ function parseRenderOptions(body: Record<string, unknown>): Omit<RenderInput, "p
     ["mp4", "webm", "mov"].includes(body.format as string) ? body.format : undefined
   ) as "mp4" | "webm" | "mov" | undefined;
 
-  return { outputPath, fps, quality, workers, useGpu, debug, entryFile, format };
+  const startFrame =
+    typeof body.startFrame === "number" ? Math.max(0, Math.floor(body.startFrame)) : undefined;
+  const endFrame =
+    typeof body.endFrame === "number" ? Math.max(0, Math.floor(body.endFrame)) : undefined;
+  const skipAudio = body.skipAudio === true;
+
+  return {
+    outputPath,
+    fps,
+    quality,
+    workers,
+    useGpu,
+    debug,
+    entryFile,
+    format,
+    startFrame,
+    endFrame,
+    skipAudio,
+  };
 }
 
 async function prepareRenderBody(
@@ -233,6 +258,8 @@ function cleanupTempDir(dir: string | undefined, log: ProducerLogger): void {
 export interface RenderHandlers {
   render: (c: Context) => Promise<Response>;
   renderStream: (c: Context) => Response | Promise<Response>;
+  renderAudio: (c: Context) => Promise<Response>;
+  probe: (c: Context) => Promise<Response>;
   lint: (c: Context) => Promise<Response>;
   health: (c: Context) => Response;
   outputs: (c: Context) => Response;
@@ -342,6 +369,11 @@ export function createRenderHandlers(options: HandlerOptions = {}): RenderHandle
       debug: input.debug,
       entryFile: input.entryFile,
       logger: log,
+      frameRange:
+        input.startFrame != null && input.endFrame != null
+          ? { startFrame: input.startFrame, endFrame: input.endFrame }
+          : undefined,
+      skipAudio: input.skipAudio,
     });
 
     let lastLoggedPct = -10;
@@ -456,6 +488,11 @@ export function createRenderHandlers(options: HandlerOptions = {}): RenderHandle
         debug: input.debug,
         entryFile: input.entryFile,
         logger: log,
+        frameRange:
+          input.startFrame != null && input.endFrame != null
+            ? { startFrame: input.startFrame, endFrame: input.endFrame }
+            : undefined,
+        skipAudio: input.skipAudio,
       });
       const abortController = new AbortController();
       const onRequestAbort = () =>
@@ -575,7 +612,109 @@ export function createRenderHandlers(options: HandlerOptions = {}): RenderHandle
       queuedRenders: renderSemaphore.waitingCount,
     });
 
-  return { render, renderStream, lint, health, outputs, queue };
+  const probe = async (c: Context): Promise<Response> => {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const result = await prepareRenderBody(body);
+    if ("error" in result) return c.json({ error: result.error }, 400);
+    const { prepared } = result;
+    const { input } = prepared;
+
+    const fps = input.fps;
+    const entryFile = input.entryFile ?? "index.html";
+    const htmlPath = resolve(input.projectDir, entryFile);
+    const downloadDir = resolve(input.projectDir, ".probe-downloads");
+
+    try {
+      mkdirSync(downloadDir, { recursive: true });
+      const compiled = await compileForRender(input.projectDir, htmlPath, downloadDir);
+      const metadata = {
+        totalFrames: Math.ceil(compiled.staticDuration * fps),
+        durationSeconds: compiled.staticDuration,
+        fps,
+        width: compiled.width,
+        height: compiled.height,
+        hasAudio: compiled.audios.length > 0,
+        videoCount: compiled.videos.length,
+        hasShaderTransitions: compiled.hasShaderTransitions,
+      };
+
+      rmSync(downloadDir, { recursive: true, force: true });
+      if (prepared.cleanupProjectDir)
+        rmSync(prepared.cleanupProjectDir, { recursive: true, force: true });
+      return c.json(metadata);
+    } catch (err) {
+      rmSync(downloadDir, { recursive: true, force: true });
+      if (prepared.cleanupProjectDir)
+        rmSync(prepared.cleanupProjectDir, { recursive: true, force: true });
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  };
+
+  const renderAudio = async (c: Context): Promise<Response> => {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const result = await prepareRenderBody(body);
+    if ("error" in result) return c.json({ error: result.error }, 400);
+    const { prepared } = result;
+    const { input } = prepared;
+
+    const entryFile = input.entryFile ?? "index.html";
+    const htmlPath = resolve(input.projectDir, entryFile);
+    const downloadDir = resolve(input.projectDir, ".audio-downloads");
+    const audioWorkDir = resolve(input.projectDir, ".audio-work");
+
+    try {
+      mkdirSync(downloadDir, { recursive: true });
+      mkdirSync(audioWorkDir, { recursive: true });
+      const compiled = await compileForRender(input.projectDir, htmlPath, downloadDir);
+
+      if (compiled.audios.length === 0) {
+        rmSync(downloadDir, { recursive: true, force: true });
+        rmSync(audioWorkDir, { recursive: true, force: true });
+        if (prepared.cleanupProjectDir)
+          rmSync(prepared.cleanupProjectDir, { recursive: true, force: true });
+        return c.json({ hasAudio: false, outputPath: null });
+      }
+
+      const outputPath = input.outputPath || resolve(input.projectDir, "audio.aac");
+      const compiledDir = resolve(input.projectDir, ".audio-downloads");
+
+      const audioResult = await processCompositionAudio(
+        compiled.audios,
+        input.projectDir,
+        audioWorkDir,
+        outputPath,
+        compiled.staticDuration,
+        undefined,
+        undefined,
+        compiledDir,
+      );
+
+      rmSync(downloadDir, { recursive: true, force: true });
+      rmSync(audioWorkDir, { recursive: true, force: true });
+      if (prepared.cleanupProjectDir)
+        rmSync(prepared.cleanupProjectDir, { recursive: true, force: true });
+
+      if (!audioResult.success) {
+        return c.json({ error: audioResult.error || "Audio processing failed" }, 500);
+      }
+
+      return c.json({
+        hasAudio: true,
+        outputPath,
+        durationSeconds: compiled.staticDuration,
+        tracksProcessed: audioResult.tracksProcessed,
+        durationMs: audioResult.durationMs,
+      });
+    } catch (err) {
+      rmSync(downloadDir, { recursive: true, force: true });
+      rmSync(audioWorkDir, { recursive: true, force: true });
+      if (prepared.cleanupProjectDir)
+        rmSync(prepared.cleanupProjectDir, { recursive: true, force: true });
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
+  };
+
+  return { render, renderStream, renderAudio, probe, lint, health, outputs, queue };
 }
 
 // ---------------------------------------------------------------------------
@@ -590,8 +729,10 @@ export function createProducerApp(options: HandlerOptions = {}): Hono {
   const handlers = createRenderHandlers(options);
 
   app.get("/health", handlers.health);
+  app.post("/probe", handlers.probe);
   app.post("/render", handlers.render);
   app.post("/render/stream", handlers.renderStream);
+  app.post("/render/audio", handlers.renderAudio);
   app.get("/render/queue", handlers.queue);
   app.post("/lint", handlers.lint);
   app.get("/outputs/:token", handlers.outputs);

@@ -287,6 +287,16 @@ export interface RenderConfig {
    * HDR constraints.
    */
   outputResolution?: CanvasResolution;
+  /**
+   * Restrict rendering to a sub-range of frames. Used by chunk rendering to
+   * split a composition across multiple workers.
+   */
+  frameRange?: FrameRange;
+  /**
+   * When `true`, skip audio processing entirely. Chunk renderers produce
+   * video-only segments and mix audio in a separate pass.
+   */
+  skipAudio?: boolean;
 }
 
 export interface RenderPerfSummary {
