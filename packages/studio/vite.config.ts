@@ -8,16 +8,21 @@ import {
   lstatSync,
   realpathSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import {
   type ResolvedProject,
   type RenderJobState,
   type StudioApiAdapter,
 } from "@hyperframes/core/studio-api";
-import { createStudioManualEditsRenderBodyScript } from "@hyperframes/core/studio-api/manual-edits-render-script";
+import { createProjectSignature } from "../core/src/studio-api/helpers/projectSignature";
 import { createRetryingModuleLoader, ensureProducerDist } from "./vite.producer";
 import { readNodeRequestBody } from "./vite.request-body.js";
+import {
+  createStudioDevRenderBodyScripts,
+  readStudioDevManualEditManifestContent,
+  readStudioDevMotionManifestContent,
+} from "./vite.studioMotion";
 import { seekThumbnailPreview } from "./vite.thumbnail";
 
 // ── Shared Puppeteer browser ─────────────────────────────────────────────────
@@ -49,8 +54,7 @@ async function getSharedBrowser(): Promise<import("puppeteer-core").Browser | nu
 
 // In-flight thumbnail dedup
 const _thumbnailInflight = new Map<string, Promise<Buffer>>();
-const THUMBNAIL_CACHE_VERSION = "v3";
-const STUDIO_MANUAL_EDITS_PATH = ".hyperframes/studio-manual-edits.json";
+const THUMBNAIL_CACHE_VERSION = "v4";
 
 interface ScreenshotClip {
   x: number;
@@ -59,43 +63,51 @@ interface ScreenshotClip {
   height: number;
 }
 
-function readStudioManualEditManifestContent(projectDir: string): string {
-  const manifestPath = join(projectDir, STUDIO_MANUAL_EDITS_PATH);
-  if (!existsSync(manifestPath)) return "";
-  try {
-    return readFileSync(manifestPath, "utf-8");
-  } catch {
-    return "";
+async function applyStudioRenderBodyScriptsToThumbnailPage(
+  page: import("puppeteer-core").Page,
+  projectDir: string,
+  activeCompositionPath: string,
+): Promise<void> {
+  const scripts = createStudioDevRenderBodyScripts(projectDir, {
+    activeCompositionPath,
+  });
+  for (const script of scripts) {
+    await page.addScriptTag({ content: script });
   }
 }
 
-async function applyStudioManualEditsToThumbnailPage(
-  page: import("puppeteer-core").Page,
-  manifestContent: string,
-  activeCompositionPath: string,
-): Promise<void> {
-  const script = createStudioManualEditsRenderBodyScript(manifestContent, {
-    activeCompositionPath,
-  });
-  if (!script) return;
-  await page.addScriptTag({ content: script });
-}
-
-async function reapplyStudioManualEditsToThumbnailPage(
+async function reapplyStudioRenderBodyScriptsToThumbnailPage(
   page: import("puppeteer-core").Page,
 ): Promise<void> {
   await page.evaluate(() => {
-    const apply = (window as Window & { __hfStudioManualEditsApply?: () => number })
-      .__hfStudioManualEditsApply;
-    if (typeof apply === "function") apply();
+    const runtimeWindow = window as Window & {
+      __hfStudioManualEditsApply?: () => number;
+      __hfStudioMotionApply?: () => number;
+    };
+    if (typeof runtimeWindow.__hfStudioManualEditsApply === "function") {
+      runtimeWindow.__hfStudioManualEditsApply();
+    }
+    if (typeof runtimeWindow.__hfStudioMotionApply === "function") {
+      runtimeWindow.__hfStudioMotionApply();
+    }
   });
+}
+
+function isPathWithin(parentDir: string, childPath: string): boolean {
+  const childRelativePath = relative(resolve(parentDir), resolve(childPath));
+  return (
+    childRelativePath === "" ||
+    (!childRelativePath.startsWith("..") && !isAbsolute(childRelativePath))
+  );
 }
 
 // ── Vite adapter for the shared studio API ───────────────────────────────────
 
 function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAdapter {
   // Lazy-load the bundler via Vite's SSR module loader
-  let _bundler: ((dir: string) => Promise<string>) | null = null;
+  let _bundler:
+    | ((dir: string, options?: { runtime?: "inline" | "placeholder" }) => Promise<string>)
+    | null = null;
   let _producerModuleLoader:
     | (() => Promise<{
         createRenderJob: (config: {
@@ -112,11 +124,17 @@ function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAda
         ) => Promise<void>;
       }>)
     | null = null;
+  const projectSignatureCache = new Map<string, string>();
+  server.watcher.on("all", (_event, file) => {
+    for (const projectDir of projectSignatureCache.keys()) {
+      if (isPathWithin(projectDir, file)) projectSignatureCache.delete(projectDir);
+    }
+  });
   const getBundler = async () => {
     if (!_bundler) {
       try {
         const mod = await server.ssrLoadModule("@hyperframes/core/compiler");
-        _bundler = (dir: string) => mod.bundleToSingleHtml(dir);
+        _bundler = (dir, options) => mod.bundleToSingleHtml(dir, options);
       } catch (err) {
         console.warn("[Studio] Failed to load compiler, previews will use raw HTML:", err);
         _bundler = null as never;
@@ -209,13 +227,25 @@ function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAda
     async bundle(dir: string) {
       const bundler = await getBundler();
       if (!bundler) return null;
-      let html = await bundler(dir);
-      // Fix empty runtime src from bundler — point to the CDN runtime
+      // Studio vite preview: bundler emits an empty `src=""` placeholder so we
+      // can point it at the local /api/runtime.js endpoint. Cached by the browser
+      // across composition hot-reloads instead of being inlined fresh each time.
+      let html = await bundler(dir, { runtime: "placeholder" });
       html = html.replace(
         'data-hyperframes-preview-runtime="1" src=""',
         `data-hyperframes-preview-runtime="1" src="${this.runtimeUrl}"`,
       );
       return html;
+    },
+
+    getProjectSignature(projectDir: string): string {
+      const cacheKey = resolve(projectDir);
+      const cached = projectSignatureCache.get(cacheKey);
+      if (cached) return cached;
+
+      const signature = createProjectSignature(cacheKey);
+      projectSignatureCache.set(cacheKey, signature);
+      return signature;
     },
 
     async lint(html: string, opts?: { filePath?: string }) {
@@ -249,13 +279,12 @@ function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAda
             if (systemChrome) process.env.PRODUCER_HEADLESS_SHELL_PATH = systemChrome;
           }
           const { createRenderJob, executeRenderJob } = await getProducerModule();
-          const manifestContent = readStudioManualEditManifestContent(opts.project.dir);
-          const manualEditsRenderScript = createStudioManualEditsRenderBodyScript(manifestContent);
+          const renderBodyScripts = createStudioDevRenderBodyScripts(opts.project.dir);
           const job = createRenderJob({
             fps: opts.fps as 24 | 30 | 60,
             quality: opts.quality as "draft" | "standard" | "high",
             format: opts.format,
-            ...(manualEditsRenderScript ? { renderBodyScripts: [manualEditsRenderScript] } : {}),
+            ...(renderBodyScripts.length > 0 ? { renderBodyScripts } : {}),
           });
           const onProgress = (j: { progress: number; currentStage?: string }) => {
             state.progress = j.progress;
@@ -288,11 +317,15 @@ function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAda
       const selectorKey = opts.selector
         ? `_${opts.selector.replace(/[^a-zA-Z0-9_-]+/g, "_").slice(0, 80)}_${opts.selectorIndex ?? 0}`
         : "";
-      const manifestContent = readStudioManualEditManifestContent(opts.project.dir);
-      const manifestKey = manifestContent.trim()
-        ? `_${createHash("sha1").update(manifestContent).digest("hex").slice(0, 16)}`
+      const manualManifestContent = readStudioDevManualEditManifestContent(opts.project.dir);
+      const manualManifestKey = manualManifestContent.trim()
+        ? `_${createHash("sha1").update(manualManifestContent).digest("hex").slice(0, 16)}`
         : "";
-      const cacheKey = `${THUMBNAIL_CACHE_VERSION}${manifestKey}_${opts.compPath.replace(/\//g, "_")}_${opts.seekTime.toFixed(2)}${selectorKey}.${opts.format === "png" ? "png" : "jpg"}`;
+      const motionManifestContent = readStudioDevMotionManifestContent(opts.project.dir);
+      const motionManifestKey = motionManifestContent.trim()
+        ? `_${createHash("sha1").update(motionManifestContent).digest("hex").slice(0, 16)}`
+        : "";
+      const cacheKey = `${THUMBNAIL_CACHE_VERSION}${manualManifestKey}${motionManifestKey}_${opts.compPath.replace(/\//g, "_")}_${opts.seekTime.toFixed(2)}${selectorKey}.${opts.format === "png" ? "png" : "jpg"}`;
 
       let bufferPromise = _thumbnailInflight.get(cacheKey);
       if (!bufferPromise) {
@@ -319,10 +352,10 @@ function createViteAdapter(dataDir: string, server: ViteDevServer): StudioApiAda
             )
             .catch(() => {});
           await seekThumbnailPreview(page, opts.seekTime);
-          await applyStudioManualEditsToThumbnailPage(page, manifestContent, opts.compPath);
+          await applyStudioRenderBodyScriptsToThumbnailPage(page, opts.project.dir, opts.compPath);
           await page.evaluate("document.fonts?.ready");
           await new Promise((r) => setTimeout(r, 200));
-          await reapplyStudioManualEditsToThumbnailPage(page);
+          await reapplyStudioRenderBodyScriptsToThumbnailPage(page);
           let clip: ScreenshotClip | undefined;
           if (opts.selector) {
             clip = await page.evaluate(

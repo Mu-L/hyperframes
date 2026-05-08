@@ -1,6 +1,7 @@
-import { forwardRef, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { isLottieAnimationLoaded } from "@hyperframes/core/runtime/lottie-readiness";
 import { useMountEffect } from "../../hooks/useMountEffect";
+import { HyperframesLoader } from "../../components/ui";
 // NOTE: importing "@hyperframes/player" registers a class extending HTMLElement
 // at module load, which throws under SSR. Defer the import to the mount effect
 // so it only runs in the browser.
@@ -15,6 +16,19 @@ interface PlayerProps {
 
 interface HyperframesPlayerElement extends HTMLElement {
   iframeElement: HTMLIFrameElement;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getShaderTransitionLoading(event: Event): boolean | null {
+  if (!(event instanceof CustomEvent)) return null;
+  const detail: unknown = event.detail;
+  if (!isRecord(detail)) return null;
+  const state = detail.state;
+  if (!isRecord(state)) return null;
+  return state.loading === true && state.ready !== true;
 }
 
 function enableInteractiveIframe(player: HyperframesPlayerElement): void {
@@ -74,7 +88,11 @@ export const Player = forwardRef<HTMLIFrameElement, PlayerProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const loadCountRef = useRef(0);
     const assetPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const assetFadeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [assetsLoading, setAssetsLoading] = useState(false);
+    const [assetOverlayVisible, setAssetOverlayVisible] = useState(false);
+    const [assetOverlayFading, setAssetOverlayFading] = useState(false);
+    const [shaderTransitionLoading, setShaderTransitionLoading] = useState(false);
 
     useMountEffect(() => {
       const container = containerRef.current;
@@ -90,6 +108,8 @@ export const Player = forwardRef<HTMLIFrameElement, PlayerProps>(
         // Create the web component imperatively to avoid JSX custom-element typing.
         const player = document.createElement("hyperframes-player") as HyperframesPlayerElement;
         const src = directUrl || `/api/projects/${projectId}/preview`;
+        player.setAttribute("shader-capture-scale", "1");
+        player.setAttribute("shader-loading", "player");
         player.setAttribute("src", src);
         player.setAttribute("width", String(portrait ? 1080 : 1920));
         player.setAttribute("height", String(portrait ? 1920 : 1080));
@@ -112,9 +132,16 @@ export const Player = forwardRef<HTMLIFrameElement, PlayerProps>(
         const preventToggle = (e: Event) => e.stopImmediatePropagation();
         player.addEventListener("click", preventToggle, { capture: true });
 
+        const handleShaderTransitionState = (event: Event) => {
+          const loading = getShaderTransitionLoading(event);
+          if (loading !== null) setShaderTransitionLoading(loading);
+        };
+        player.addEventListener("shadertransitionstate", handleShaderTransitionState);
+
         // Forward the iframe's native load event to the studio's onIframeLoad.
         const handleLoad = () => {
           loadCountRef.current++;
+          setShaderTransitionLoading(false);
           // Reveal animation on reload (hot-reload, composition switch)
           if (loadCountRef.current > 1) {
             container.classList.remove("preview-revealing");
@@ -164,6 +191,7 @@ export const Player = forwardRef<HTMLIFrameElement, PlayerProps>(
         cleanup = () => {
           iframe.removeEventListener("load", handleLoad);
           player.removeEventListener("click", preventToggle, { capture: true });
+          player.removeEventListener("shadertransitionstate", handleShaderTransitionState);
           if (assetPollRef.current) clearInterval(assetPollRef.current);
           assetPollRef.current = null;
           container.removeChild(player);
@@ -182,16 +210,60 @@ export const Player = forwardRef<HTMLIFrameElement, PlayerProps>(
       };
     });
 
+    useEffect(() => {
+      if (assetFadeRef.current) {
+        clearTimeout(assetFadeRef.current);
+        assetFadeRef.current = null;
+      }
+
+      if (assetsLoading) {
+        setAssetOverlayVisible(true);
+        setAssetOverlayFading(false);
+        return;
+      }
+
+      setAssetOverlayFading(true);
+      assetFadeRef.current = setTimeout(() => {
+        setAssetOverlayVisible(false);
+        setAssetOverlayFading(false);
+        assetFadeRef.current = null;
+      }, 240);
+
+      return () => {
+        if (assetFadeRef.current) {
+          clearTimeout(assetFadeRef.current);
+          assetFadeRef.current = null;
+        }
+      };
+    }, [assetsLoading]);
+
+    const showAssetOverlay = assetOverlayVisible && !shaderTransitionLoading;
+
     return (
       <div
         className="relative w-full h-full max-w-full max-h-full overflow-hidden bg-black flex items-center justify-center"
         style={style}
       >
         <div ref={containerRef} className="w-full h-full" />
-        {assetsLoading && (
-          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20 pointer-events-none">
-            <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            <span className="text-white/60 text-xs mt-3">Loading assets…</span>
+        {showAssetOverlay && (
+          <div
+            className="absolute inset-0 bg-black flex items-center justify-center z-20 select-none"
+            data-hyperframes-ignore=""
+            draggable={false}
+            style={{
+              opacity: assetOverlayFading ? 0 : 1,
+              pointerEvents: assetOverlayFading ? "none" : "auto",
+              transition: "opacity 240ms ease-out",
+            }}
+            onDragStart={(event) => event.preventDefault()}
+            onMouseDown={(event) => event.preventDefault()}
+            onPointerDown={(event) => event.preventDefault()}
+          >
+            <HyperframesLoader
+              title="Preparing preview assets"
+              detail="Waiting for media and motion assets before playback starts."
+              size={56}
+            />
           </div>
         )}
       </div>
