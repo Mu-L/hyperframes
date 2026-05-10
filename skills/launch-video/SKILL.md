@@ -258,14 +258,15 @@ tl.from(el, { opacity: 0, duration: 0.3, ease: "power1.out" }, t);
 
 ## Anti-Patterns
 
-| Mistake                             | Fix                                  |
-| ----------------------------------- | ------------------------------------ |
-| Grid of cards                       | One card per beat, full-bleed        |
-| Multi-step layout                   | One step per beat                    |
-| Slow camera pan between scenes      | Instant cut with scale pulse         |
-| Blur/zoom transitions eating frames | Every frame is content               |
-| Same font/color across beats        | Each beat gets its own world         |
-| Dense info layout                   | If you can't read it in 1s, split it |
+| Mistake                             | Fix                                                         |
+| ----------------------------------- | ----------------------------------------------------------- |
+| Grid of cards                       | One card per beat, full-bleed                               |
+| Multi-step layout                   | One step per beat                                           |
+| Slow camera pan between scenes      | Instant cut with scale pulse                                |
+| Blur/zoom transitions eating frames | Every frame is content                                      |
+| Same font/color across beats        | Each beat gets its own world                                |
+| Dense info layout                   | If you can't read it in 1s, split it                        |
+| Unrelated placeholder images        | Image beats must show YOUR product, not generic screenshots |
 
 ## Checklist
 
