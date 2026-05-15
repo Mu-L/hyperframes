@@ -67,4 +67,13 @@ will not match CI. Use it only for local-only experimentation.
 
 ## Skills
 
-Composition authoring (not repo development) is guided by skills installed via `npx skills add heygen-com/hyperframes`. See `skills/` for source. Invoke `/hyperframes`, `/hyperframes-cli`, `/hyperframes-registry`, `/tailwind`, or `/gsap` when authoring compositions. Use `/tailwind` for projects created with `hyperframes init --tailwind` so agents follow the pinned Tailwind v4 browser-runtime contract instead of Studio's Tailwind v3 setup. Use `/animejs`, `/css-animations`, `/lottie`, `/three`, or `/waapi` when a composition uses those first-party runtime adapters. Invoke `/hyperframes-media` for asset preprocessing (TTS narration, audio/video transcription, background removal for transparent overlays) — these commands have their own skill so the CLI skill stays focused on the dev loop. When a user provides a website URL and wants a video, invoke `/website-to-hyperframes` — it runs the full 7-step capture-to-video pipeline.
+Composition authoring (not repo development) is guided by skills installed via `npx skills add heygen-com/hyperframes`. See `skills/` for source. The active skills are:
+
+- `/hyperframes-core` — HTML composition contract: data attributes, clips, tracks, sub-compositions, variables, media playback, deterministic render rules, and validation of minimal renderable projects.
+- `/hyperframes-creative` — Creative direction: `design.md` handling, palettes, typography, motion principles, scene transitions, beat planning, narration, audio-reactive visuals, title cards, data-in-motion, and advanced recipes.
+- `/hyperframes-captions` — Subtitles, lyrics, karaoke, per-word styling, transcript JSON/SRT/VTT import, and caption timing from audio. Consumes transcripts produced by `/hyperframes-media`.
+- `/hyperframes-cli` — CLI dev loop: `init`, `lint`, `validate`, `inspect`, `preview`, `render`, `doctor`, `browser`, `info`, `upgrade`, `compositions`, `docs`, `benchmark`, and environment troubleshooting.
+- `/hyperframes-registry` — Installing registry blocks and components via `hyperframes add`, wiring them into `index.html`, and working with `hyperframes.json`.
+- `/hyperframes-tailwind` — Use for projects created with `hyperframes init --tailwind`. Pinned Tailwind v4 browser-runtime contract (distinct from Studio's Tailwind v3 setup).
+- `/hyperframes-media` — Asset preprocessing: `npx hyperframes tts`, `transcribe`, `remove-background`. Has its own skill so the CLI skill stays focused on the dev loop.
+- `/gsap` — GSAP timeline API reference for writing seekable GSAP animations registered on `window.__timelines`.

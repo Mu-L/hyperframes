@@ -1,6 +1,6 @@
 ---
 name: gsap
-description: GSAP animation reference for HyperFrames. Covers gsap.to(), from(), fromTo(), easing, stagger, defaults, timelines (gsap.timeline(), position parameter, labels, nesting, playback), and performance (transforms, will-change, quickTo). Use when writing GSAP animations in HyperFrames compositions.
+description: GSAP animation API reference for HyperFrames. Use when writing seekable GSAP timelines in HyperFrames compositions, including gsap.to(), from(), fromTo(), set(), timeline position parameters, labels, easing, stagger, finite repeats, and transform performance.
 ---
 
 # GSAP
@@ -212,10 +212,6 @@ Pause or kill off-screen animations.
 
 ---
 
-## References (loaded on demand)
-
-- **[references/effects.md](references/effects.md)** — Drop-in effects: typewriter text, audio visualizer. Read when needing ready-made effect patterns for HyperFrames.
-
 ## Best Practices
 
 - Use camelCase property names; prefer transform aliases and autoAlpha.
@@ -230,7 +226,6 @@ Pause or kill off-screen animations.
 - Use both svgOrigin and transformOrigin on the same SVG element.
 - Chain animations with delay when a timeline can sequence them.
 - Create tweens before the DOM exists.
-- Skip cleanup — always kill tweens when no longer needed.
 - Use infinite repeat values in HyperFrames compositions. Use finite repeat counts computed from the visible duration.
 
 ## Credits And References
