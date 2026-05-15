@@ -76,4 +76,4 @@ Composition authoring (not repo development) is guided by skills installed via `
 - `/hyperframes-registry` — Installing registry blocks and components via `hyperframes add`, wiring them into `index.html`, and working with `hyperframes.json`.
 - `/hyperframes-tailwind` — Use for projects created with `hyperframes init --tailwind`. Pinned Tailwind v4 browser-runtime contract (distinct from Studio's Tailwind v3 setup).
 - `/hyperframes-media` — Asset preprocessing: `npx hyperframes tts`, `transcribe`, `remove-background`. Has its own skill so the CLI skill stays focused on the dev loop.
-- `/gsap` — GSAP timeline API reference for writing seekable GSAP animations registered on `window.__timelines`.
+- `/hyperframes-gsap` — GSAP timeline API reference for writing seekable GSAP animations registered on `window.__timelines`, scoped to the HyperFrames runtime contract.

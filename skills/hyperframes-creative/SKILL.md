@@ -14,7 +14,7 @@ Use this skill after the technical composition contract is clear. For minimal re
    - Named style or mood: read `visual-styles.md`.
    - Fast defaults: read `house-style.md`.
    - Interactive selection: read `references/design-picker.md`.
-3. For multi-scene work, plan beats and rhythm before writing HTML. Read `references/beat-direction.md` and `references/transitions.md`.
+3. For multi-scene work, plan beats and rhythm before writing HTML. Read `references/beat-direction.md` and `references/transitions/overview.md`.
 4. For motion-heavy work, read `references/motion-principles.md` and the relevant recipe reference.
 5. After authoring significant animation, run the animation map script and inspect its flags.
 
@@ -28,8 +28,9 @@ Use this skill after the technical composition contract is clear. For minimal re
 - `references/prompt-expansion.md`: structured expansion for open-ended prompts.
 - `references/video-composition.md`: video-medium density, scale, color, and frame-composition guidance.
 - `references/beat-direction.md`: per-beat direction, rhythm planning, and transition timing.
-- `references/transitions.md`: scene transition selection and implementation guidance.
-- `references/transitions/catalog.md`: transition implementation catalog.
+- `references/transitions/overview.md`: scene transition selection, energy/mood mapping, and shader-CSS rules.
+- `references/transitions/catalog.md`: transition implementation catalog with GSAP code per type.
+- `references/transitions/css-*.md`: per-category CSS implementations (push, scale, dissolve, distortion, etc.).
 - `references/motion-principles.md`: motion guardrails and GSAP rules that affect visual quality.
 - `references/typography.md`: font selection, pairings, and rendered-video type guardrails.
 - `references/narration.md`: script pacing, tone, openings, and number pronunciation.

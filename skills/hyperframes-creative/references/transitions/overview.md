@@ -81,7 +81,7 @@ Think about what the transition _communicates_, not just what it looks like.
 
 ## Implementation
 
-Read `references/transitions/catalog.md` from the `hyperframes-creative` skill for GSAP code and hard rules for every transition type.
+Read `catalog.md` in this directory for GSAP code and hard rules for every transition type, and the `css-*.md` files for per-category implementation details.
 
 | Category    | CSS                                                            | Shader (WebGL)                                                            |
 | ----------- | -------------------------------------------------------------- | ------------------------------------------------------------------------- |
