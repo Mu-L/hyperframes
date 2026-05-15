@@ -2415,7 +2415,75 @@
           overridePalette = bestIdx;
         }
         selectedMood = 0;
-        setTimeout(function() { goToTune(); }, 300);
+        setTimeout(function() {
+          goToTune();
+          // Replace scene grid with template iframe
+          if (pick.slug) {
+            var grid = document.getElementById("sc-scene-grid");
+            if (grid) {
+              grid.innerHTML = "";
+              var wrap = document.createElement("div");
+              wrap.style.cssText = "grid-column:1/-1;position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#000;border-radius:4px;";
+              var ifr = document.createElement("iframe");
+              ifr.src = "templates/" + pick.slug + "/template.html";
+              ifr.sandbox = "allow-same-origin";
+              ifr.style.cssText = "width:1920px;height:1080px;border:none;transform-origin:top left;pointer-events:none;";
+              wrap.appendChild(ifr);
+              var nav = document.createElement("div");
+              nav.style.cssText = "position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;background:rgba(0,0,0,0.75);padding:4px 14px;border-radius:20px;z-index:10;";
+              nav.innerHTML = '<button style="background:none;border:none;color:#999;font-size:16px;cursor:pointer;padding:2px 6px;" id="tp-prev">&#9664;</button><span style="font-size:11px;color:#888;min-width:40px;text-align:center;font-variant-numeric:tabular-nums;" id="tp-num">...</span><button style="background:none;border:none;color:#999;font-size:16px;cursor:pointer;padding:2px 6px;" id="tp-next">&#9654;</button>';
+              wrap.appendChild(nav);
+              grid.appendChild(wrap);
+              ifr.addEventListener("load", function() {
+                var doc = ifr.contentDocument;
+                if (!doc) return;
+                doc.querySelectorAll("script").forEach(function(s) { s.remove(); });
+                doc.querySelectorAll("*").forEach(function(el) {
+                  try {
+                    var cs = ifr.contentWindow.getComputedStyle(el);
+                    if (cs.opacity === "0" && cs.display !== "none") el.style.opacity = "1";
+                  } catch(e) {}
+                });
+                var ds = doc.querySelector("deck-stage");
+                if (ds) {
+                  var dsStyle = doc.createElement("style");
+                  dsStyle.textContent = "deck-stage{display:block;width:1920px;height:1080px;position:relative;overflow:hidden;}deck-stage>section.slide{position:absolute;top:0;left:0;width:100%;height:100%;}deck-stage>section.slide:not(.active){visibility:hidden;opacity:0;}";
+                  doc.head.appendChild(dsStyle);
+                }
+                var slides = doc.querySelectorAll("section.slide, div.slide, .slide");
+                var cur = 0, tot = slides.length;
+                var scrollMode = false;
+                if (slides[0]) {
+                  var ps = ifr.contentWindow.getComputedStyle(slides[0].parentElement);
+                  var fs = ifr.contentWindow.getComputedStyle(slides[0]);
+                  if (fs.flex && fs.flex.indexOf("100") !== -1 && ps.display === "flex") {
+                    scrollMode = true;
+                    slides[0].parentElement.style.overflow = "hidden";
+                    doc.body.style.overflow = "hidden";
+                    doc.documentElement.style.overflow = "hidden";
+                  }
+                }
+                if (!scrollMode) {
+                  slides.forEach(function(s, i) {
+                    if (i === 0) { s.classList.add("active"); s.style.visibility = "visible"; s.style.opacity = "1"; }
+                    else { s.classList.remove("active"); s.style.visibility = "hidden"; s.style.opacity = "0"; }
+                  });
+                }
+                var scale = wrap.offsetWidth / 1920;
+                ifr.style.transform = "scale(" + scale + ")";
+                document.getElementById("tp-num").textContent = "1 / " + tot;
+                function go(delta) {
+                  cur = (cur + delta + tot) % tot;
+                  if (scrollMode) { slides[cur].scrollIntoView({behavior:"instant",inline:"start",block:"start"}); }
+                  else { slides.forEach(function(s,i) { if (i===cur) { s.classList.add("active"); s.style.visibility="visible"; s.style.opacity="1"; } else { s.classList.remove("active"); s.style.visibility="hidden"; s.style.opacity="0"; } }); }
+                  document.getElementById("tp-num").textContent = (cur+1) + " / " + tot;
+                }
+                document.getElementById("tp-prev").onclick = function() { go(-1); };
+                document.getElementById("tp-next").onclick = function() { go(1); };
+              });
+            }
+          }
+        }, 300);
       }
       window.addEventListener("message", function(e) {
         if (e.data && e.data.type === "templatePick") handleTemplatePick(e.data);
