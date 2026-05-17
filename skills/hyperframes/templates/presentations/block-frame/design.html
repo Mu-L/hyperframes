@@ -135,8 +135,7 @@ section{position:relative;padding:var(--pad-y) var(--pad-x)}
 .panel pre{margin:0;padding:14px;border:3px solid var(--black);background:var(--offwhite);font:11px/1.5 var(--f-mono);overflow-x:auto}
 
 .bg-preview{border:var(--border);box-shadow:var(--shadow);aspect-ratio:4/3;position:relative;overflow:hidden;background:var(--secondary)}
-.bg-preview .mock{position:absolute;inset:0;background:radial-gradient(circle at 35% 35%,var(--accent),transparent 55%),radial-gradient(circle at 70% 75%,var(--tertiary),transparent 55%),var(--secondary);filter:blur(28px)}
-.bg-preview .grain{position:absolute;inset:0;background-image:radial-gradient(circle,rgba(224,240,255,.3) .5px,transparent .5px);background-size:3px 3px;mix-blend-mode:overlay}
+.bg-preview canvas{width:100%;height:100%;display:block}
 .bg-preview .badge{position:absolute;bottom:14px;left:14px;font:600 11px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--black);background:var(--accent);border:3px solid var(--black);padding:6px 12px}
 
 details.code-block{background:var(--white);border:3px solid var(--black);margin-top:12px}
@@ -303,7 +302,7 @@ __TEMPLATE_CSS__
   </div>
   <div class="two-col">
     <div class="bg-preview">
-      <div class="mock"></div><div class="grain"></div>
+      <canvas id="bg-preview-canvas"></canvas>
       <span class="badge">&#9656; __BG_BADGE__</span>
     </div>
     <div style="display:flex;flex-direction:column;gap:8px">

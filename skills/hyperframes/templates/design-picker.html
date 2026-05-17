@@ -2891,7 +2891,7 @@
             ss += 'import{EffectComposer}from"three/addons/postprocessing/EffectComposer.js";\n';
             ss += 'import{RenderPass}from"three/addons/postprocessing/RenderPass.js";\n';
             ss += 'import{HalftonePass}from"three/addons/postprocessing/HalftonePass.js";\n';
-            ss += 'const c=document.getElementById("design-bg"),r=new THREE.WebGLRenderer({canvas:c,antialias:!0,alpha:!0});\n';
+            ss += 'const c=document.getElementById("design-bg"),r=new THREE.WebGLRenderer({canvas:c,antialias:!0,alpha:!0,preserveDrawingBuffer:!0});\n';
             ss += 'r.setPixelRatio(Math.min(devicePixelRatio,2));\n';
             ss += 'const s=new THREE.Scene,cam=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,100);\n';
             ss += 'cam.position.set(' + camX + ',' + camY + ',' + camZ + ');cam.lookAt(0,0,0);';
@@ -2912,7 +2912,11 @@
             }
             ss += 'function rs(){r.setSize(innerWidth,innerHeight,!1);comp.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}\n';
             ss += 'addEventListener("resize",rs);rs();\n';
-            ss += 'const t0=performance.now();(function tick(t){u.uTime.value=(t-t0)*.001;comp.render();requestAnimationFrame(tick)})(performance.now());\n';
+            ss += 'const t0=performance.now();\n';
+            ss += 'const pc=document.getElementById("bg-preview-canvas");\n';
+            ss += 'let pctx=null;\n';
+            ss += 'if(pc){pc.width=pc.clientWidth*devicePixelRatio;pc.height=pc.clientHeight*devicePixelRatio;pctx=pc.getContext("2d");}\n';
+            ss += '(function tick(t){u.uTime.value=(t-t0)*.001;comp.render();if(pctx){pctx.drawImage(c,0,0,pc.width,pc.height);}requestAnimationFrame(tick)})(performance.now());\n';
             ss += '<\/script>';
             h = h.replace(/__SHADER_SCRIPT__/g, ss);
           } else {

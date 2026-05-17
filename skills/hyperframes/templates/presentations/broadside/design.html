@@ -114,7 +114,7 @@ section{position:relative;padding:var(--pad-y) var(--pad-x)}
 .panel .label-row{font:500 11px/1 var(--f-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
 .panel p{margin:0;color:var(--ink-dim);font-size:13px;line-height:1.7;max-width:38ch}
 .bg-preview{border:1px solid var(--hairline);aspect-ratio:4/3;position:relative;overflow:hidden;background:var(--secondary)}
-.bg-preview .mock{position:absolute;inset:0;background:radial-gradient(circle at 30% 40%,var(--accent),transparent 55%),radial-gradient(circle at 70% 70%,var(--tertiary),transparent 50%),var(--secondary);filter:blur(36px);opacity:.7}
+.bg-preview canvas{width:100%;height:100%;display:block}
 .bg-preview .badge{position:absolute;bottom:12px;left:12px;font:500 10px/1 var(--f-mono);letter-spacing:.18em;text-transform:uppercase;background:color-mix(in srgb,var(--secondary) 75%,transparent);padding:6px 10px;backdrop-filter:blur(8px)}
 
 details.code-block{border:1px solid var(--hairline);background:color-mix(in srgb,var(--secondary) 60%,transparent);margin-top:12px}
@@ -274,7 +274,7 @@ __TEMPLATE_CSS__
     <p class="lede">__BG_LEDE__</p>
   </div>
   <div class="two-col">
-    <div class="bg-preview"><div class="mock"></div><span class="badge">// __BG_BADGE__</span></div>
+    <div class="bg-preview"><canvas id="bg-preview-canvas"></canvas><span class="badge">// __BG_BADGE__</span></div>
     <div style="display:flex;flex-direction:column;gap:8px">
       <ul class="tokens" style="border-top:none">
         <li><span class="name">Geometry</span><span class="val">__BG_TYPE__</span><span class="bar" style="width:36px"></span></li>
