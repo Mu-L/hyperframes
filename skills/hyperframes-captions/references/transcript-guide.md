@@ -2,15 +2,6 @@
 
 For the `transcribe` CLI invocation, the `.en`-translates-non-English rule, and whisper model selection, see the `hyperframes-media` skill. This file covers what to do with the resulting transcript when authoring captions: input formats, mandatory quality checks, cleaning code, external-API fallbacks.
 
-## Contents
-
-- Supported input formats
-- Transcript quality check
-- Cleaning a transcript
-- Model decision tree
-- External transcription API import
-- No-transcript flow
-
 ## Supported Input Formats
 
 The CLI auto-detects and normalizes these formats:

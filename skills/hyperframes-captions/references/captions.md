@@ -1,26 +1,14 @@
 # Captions
 
-## Contents
-
-- Language rule
-- Transcript source
-- Style detection
-- Per-word styling
-- Script-to-style mapping
-- Word grouping
-- Positioning
-- Text overflow prevention
-- Caption exit guarantee
-- Further references
-- Constraints
-
 ## Language Rule (Non-Negotiable)
 
-**Never use `.en` models unless the user explicitly states the audio is English.** `.en` models TRANSLATE non-English audio into English instead of transcribing it.
+`.en` models (`tiny.en` / `base.en` / `small.en` / `medium.en`) **translate** non-English audio into English instead of transcribing it. This silently destroys the original language.
 
-1. User says the language → `--model small --language <code>` (no `.en`)
-2. User says English → `--model small.en`
-3. Language unknown → `--model small` (no `.en`, no `--language`) — auto-detects
+1. **Known English** → `--model small.en` (or `medium.en` for music / noisy audio)
+2. **Known non-English** → `--model small --language <iso-code>` (no `.en` suffix)
+3. **Unknown language** → `--model small` (whisper auto-detects)
+
+**CLI default is `small.en`** — do not rely on it; always pass `--model` to make the choice explicit.
 
 ---
 
@@ -58,7 +46,7 @@ Scan for words deserving distinct treatment:
 - **Numbers/statistics** — bold weight, accent color
 - **Emotional keywords** — exaggerated animation (overshoot, bounce)
 - **Call-to-action** — highlight, underline, color pop
-- **Marker highlight** — for beyond-color emphasis, use the `hyperframes-creative` CSS pattern reference.
+- **Marker highlight** — for beyond-color emphasis, see `hyperframes-creative/references/css-patterns.md`.
 
 ## Script-to-Style Mapping
 
@@ -135,7 +123,7 @@ tl.seek(0);
 
 - `references/dynamic-techniques.md` — karaoke, clip-path reveals, slam words, scatter exits, elastic, 3D rotation.
 - `references/transcript-guide.md` — transcript formats, quality checks, and cleanup.
-- `hyperframes-creative` CSS patterns — marker highlighting (deterministic, fully seekable).
+- `hyperframes-creative/references/css-patterns.md` — marker highlighting (deterministic, fully seekable).
 
 ## Constraints
 

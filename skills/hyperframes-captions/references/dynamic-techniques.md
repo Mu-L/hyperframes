@@ -16,7 +16,7 @@ You are here because SKILL.md told you to read this file before writing animatio
 
 **Emphasis words always break the pattern.** When a word is flagged as emphasis (emotional keyword, ALL CAPS, brand name), give it a stronger animation than surrounding words (larger scale, accent color, overshoot ease). This creates contrast.
 
-**Marker highlight modes add a visual layer on top of karaoke.** For emphasis words that need more than color/scale, add a marker-style effect: highlight sweep, circle, burst, or scribble. Use the `hyperframes-creative` skill's CSS pattern reference for implementation details. Match mode to energy: burst for hype, circle for key terms, highlight for standard, scribble for subtle.
+**Marker highlight modes add a visual layer on top of karaoke.** For emphasis words that need more than color/scale, add a marker-style effect: highlight sweep, circle, burst, or scribble. See `hyperframes-creative/references/css-patterns.md` for implementation details. Match mode to energy: burst for hype, circle for key terms, highlight for standard, scribble for subtle.
 
 ## Audio-Reactive Captions (Mandatory for Music)
 
