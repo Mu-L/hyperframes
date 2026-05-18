@@ -44,6 +44,7 @@ See `sub-compositions.md` for the full wiring pattern.
 
 ## Authoring Hints
 
+- `id="root"` — template convention used by scaffolds and the transition catalog so CSS can target the composition root with `#root` instead of `[data-composition-id="main"]`. Not required by the runtime, but consistent with the rest of the ecosystem.
 - `class="clip"` — semantic marker for tooling. Not required by the runtime.
 - `data-layout-allow-overflow` — tells `hyperframes inspect` that overflow on this element (or its descendants) is intentional.
 - `data-layout-ignore` — exclude this element from layout audits entirely.

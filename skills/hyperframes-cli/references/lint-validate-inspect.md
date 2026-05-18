@@ -2,6 +2,15 @@
 
 The correctness pipeline. Run in this order: `lint` (static, fast) → `validate` (runtime, headless Chrome) → `inspect` (layout sweep). `snapshot` is a separate utility for capturing still frames.
 
+## Discipline (motion-heavy work)
+
+When the composition is animation-driven, run the checks before you reach for `preview` or `render`:
+
+- Run `lint` after the first HTML pass — earlier, not later.
+- Capture `snapshot` at meaningful timeline states; look at the PNGs.
+- Inspect snapshots _before_ tuning automated warnings — your eye catches what the auditor misses.
+- Treat layout warnings as defects unless a snapshot proves the overflow is intentional, in which case mark it with `data-layout-allow-overflow`.
+
 ## lint
 
 ```bash

@@ -28,7 +28,7 @@ Standalone compositions put the composition root directly in `<body>`. Do not wr
         color: white;
         font-family: Inter, system-ui, sans-serif;
       }
-      [data-composition-id="main"] {
+      #root {
         position: relative;
         width: 1920px;
         height: 1080px;
@@ -47,7 +47,13 @@ Standalone compositions put the composition root directly in `<body>`. Do not wr
     </style>
   </head>
   <body>
-    <div data-composition-id="main" data-width="1920" data-height="1080" data-duration="5">
+    <div
+      id="root"
+      data-composition-id="main"
+      data-width="1920"
+      data-height="1080"
+      data-duration="5"
+    >
       <section id="title-card" class="clip" data-start="0" data-duration="5" data-track-index="1">
         <h1 id="title">Hello HyperFrames</h1>
       </section>
@@ -71,6 +77,7 @@ Standalone compositions put the composition root directly in `<body>`. Do not wr
 | Wire a sub-composition into a host                | `references/sub-compositions.md`    |
 | Declare variables or place video/audio            | `references/variables-and-media.md` |
 | Make the composition render deterministically     | `references/determinism-rules.md`   |
+| Author full-frame motion with shared backgrounds  | `references/full-screen-motion.md`  |
 
 For GSAP API details (tween syntax, timelines, easing, performance) use the `hyperframes-gsap` skill.
 

@@ -5,7 +5,7 @@ description: HyperFrames CLI dev loop. Use when running npx hyperframes init, ca
 
 # HyperFrames CLI
 
-Everything runs through `npx hyperframes`. Requires Node.js >= 22 and FFmpeg.
+Everything runs through `npx hyperframes` unless project instructions specify a local wrapper. Obey the local wrapper exactly. Requires Node.js >= 22 and FFmpeg.
 
 ## Workflow
 
@@ -18,6 +18,8 @@ Everything runs through `npx hyperframes`. Requires Node.js >= 22 and FFmpeg.
 7. **Render** — `npx hyperframes render`
 
 Run lint, validate, and inspect before preview. `lint` catches missing `data-composition-id`, overlapping tracks, and unregistered timelines. `validate` loads the composition in headless Chrome and reports runtime console errors plus WCAG contrast issues. `inspect` seeks through the timeline and reports text spilling out of bubbles/containers or off the canvas.
+
+For motion-heavy work, prefer snapshot-driven iteration — see `references/lint-validate-inspect.md` for the discipline.
 
 ## Routing
 

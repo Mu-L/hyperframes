@@ -18,6 +18,17 @@ Use this skill after the technical composition contract is clear. For minimal re
 4. For motion-heavy work, read `references/motion-principles.md` and the relevant recipe reference.
 5. After authoring significant animation, run the animation map script and inspect its flags.
 
+## Structured Prompt Fast Path
+
+When the prompt is already structured, convert it directly into an implementation beat map:
+
+- Preserve specified constraints unless they are impossible to render.
+- Build timing first, styling second.
+- Prefer native render primitives before adding assets.
+- Use shared background layers for global state changes.
+- Choose snapshots from meaningful timeline states.
+- Interpret animation-map flags against the intended rhythm before changing choreography.
+
 ## References
 
 - `house-style.md`: default palettes, motion, typography, and lazy defaults to question.
