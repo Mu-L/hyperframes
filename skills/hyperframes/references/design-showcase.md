@@ -216,9 +216,41 @@ Build in this order. Each section has a job; don't blur them.
 
 ### Cover (`min-height: 100vh`)
 
-- Top chrome: two corners of mono labels — left says `Design System / № xxx`, right says something accented like `Studio · 2026`
-- Cover headline at bottom-left (or centered for symmetric systems), full bleed at the scale from §6
-- Cover-foot: 4 metadata cells in a 1×4 grid (`Discipline / Display / Accent / Volume`) — each cell uses one of paper / accent / canvas to introduce all four palette tones at once
+<HARD-GATE>
+The cover communicates the FEEL of the design system, not the story of the product. No user counts, no feature claims, no product copy, no mockup UI. The hero shows the system's visual character at maximum intensity — the accent color, the type at scale, the surface treatment, the shape language.
+
+- **Brand name** as the headline — not a product tagline
+- **Subtitle** describes the system's character ("Dark canvas, yellow voltage, flat elevation" / "Photography-led marketplace, soft shapes, single accent") — not what the product does
+- **CTAs** are generic system labels ("Primary Action" / "Secondary") — not product actions ("Sign Up" / "Buy Now")
+- **Decorative gesture** comes from the system's signature shape language, not from product UI components. A pill search bar IS a shape-language gesture. A markets table is NOT.
+  </HARD-GATE>
+
+**The cover must be UNFORGETTABLE.** Ask: what is the ONE visual moment someone will remember after closing this page? That moment is the cover. If the cover could belong to any brand, it belongs to none.
+
+**Anti-convergence rule:** NEVER produce the same cover structure twice. If you catch yourself writing headline + subtitle + 2 CTAs + metadata footer grid — STOP. That's the default. Break it. Every brand gets a unique spatial composition derived from its character axes.
+
+**Standard elements** (arrange these however the character demands — they are NOT a fixed layout):
+
+- Brand name at the scale from §6
+- One sentence describing the visual system's character (not the product)
+- Primary + secondary button chrome
+- 3-4 metadata labels (discipline, display font, accent, canvas)
+- The brand's signature decorative gesture
+
+**Design thinking for the cover:**
+
+- **What's the extreme?** Commit to the character axis fully. Soft → EXTREMELY soft (overlapping rounded cards, generous whitespace, no hard lines). Dark → EXTREMELY dark (the accent is the only light). Warm → EXTREMELY warm (cream/olive/amber tones, textbook feel).
+- **What's unexpected?** Asymmetry, overlap, diagonal flow, grid-breaking elements, generous negative space OR controlled density. NOT centered headline + subtitle + buttons.
+- **What's the atmosphere?** Solid flat backgrounds are the default. Add depth through the system's own vocabulary — overlapping card surfaces, accent-tinted regions, the decorative gesture at architectural scale.
+- **What will they remember?** One visual moment: Airbnb's pill search bar with the Rausch orb. Binance's yellow-on-near-black voltage. PostHog's hedgehog on cream. HP's skewed blue chevrons. That gesture drives the entire cover composition.
+
+**Character-driven cover examples:**
+
+- **Airbnb** (soft, photography-led, quiet): split layout — pill search bar as decorative gesture on left, 2×2 card grid showing card chrome vocabulary on right
+- **Binance** (dark, bold, financial): full-bleed dark canvas — massive headline with accent period, yellow CTA pair, metadata on elevated card surface
+- **PostHog** (warm, engineering-sketchbook): single-column on cream — weight-ladder headline, yellow pill + soft secondary CTAs, hedgehog mascot, code specimen block as the "cinematic moment"
+- **HP** (commercial, angular): split — headline on left, accent-colored skewed chevron decorations flanking swatch grid on right
+- **Meta** (flat, pill-shaped, confident): centered headline with pill CTAs, minimal decoration — the flatness IS the gesture
 
 ### Manifesto
 

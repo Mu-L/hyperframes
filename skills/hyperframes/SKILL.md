@@ -56,7 +56,12 @@ Most prompts already answer 2-3 of these — a typical brief is 2-3 questions, n
    2. **Want to browse options visually?** → Run the design picker: read [references/design-picker.md](references/design-picker.md) for the full workflow. This serves a visual picker page. The user configures mood, palette, typography, and motion in the browser, then exports a DESIGN.html.
    3. **Want to skip and go fast?** → Ask: mood, light or dark, any brand colors/fonts? Then pick a palette from [house-style.md](./house-style.md).
 
-If a design file names fonts you can't find locally (no `fonts/` directory with `.woff2` files, not a built-in font), warn the user before writing HTML: "The design specifies [font name] but no font files found. Please add .woff2 files to `fonts/` or I'll fall back to [closest built-in alternative]."
+**Font resolution:** When a design file names a font, resolve it in this order:
+
+1. Check `fonts/` directory for `.woff2` files matching the family name → use `@font-face` with local files
+2. Check if the font is on Google Fonts (IBM Plex Sans, Inter, etc.) → use `<link>` tag directly
+3. Check the design.md's "Font Substitutes" section → use the first recommended substitute
+4. If none found, warn: "The design specifies [font name] but no font files found. Add .woff2 files to `fonts/` or I'll fall back to [closest built-in alternative]."
 
 **The design file defines the brand. It does not define video composition rules.** Those come from [references/video-composition.md](references/video-composition.md) and [house-style.md](./house-style.md). Use brand colors at video-appropriate scale — not at web-UI opacity.
 
