@@ -78,7 +78,12 @@ import {
 import { join, dirname, resolve } from "path";
 import { randomUUID } from "crypto";
 import { fileURLToPath } from "url";
-import { createFileServer, type FileServerHandle, VIRTUAL_TIME_SHIM } from "./fileServer.js";
+import {
+  createFileServer,
+  type FileServerHandle,
+  HF_PAGE_SIDE_COMPOSITING_STUB,
+  VIRTUAL_TIME_SHIM,
+} from "./fileServer.js";
 import { defaultLogger, type ProducerLogger } from "../logger.js";
 import { type HdrImageTransferCache } from "./hdrImageTransferCache.js";
 import {
@@ -531,17 +536,24 @@ export function buildMissingFrameRetryBatches(
   maxWorkers: number,
   workDir: string,
   attempt: number,
+  rangeStart: number = 0,
 ): WorkerTask[][] {
   const workersPerBatch = Math.max(1, Math.floor(maxWorkers));
   const batches: WorkerTask[][] = [];
 
+  // `ranges` are 0-indexed within the chunk's frame range (or full timeline
+  // when `rangeStart === 0`); translate to absolute composition indices so
+  // `WorkerTask`'s per-frame time math lands on the page's actual virtual
+  // clock, and propagate `outputFrameOffset` so the retry captures back at
+  // the same local file name `findMissingFrameRanges` was looking for.
   for (let i = 0; i < ranges.length; i += workersPerBatch) {
     const batchIndex = batches.length;
     const batch = ranges.slice(i, i + workersPerBatch).map((range, workerId) => ({
       workerId,
-      startFrame: range.startFrame,
-      endFrame: range.endFrame,
+      startFrame: rangeStart + range.startFrame,
+      endFrame: rangeStart + range.endFrame,
       outputDir: join(workDir, `retry-${attempt}-batch-${batchIndex}-worker-${workerId}`),
+      outputFrameOffset: rangeStart,
     }));
     batches.push(batch);
   }
@@ -600,11 +612,18 @@ export async function executeDiskCaptureWithAdaptiveRetry(options: {
   onProgress?: (progress: ParallelProgress) => void;
   cfg: EngineConfig;
   log: ProducerLogger;
+  /**
+   * Forwarded to each `WorkerTask`'s `outputFrameOffset` and to the
+   * `buildMissingFrameRetryBatches` translation. Default 0 (in-process
+   * contract: `[0, totalFrames)`). See `WorkerTask.outputFrameOffset`.
+   */
+  frameRangeStart?: number;
 }): Promise<CaptureAttemptSummary[]> {
   const attempts: CaptureAttemptSummary[] = [];
   let currentWorkers = options.initialWorkerCount;
   let missingRanges: FrameRange[] | null = null;
   let attempt = 0;
+  const rangeStart = options.frameRangeStart ?? 0;
 
   while (true) {
     const frameCount = missingRanges ? countFrameRanges(missingRanges) : options.totalFrames;
@@ -617,8 +636,14 @@ export async function executeDiskCaptureWithAdaptiveRetry(options: {
 
     const attemptWorkDir = join(options.workDir, `capture-attempt-${attempt}`);
     const batches = missingRanges
-      ? buildMissingFrameRetryBatches(missingRanges, currentWorkers, attemptWorkDir, attempt)
-      : [distributeFrames(options.totalFrames, currentWorkers, attemptWorkDir)];
+      ? buildMissingFrameRetryBatches(
+          missingRanges,
+          currentWorkers,
+          attemptWorkDir,
+          attempt,
+          rangeStart,
+        )
+      : [distributeFrames(options.totalFrames, currentWorkers, attemptWorkDir, rangeStart)];
 
     try {
       for (const tasks of batches) {
@@ -1447,8 +1472,8 @@ export async function executeRenderJob(
   // returned on `compileResult.forceScreenshot`. The sequencer stores it
   // in a local `captureForceScreenshot` below; the BeginFrame calibration
   // fallback updates the local — not `cfg` — and capture stages receive
-  // the value as an explicit parameter. See DISTRIBUTED-RENDERING-PLAN.md
-  // §4.3 (`LockedRenderConfig.forceScreenshot`).
+  // the value as an explicit parameter. This keeps `cfg` immutable for
+  // the rest of the pipeline.
   const enableChunkedEncode = cfg.enableChunkedEncode;
   const chunkedEncodeSize = cfg.chunkSizeFrames;
   // Declared outside the try so `finally` can stop the interval, but
@@ -1618,7 +1643,9 @@ export async function executeRenderJob(
     const stage4Start = Date.now();
     updateJobStatus(job, "rendering", "Starting frame capture", 25, onProgress);
 
-    // Start file server (may already be running from duration discovery)
+    // Start file server (may already be running from duration discovery).
+    // The page-side compositing stub is injected later (after hasHdrContent
+    // is known) via addPreHeadScript — see usePageSideCompositingForTransitions.
     if (!fileServer) {
       fileServer = await createFileServer({
         projectDir,
@@ -1742,11 +1769,34 @@ export async function executeRenderJob(
     // issues (orange shift) with no quality benefit.
     const nativeHdrIds = new Set([...nativeHdrVideoIds, ...nativeHdrImageIds]);
     const hasHdrContent = Boolean(effectiveHdr && nativeHdrIds.size > 0);
-    const useLayeredComposite = shouldUseLayeredComposite({
-      hasHdrContent,
-      hasShaderTransitions: compiled.hasShaderTransitions,
-      isPngSequence,
-    });
+    // Page-side compositing opt-in: when the engine is configured to run the
+    // shader blend inside Chrome via a page-side WebGL canvas, the layered
+    // Node-side composite path is unnecessary for SDR shader transitions.
+    // The streaming path takes ONE opaque RGB screenshot per output frame —
+    // exactly the single capture the page-side compositor produces. HDR
+    // content still forces the layered path (HDR layers need per-layer
+    // alpha + native HDR raw frame compositing in Node; that's out of scope
+    // for this opt-in).
+    const usePageSideCompositingForTransitions =
+      cfg.enablePageSideCompositing &&
+      compiled.hasShaderTransitions &&
+      !hasHdrContent &&
+      !isPngSequence &&
+      !needsAlpha;
+    if (usePageSideCompositingForTransitions) {
+      fileServer.addPreHeadScript(HF_PAGE_SIDE_COMPOSITING_STUB);
+      log.info(
+        "[Render] Page-side compositing enabled — bypassing Node-side layered " +
+          "shader-blend path. Engine will capture one opaque RGB frame per output frame.",
+      );
+    }
+    const useLayeredComposite =
+      !usePageSideCompositingForTransitions &&
+      shouldUseLayeredComposite({
+        hasHdrContent,
+        hasShaderTransitions: compiled.hasShaderTransitions,
+        isPngSequence,
+      });
     const encoderHdr = hasHdrContent ? effectiveHdr : undefined;
     // png-sequence has no encoder, but the rest of the orchestrator still
     // reads `preset.quality` for `effectiveQuality` and `preset.codec` for

@@ -57,9 +57,21 @@ jobs:
               - "bun.lock"
               - ".github/workflows/windows-render.yml"
 
+  preflight:
+    name: Preflight (lint + format)
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
+      - uses: ./.github/actions/preflight
+
   render-windows:
     name: Render on windows-latest
-    needs: changes
+    needs: [changes, preflight]
     if: needs.changes.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 30
@@ -341,10 +353,15 @@ jobs:
   # invocations, CRLF, file URLs, etc.) in existing vitest suites.
   # The producer package is skipped because its tests require Docker /
   # Linux-only tooling (Dockerfile.test, LFS golden MP4 baselines).
+  # The aws-lambda package is skipped because it targets the AWS Lambda
+  # Linux runtime exclusively (`@sparticuz/chromium` is Linux-only; the
+  # ZIP layout is for `/var/task` on AL2023). Its handler.test.ts also
+  # trips a bun-on-Windows workspace-symlink quirk reading the
+  # producer's transitive `hono` dep.
   # -------------------------------------------------------------------
   test-windows:
     name: Tests on windows-latest
-    needs: changes
+    needs: [changes, preflight]
     if: needs.changes.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 20
@@ -395,9 +412,15 @@ jobs:
         shell: pwsh
         run: bun run build
 
-      - name: Run tests (all packages except producer)
+      - name: Run tests (all packages except producer + aws-lambda)
         shell: pwsh
-        run: bun run --filter "!@hyperframes/producer" test
+        # Enumerate the packages we want to test instead of negating —
+        # `bun run --filter "!a" --filter "!b"` composes as a union (any
+        # package matching either negation runs), not an intersection.
+        # That meant `@hyperframes/producer` was effectively still being
+        # tested on Windows, which is what we explicitly want skipped
+        # (Docker / LFS-baseline tooling).
+        run: bun run --filter @hyperframes/core --filter @hyperframes/engine --filter @hyperframes/player --filter @hyperframes/cli --filter @hyperframes/studio --filter @hyperframes/shader-transitions test
 
       - name: Run runtime contract test
         shell: pwsh

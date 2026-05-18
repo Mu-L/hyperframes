@@ -1,0 +1,16 @@
+{
+  "$schema": "https://hyperframes.heygen.com/schema/registry-item.json",
+  "name": "caption-neon-glow",
+  "type": "hyperframes:component",
+  "title": "Neon Glow",
+  "description": "Cyan and magenta neon glow with keyword accent colors",
+  "tags": ["captions", "caption-style", "neon", "glow", "gaming"],
+  "files": [
+    {
+      "path": "caption-neon-glow.html",
+      "target": "compositions/components/caption-neon-glow.html",
+      "type": "hyperframes:snippet"
+    }
+  ],
+  "preview": "https://static.heygen.ai/hyperframes-oss/registry/components/caption-neon-glow/preview.mp4?v=1779051416"
+}

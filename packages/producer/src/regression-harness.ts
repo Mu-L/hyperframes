@@ -18,7 +18,11 @@ import { createRenderJob, executeRenderJob } from "./services/renderOrchestrator
 import { compileForRender } from "./services/htmlCompiler.js";
 import { validateCompilation } from "./services/compilationTester.js";
 import { extractMediaMetadata } from "./utils/ffprobe.js";
-import { buildRmsEnvelope, compareAudioEnvelopes } from "./utils/audioRegression.js";
+import {
+  buildRmsEnvelope,
+  compareAudioEnvelopes,
+  computeAudioResidualRmsDb,
+} from "./utils/audioRegression.js";
 import { parseFps, fpsToNumber } from "@hyperframes/core";
 import {
   checkDistributedSupport,
@@ -27,6 +31,35 @@ import {
   resolveMinPsnrForMode,
   runDistributedSimulatedRender,
 } from "./regression-harness-distributed.js";
+
+// `regression-harness-lambda-local` statically imports
+// `@hyperframes/aws-lambda`, which depends on @aws-sdk + @sparticuz/chromium.
+// In Dockerfile.test the workspace copy of aws-lambda's src isn't present,
+// so a static import here would fail at module-load time even when
+// running `--mode=in-process`. Load it on demand instead.
+//
+// The signature is typed via `RunLambdaLocalRender` (in its own types-only
+// file) instead of `typeof import(...)` so producer's tsc doesn't have to
+// type-check the implementation. The implementation imports
+// `@hyperframes/aws-lambda`, whose types come from `dist/index.d.ts` after
+// aws-lambda's build runs — a chicken-and-egg with producer's tsc that
+// would otherwise fail the whole-repo build.
+//
+// The dynamic import path is indirected through a variable so tsc can't
+// statically resolve the target file. Without this indirection tsc still
+// pulls `regression-harness-lambda-local.ts` (and its `@hyperframes/aws-lambda`
+// imports) into the program even though the tsconfig `exclude` list
+// nominally hides it. `tsx` resolves the path normally at runtime.
+import type { RunLambdaLocalRender } from "./regression-harness-lambda-local-types.js";
+
+const LAMBDA_LOCAL_MODULE = "./regression-harness-lambda-local.js";
+
+async function loadLambdaLocalRender(): Promise<RunLambdaLocalRender> {
+  const mod = (await import(LAMBDA_LOCAL_MODULE)) as {
+    runLambdaLocalRender: RunLambdaLocalRender;
+  };
+  return mod.runLambdaLocalRender;
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +71,15 @@ type TestMetadata = {
   maxFrameFailures: number;
   minAudioCorrelation: number;
   maxAudioLagWindows: number;
+  /**
+   * Optional residual-RMS check. Subtracts the rendered audio from the
+   * baseline and reads the residual Overall RMS via `astats`. A value
+   * of `-50` treats residuals at-or-below -50 dBFS as effectively-
+   * silent — i.e. the streams are sample-level equivalent. Omit
+   * (undefined) to skip the check; fixtures authored before this field
+   * was introduced have implicit `undefined`.
+   */
+  maxAudioResidualRmsDb?: number;
   renderConfig: {
     /**
      * Frame rate. Stored on disk as a JSON number (integer fps, e.g. `30`)
@@ -140,6 +182,15 @@ type TestResult = {
     passed: boolean;
     correlation: number;
     lagWindows: number;
+    /**
+     * Residual Overall RMS (dBFS) of `rendered - snapshot`. Present only
+     * when the fixture opts in via `meta.maxAudioResidualRmsDb`.
+     * `Number.NEGATIVE_INFINITY` ⇒ perfect cancellation. `NaN` ⇒ residual
+     * check could not run (missing ffmpeg, duration mismatch, ...); see
+     * `audio.residualError` for the reason.
+     */
+    residualRmsDb?: number;
+    residualError?: string;
   };
   renderedOutputPath?: string;
 };
@@ -151,6 +202,28 @@ type TestResult = {
  */
 function logPretty(message: string, emoji = "•") {
   console.error(`${emoji} ${message}`);
+}
+
+/**
+ * Format the residual-RMS suffix used in the audio-quality log line.
+ *
+ * Three states must surface distinctly:
+ *   • `null`            → fixture didn't opt into residual RMS         → "" (no suffix)
+ *   • `NaN`             → check ran but produced no parseable reading  → "(error: ...)"
+ *   • `-Infinity`       → perfect cancellation (identical streams)     → "-inf dBFS"
+ *   • finite number     → measured residual                            → "<value> dBFS"
+ *
+ * Pre-fix this branched on `Number.isFinite()` only, collapsing NaN
+ * (a real-failure signal) into the `-inf` label (a perfect-match signal).
+ */
+function formatResidualSuffix(residualRmsDb: number | null, error: string | undefined): string {
+  if (residualRmsDb === null && !error) return "";
+  if (error) return `, residualRMS: error (${error})`;
+  if (residualRmsDb === null || Number.isNaN(residualRmsDb)) {
+    return ", residualRMS: error (no parseable reading)";
+  }
+  if (!Number.isFinite(residualRmsDb)) return ", residualRMS: -inf dBFS";
+  return `, residualRMS: ${residualRmsDb.toFixed(2)} dBFS`;
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -184,13 +257,13 @@ function parseArgs(argv: string[]): CliOptions {
     }
   }
 
-  if (update && mode === "distributed-simulated") {
+  if (update && (mode === "distributed-simulated" || mode === "lambda-local")) {
     // The in-process renderer is the source of truth for golden baselines —
-    // distributed-simulated's job is to verify the contract against the
-    // same baseline, not to author its own. Surfacing this at parse time
-    // saves a multi-minute render before the user notices.
+    // the other two modes verify the contract against the same baseline,
+    // not author their own. Surfacing this at parse time saves a multi-
+    // minute render before the user notices.
     throw new Error(
-      "regression-harness: --update is incompatible with --mode=distributed-simulated. " +
+      `regression-harness: --update is incompatible with --mode=${mode}. ` +
         "Generate baselines with the in-process renderer (the default mode), then re-run " +
         "without --update to verify both modes match.",
     );
@@ -228,6 +301,12 @@ function validateMetadata(meta: unknown): TestMetadata {
   }
   if (typeof m.maxAudioLagWindows !== "number" || m.maxAudioLagWindows < 1) {
     throw new Error("meta.json: 'maxAudioLagWindows' must be >= 1");
+  }
+  if (
+    m.maxAudioResidualRmsDb !== undefined &&
+    (typeof m.maxAudioResidualRmsDb !== "number" || !Number.isFinite(m.maxAudioResidualRmsDb))
+  ) {
+    throw new Error("meta.json: 'maxAudioResidualRmsDb' must be a finite number when present");
   }
   if (!m.renderConfig || typeof m.renderConfig !== "object") {
     throw new Error("meta.json: 'renderConfig' must be an object");
@@ -671,16 +750,29 @@ function saveFailureDetails(
 
   // Save audio failures
   if (result.audio && !result.audio.passed) {
+    const residualRmsDb = result.audio.residualRmsDb;
+    const residualError = result.audio.residualError;
+    const residualThreshold = suite.meta.maxAudioResidualRmsDb;
+    const residualExceeds =
+      residualThreshold !== undefined &&
+      typeof residualRmsDb === "number" &&
+      Number.isFinite(residualRmsDb) &&
+      residualRmsDb > residualThreshold;
     const audioReport = {
       summary: {
         correlation: result.audio.correlation,
         lagWindows: result.audio.lagWindows,
         threshold: suite.meta.minAudioCorrelation,
         maxLagWindows: suite.meta.maxAudioLagWindows,
+        ...(residualRmsDb !== undefined ? { residualRmsDb } : {}),
+        ...(residualThreshold !== undefined ? { residualThreshold } : {}),
+        ...(residualError ? { residualError } : {}),
       },
       analysis: {
         correlationBelowThreshold: result.audio.correlation < suite.meta.minAudioCorrelation,
         lagExceedsLimit: Math.abs(result.audio.lagWindows) > suite.meta.maxAudioLagWindows,
+        residualExceedsThreshold: residualExceeds,
+        residualCheckFailed: residualError !== undefined,
       },
     };
 
@@ -826,13 +918,14 @@ async function runTestSuite(
     copyFixtureSupportFiles(suite, tempRoot);
     cpSync(suite.srcDir, tempSrcDir, { recursive: true });
 
-    if (options.mode === "distributed-simulated") {
+    if (options.mode === "distributed-simulated" || options.mode === "lambda-local") {
       const support = checkDistributedSupport(suite.meta.renderConfig);
       if (!support.supported) {
-        // Skipping is a clean outcome — the distributed pipeline can't
-        // run this fixture, but in-process mode already covers it. Mark
-        // passed so the suite summary doesn't trip CI; the `skipped`
-        // field is what distinguishes a real pass from a skip.
+        // Skipping is a clean outcome — the distributed pipeline (which
+        // both modes go through) can't run this fixture, but in-process
+        // mode already covers it. Mark passed so the suite summary
+        // doesn't trip CI; the `skipped` field is what distinguishes a
+        // real pass from a skip.
         console.log(
           JSON.stringify({
             event: "test_skipped",
@@ -849,21 +942,33 @@ async function runTestSuite(
       // `checkDistributedSupport` already narrowed fps to {24,30,60} and
       // rejected webm; the cast surfaces that guarantee to TS.
       const fpsNum = suite.meta.renderConfig.fps.num as 24 | 30 | 60;
-      // `runDistributedSimulatedRender`'s `format` parameter accepts the
-      // distributed-supported set; the harness type allows `"webm"` too
-      // but `checkDistributedSupport` rejected that above. Narrow the cast
-      // accordingly.
-      await runDistributedSimulatedRender({
+      const distributedInput = {
         projectDir: tempSrcDir,
         tempRoot,
         renderedOutputPath,
         fps: fpsNum,
+        // `runDistributedSimulatedRender` / `runLambdaLocalRender`'s
+        // `format` parameter accepts the distributed-supported set;
+        // the harness type allows `"webm"` too but
+        // `checkDistributedSupport` rejected that above. Narrow.
         format: outputFormat as "mp4" | "mov" | "png-sequence",
         codec: suite.meta.renderConfig.codec,
         chunkSize: suite.meta.renderConfig.chunkSize,
         maxParallelChunks: suite.meta.renderConfig.maxParallelChunks,
         variables: suite.meta.renderConfig.variables,
-      });
+      };
+      if (options.mode === "lambda-local") {
+        const runLambdaLocalRender = await loadLambdaLocalRender();
+        // The fixture's authored dimensions live in the composition's
+        // `data-width`/`data-height` attributes, not in `meta.json`'s
+        // renderConfig. Until the harness compiles the HTML up-front
+        // to surface them here, pass 1920×1080 — the same placeholder
+        // `runDistributedSimulatedRender` uses internally. The
+        // composition attrs override at plan time.
+        await runLambdaLocalRender({ ...distributedInput, width: 1920, height: 1080 });
+      } else {
+        await runDistributedSimulatedRender(distributedInput);
+      }
     } else {
       const job = createRenderJob({
         fps: suite.meta.renderConfig.fps,
@@ -1051,6 +1156,8 @@ async function runTestSuite(
     let audioPassed = true;
     let audioCorrelation = 1;
     let audioLagWindows = 0;
+    let audioResidualRmsDb: number | null = null;
+    let audioResidualError: string | undefined;
 
     if (!isPngSequence) {
       logPretty("Comparing audio quality...", "🔊");
@@ -1068,6 +1175,26 @@ async function runTestSuite(
         audioCorrelation = audio.correlation;
         audioLagWindows = audio.lagWindows;
         audioPassed = audio.correlation >= suite.meta.minAudioCorrelation;
+
+        // Sample-level residual-RMS check (complementary to the
+        // envelope-correlation gate above). Only runs when the fixture
+        // opts in via `maxAudioResidualRmsDb`; the correlation gate
+        // stays in place either way for legacy fixtures. Correlation
+        // measures shape similarity at envelope granularity; residual
+        // RMS measures sample-level cancellation — both surface
+        // different drift classes.
+        if (suite.meta.maxAudioResidualRmsDb !== undefined) {
+          const residual = computeAudioResidualRmsDb(
+            renderedOutputPath,
+            snapshotVideoPath,
+            suite.meta.maxAudioResidualRmsDb,
+          );
+          audioResidualRmsDb = residual.overallDb;
+          audioResidualError = residual.error;
+          if (!residual.ok) {
+            audioPassed = false;
+          }
+        }
       }
     }
 
@@ -1075,6 +1202,8 @@ async function runTestSuite(
       passed: audioPassed,
       correlation: audioCorrelation,
       lagWindows: audioLagWindows,
+      ...(audioResidualRmsDb !== null ? { residualRmsDb: audioResidualRmsDb } : {}),
+      ...(audioResidualError ? { residualError: audioResidualError } : {}),
     };
 
     console.log(
@@ -1084,17 +1213,20 @@ async function runTestSuite(
         passed: audioPassed,
         correlation: audioCorrelation,
         lagWindows: audioLagWindows,
+        residualRmsDb: audioResidualRmsDb,
+        residualError: audioResidualError,
       }),
     );
 
+    const residualSuffix = formatResidualSuffix(audioResidualRmsDb, audioResidualError);
     if (audioPassed) {
       logPretty(
-        `Audio quality: PASSED (correlation: ${audioCorrelation.toFixed(3)}, lag: ${audioLagWindows})`,
+        `Audio quality: PASSED (correlation: ${audioCorrelation.toFixed(3)}, lag: ${audioLagWindows}${residualSuffix})`,
         "✓",
       );
     } else {
       logPretty(
-        `Audio quality: FAILED (correlation: ${audioCorrelation.toFixed(3)}, threshold: ${suite.meta.minAudioCorrelation})`,
+        `Audio quality: FAILED (correlation: ${audioCorrelation.toFixed(3)}, threshold: ${suite.meta.minAudioCorrelation}${residualSuffix})`,
         "✗",
       );
     }

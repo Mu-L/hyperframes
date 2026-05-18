@@ -96,6 +96,26 @@
         "tab": "Catalog",
         "groups": [
           {
+            "group": "Captions",
+            "pages": [
+              "catalog/components/caption-clip-wipe",
+              "catalog/components/caption-editorial-emphasis",
+              "catalog/components/caption-emoji-pop",
+              "catalog/components/caption-glitch-rgb",
+              "catalog/components/caption-gradient-fill",
+              "catalog/components/caption-highlight",
+              "catalog/components/caption-kinetic-slam",
+              "catalog/components/caption-matrix-decode",
+              "catalog/components/caption-neon-accent",
+              "catalog/components/caption-neon-glow",
+              "catalog/components/caption-parallax-layers",
+              "catalog/components/caption-particle-burst",
+              "catalog/components/caption-pill-karaoke",
+              "catalog/components/caption-texture-lava",
+              "catalog/components/caption-weight-shift"
+            ]
+          },
+          {
             "group": "HTML-in-Canvas",
             "pages": [
               "catalog/blocks/vfx-iphone-device",
@@ -205,6 +225,13 @@
               "packages/producer",
               "packages/studio",
               "packages/cli"
+            ]
+          },
+          {
+            "group": "Deploy",
+            "pages": [
+              "deploy/aws-lambda",
+              "deploy/migrating-to-hyperframes-lambda"
             ]
           }
         ]

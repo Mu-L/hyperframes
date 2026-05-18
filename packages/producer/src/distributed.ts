@@ -1,9 +1,9 @@
 /**
  * `@hyperframes/producer/distributed` — the distributed render primitives.
  *
- * See `DISTRIBUTED-RENDERING-PLAN.md` for the full architecture. The three
- * activities (`plan` → `renderChunk` × N → `assemble`) are pure functions
- * over local file paths; networking + orchestration live in adapters.
+ * The three activities (`plan` → `renderChunk` × N → `assemble`) are pure
+ * functions over local file paths; networking + orchestration live in
+ * adapters.
  *
  * Adopters (AWS Lambda, Cloud Run Jobs, Temporal, K8s Jobs, plain SSH):
  *
@@ -45,6 +45,7 @@ export {
   DEFAULT_CHUNK_SIZE,
   DEFAULT_MAX_PARALLEL_CHUNKS,
   PLAN_DIR_SIZE_LIMIT_BYTES,
+  PLAN_PROJECT_DIR_SKIP_SEGMENTS,
   // Error codes + classes
   FORMAT_NOT_SUPPORTED_IN_DISTRIBUTED,
   FormatNotSupportedInDistributedError,

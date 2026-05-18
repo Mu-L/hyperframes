@@ -519,7 +519,8 @@ function main(): void {
   // Items with the same first tag are grouped together. Items without tags
   // go into an "Other" group. Groups are sorted with a priority order.
   const GROUP_ORDER: Record<string, number> = {
-    "HTML-in-Canvas": 0,
+    Captions: 0,
+    "HTML-in-Canvas": 1,
     "Social Overlays": 2,
     "Shader Transitions": 3,
     "CSS Transitions": 4,
@@ -534,7 +535,7 @@ function main(): void {
     // Two-tag combos for specific grouping
     if (tags.includes("transition") && tags.includes("shader")) return "Shader Transitions";
     if (tags.includes("transition") && tags.includes("showcase")) return "CSS Transitions";
-    // HTML-in-Canvas and Captions categories
+    if (tags.includes("captions")) return "Captions";
     if (tags.includes("html-in-canvas")) return "HTML-in-Canvas";
     // Single-tag mapping
     if (tags.includes("social")) return "Social Overlays";

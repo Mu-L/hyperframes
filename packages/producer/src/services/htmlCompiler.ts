@@ -20,10 +20,8 @@ import {
   shouldClampMediaDuration,
   type ResolvedDuration,
   type UnresolvedElement,
-  rewriteAssetPaths,
-  rewriteCssAssetUrls,
 } from "@hyperframes/core";
-import { scopeCssToComposition, wrapScopedCompositionScript } from "@hyperframes/core/compiler";
+import { inlineSubCompositions as inlineSubCompositionsShared } from "@hyperframes/core/compiler";
 import { extractMediaMetadata, extractAudioMetadata } from "../utils/ffprobe.js";
 import { isPathInside, toExternalAssetKey } from "../utils/paths.js";
 import {
@@ -38,6 +36,7 @@ import {
 import { downloadToTemp, isHttpUrl } from "../utils/urlDownloader.js";
 import type { Page } from "puppeteer-core";
 import { injectDeterministicFontFaces } from "./deterministicFonts.js";
+import { createStudioPositionSeekReapplyScript } from "@hyperframes/core/studio-api/manual-edits-render-script";
 
 export interface CompiledComposition {
   html: string;
@@ -542,13 +541,11 @@ function coalesceHeadStylesAndBodyScripts(html: string): string {
 }
 
 /**
- * Inline sub-composition HTML into the main document, mirroring what the
- * bundler's step 6 does.  For each host element with `data-composition-src`:
- *   - Resolve the composition HTML from the pre-compiled map or disk
- *   - Extract <template> (or <body>) content
- *   - Move composition <style> to <head>, <script> to end of <body>
- *   - Replace host innerHTML with composition children
- *   - Remove data-composition-src so the runtime skips async fetching
+ * Inline sub-composition HTML into the main document using the shared
+ * inlining logic from @hyperframes/core. This wrapper handles the
+ * producer-specific concerns: parsing HTML via linkedom, resolving
+ * compositions from the pre-compiled map or disk, and setting explicit
+ * pixel dimensions on host elements for headless rendering.
  */
 function inlineSubCompositions(
   html: string,
@@ -558,141 +555,33 @@ function inlineSubCompositions(
   const { document } = parseHTML(html);
   const head = document.querySelector("head");
   const body = document.querySelector("body");
-  const hosts = document.querySelectorAll("[data-composition-src]");
+  const hosts = Array.from(document.querySelectorAll("[data-composition-src]"));
 
   if (!hosts.length) return html;
 
-  const collectedStyles: string[] = [];
-  const collectedScripts: string[] = [];
-  const collectedExternalScriptSrcs: string[] = [];
+  const result = inlineSubCompositionsShared(
+    document as unknown as Document,
+    hosts as unknown as Element[],
+    {
+      resolveHtml: (srcPath: string) => {
+        let compHtml = subCompositions.get(srcPath) || null;
+        if (!compHtml) {
+          const filePath = resolve(projectDir, srcPath);
+          if (existsSync(filePath)) {
+            compHtml = readFileSync(filePath, "utf-8");
+          }
+        }
+        return compHtml;
+      },
+      parseHtml: (htmlStr: string) => parseHTML(htmlStr).document as unknown as Document,
+      scriptErrorLabel: "[Compiler] Composition script failed",
+    },
+  );
 
+  // Producer-specific: set explicit pixel dimensions on host elements so
+  // children using width/height: 100% resolve correctly. The runtime does
+  // this automatically but compiled HTML needs it inline.
   for (const host of hosts) {
-    const srcPath = host.getAttribute("data-composition-src");
-    if (!srcPath) continue;
-
-    let compHtml = subCompositions.get(srcPath) || null;
-    if (!compHtml) {
-      const filePath = resolve(projectDir, srcPath);
-      if (existsSync(filePath)) {
-        compHtml = readFileSync(filePath, "utf-8");
-      }
-    }
-    if (!compHtml) {
-      continue;
-    }
-
-    const compDoc = parseHTML(compHtml).document;
-    const compId = host.getAttribute("data-composition-id");
-
-    const templateEl = compDoc.querySelector("template");
-    const bodyEl = compDoc.querySelector("body");
-    const contentHtml = templateEl
-      ? templateEl.innerHTML || ""
-      : bodyEl
-        ? bodyEl.innerHTML || ""
-        : compDoc.toString();
-
-    const contentDoc = parseHTML(contentHtml).document;
-
-    const innerRoot = compId
-      ? contentDoc.querySelector(`[data-composition-id="${compId}"]`)
-      : contentDoc.querySelector("[data-composition-id]");
-    const inferredCompId = innerRoot?.getAttribute("data-composition-id")?.trim() || null;
-
-    // When a sub-composition is a full HTML document (no <template>), styles
-    // and scripts in <head> are not part of contentDoc (which only has body
-    // content). Extract them separately so backgrounds, positioning, fonts,
-    // and library scripts (e.g. GSAP CDN) are not silently dropped.
-    if (!templateEl) {
-      const compHead = compDoc.querySelector("head");
-      if (compHead) {
-        for (const styleEl of compHead.querySelectorAll("style")) {
-          const css = rewriteCssAssetUrls(styleEl.textContent || "", srcPath);
-          const scopeId = compId || inferredCompId;
-          if (scopeId && css.trim()) {
-            collectedStyles.push(scopeCssToComposition(css, scopeId));
-          } else {
-            collectedStyles.push(css);
-          }
-        }
-        for (const scriptEl of compHead.querySelectorAll("script")) {
-          const src = (scriptEl.getAttribute("src") || "").trim();
-          if (src && !collectedExternalScriptSrcs.includes(src)) {
-            collectedExternalScriptSrcs.push(src);
-          }
-        }
-      }
-    }
-
-    for (const styleEl of contentDoc.querySelectorAll("style")) {
-      const css = rewriteCssAssetUrls(styleEl.textContent || "", srcPath);
-      const scopeId = compId || inferredCompId;
-      if (scopeId && css.trim()) {
-        // Scope sub-composition styles to their composition ID to prevent
-        // CSS class collisions when multiple compositions use the same
-        // class names (e.g. ".content"). This matches preview behavior
-        // where each composition's styles are naturally scoped.
-        collectedStyles.push(scopeCssToComposition(css, scopeId));
-      } else {
-        collectedStyles.push(css);
-      }
-      styleEl.remove();
-    }
-
-    for (const scriptEl of contentDoc.querySelectorAll("script")) {
-      const src = (scriptEl.getAttribute("src") || "").trim();
-      if (src) {
-        // External CDN/remote script — collect for deduped injection into the
-        // parent document, mirroring the bundler's hoisting behavior.
-        if (!collectedExternalScriptSrcs.includes(src)) {
-          collectedExternalScriptSrcs.push(src);
-        }
-        scriptEl.remove();
-        continue;
-      }
-      const content = (scriptEl.textContent || "").trim();
-      if (content) {
-        const scriptMountCompId = compId || inferredCompId || "";
-        collectedScripts.push(
-          scriptMountCompId
-            ? wrapScopedCompositionScript(
-                content,
-                scriptMountCompId,
-                "[Compiler] Composition script failed",
-              )
-            : `(function(){ try { ${content} } catch (_err) { console.error("[Compiler] Composition script failed", _err); } })()`,
-        );
-      }
-      scriptEl.remove();
-    }
-
-    // Rewrite relative asset paths before inlining so ../foo.svg from
-    // compositions/ resolves correctly when the content moves to root.
-    const rewriteTarget = innerRoot || contentDoc;
-    rewriteAssetPaths(
-      rewriteTarget.querySelectorAll("[src], [href]"),
-      srcPath,
-      (el, attr) => (el.getAttribute(attr) || "").trim(),
-      (el, attr, val) => el.setAttribute(attr, val),
-    );
-
-    if (innerRoot) {
-      const innerW = innerRoot.getAttribute("data-width");
-      const innerH = innerRoot.getAttribute("data-height");
-      if (innerW && !host.getAttribute("data-width")) host.setAttribute("data-width", innerW);
-      if (innerH && !host.getAttribute("data-height")) host.setAttribute("data-height", innerH);
-      innerRoot.querySelectorAll("style, script").forEach((el) => el.remove());
-      host.innerHTML = compId ? innerRoot.innerHTML || "" : innerRoot.outerHTML || "";
-    } else {
-      contentDoc.querySelectorAll("style, script").forEach((el) => el.remove());
-      host.innerHTML = contentDoc.toString();
-    }
-
-    host.removeAttribute("data-composition-src");
-
-    // Set explicit pixel dimensions on the host element so children using
-    // width/height: 100% resolve correctly. The runtime does this
-    // automatically but compiled HTML needs it inline.
     const hostW = host.getAttribute("data-width");
     const hostH = host.getAttribute("data-height");
     if (hostW && hostH) {
@@ -711,22 +600,23 @@ function inlineSubCompositions(
     }
   }
 
-  if (collectedStyles.length && head) {
+  // Append collected styles to <head>
+  if (result.styles.length && head) {
     const styleEl = document.createElement("style");
-    styleEl.textContent = collectedStyles.join("\n\n");
+    styleEl.textContent = result.styles.join("\n\n");
     head.appendChild(styleEl);
   }
 
   // Inject external CDN scripts before inline scripts so plugins (e.g.
   // TextPlugin, ScrollTrigger) are registered before composition code runs.
   // Deduplicate against scripts already present in the document.
-  if (collectedExternalScriptSrcs.length && body) {
+  if (result.externalScriptSrcs.length && body) {
     const existingScriptSrcs = new Set(
-      Array.from(document.querySelectorAll("script[src]")).map((el) =>
+      Array.from(document.querySelectorAll("script[src]")).map((el: Element) =>
         (el.getAttribute("src") || "").trim(),
       ),
     );
-    for (const src of collectedExternalScriptSrcs) {
+    for (const src of result.externalScriptSrcs) {
       if (!existingScriptSrcs.has(src)) {
         const scriptEl = document.createElement("script");
         scriptEl.setAttribute("src", src);
@@ -736,9 +626,10 @@ function inlineSubCompositions(
     }
   }
 
-  if (collectedScripts.length && body) {
+  // Append collected inline scripts to <body>
+  if (result.scripts.length && body) {
     const scriptEl = document.createElement("script");
-    scriptEl.textContent = collectedScripts.join("\n;\n");
+    scriptEl.textContent = result.scripts.join("\n;\n");
     body.appendChild(scriptEl);
   }
 
@@ -993,7 +884,24 @@ export async function compileForRender(
   // Collect assets that resolve outside projectDir (e.g. ../shared-assets/hero.png).
   // These can't be served by the file server, so we map them to paths the
   // orchestrator will copy into the compiled output directory.
-  const { html, externalAssets } = collectExternalAssets(assembledHtml, projectDir);
+  const { html: htmlWithAssets, externalAssets } = collectExternalAssets(assembledHtml, projectDir);
+
+  // Inject studio position seek re-apply script when positions are baked into HTML.
+  // GSAP overwrites the `translate` CSS property on every frame seek; this script
+  // re-asserts the CSS custom property var() form after each seek so dragged
+  // positions survive frame-by-frame rendering without a JSON sidecar.
+  const HF_POSITION_ATTRS = [
+    'data-hf-studio-path-offset="true"',
+    'data-hf-studio-rotation="true"',
+    'data-hf-studio-motion="',
+  ];
+  const hasPositionEdits = HF_POSITION_ATTRS.some((attr) => htmlWithAssets.includes(attr));
+  const html = hasPositionEdits
+    ? htmlWithAssets.replace(
+        /<\/body>/i,
+        `<script>${createStudioPositionSeekReapplyScript()}</script></body>`,
+      )
+    : htmlWithAssets;
 
   // Parse main HTML elements
   const mainVideos = parseVideoElements(html);
@@ -1131,6 +1039,109 @@ export async function discoverMediaFromBrowser(page: Page): Promise<BrowserMedia
   });
 
   return elements as BrowserMediaElement[];
+}
+
+export interface VideoVisibilityWindow {
+  videoId: string;
+  visibleStart: number;
+  visibleEnd: number;
+}
+
+/**
+ * Seek the GSAP timeline to discover when each video's parent scene is visible.
+ * Only processes videos with the data-hf-auto-start sentinel (auto-injected timing).
+ */
+export async function discoverVideoVisibilityFromTimeline(
+  page: Page,
+  compositionDuration: number,
+): Promise<VideoVisibilityWindow[]> {
+  if (compositionDuration <= 0) return [];
+
+  return page.evaluate((duration: number) => {
+    const results: { videoId: string; visibleStart: number; visibleEnd: number }[] = [];
+    const videos = document.querySelectorAll("video[data-hf-auto-start]");
+    if (videos.length === 0) return results;
+
+    const timelines = (window as unknown as { __timelines?: Record<string, unknown> }).__timelines;
+    if (!timelines) return results;
+
+    const rootEl = document.querySelector("[data-composition-id]");
+    const compId = rootEl?.getAttribute("data-composition-id");
+    if (!compId) return results;
+
+    const tl = timelines[compId] as
+      | {
+          totalTime?: (t: number, suppressEvents?: boolean) => unknown;
+          seek?: (t: number, suppressEvents?: boolean) => unknown;
+        }
+      | undefined;
+    if (!tl) return results;
+
+    const seekTl = (t: number) => {
+      if (typeof tl.totalTime === "function") {
+        tl.totalTime(t, true);
+      } else if (typeof tl.seek === "function") {
+        tl.seek(t, true);
+      }
+    };
+
+    const SAMPLE_STEP = 0.1;
+    const BINARY_PRECISION = 1 / 60;
+
+    for (const videoEl of videos) {
+      const id = videoEl.id;
+      if (!id) continue;
+
+      const sceneEl = videoEl.closest(".scene") || videoEl;
+
+      let firstVisible: number | null = null;
+      let lastVisible: number | null = null;
+
+      for (let t = 0; t <= duration; t += SAMPLE_STEP) {
+        seekTl(t);
+        const opacity = parseFloat(window.getComputedStyle(sceneEl).opacity);
+        if (opacity > 0) {
+          if (firstVisible === null) firstVisible = t;
+          lastVisible = t;
+        }
+      }
+
+      if (firstVisible === null || lastVisible === null) continue;
+
+      // Binary search left boundary
+      let lo = Math.max(0, firstVisible - SAMPLE_STEP);
+      let hi = firstVisible;
+      while (hi - lo > BINARY_PRECISION) {
+        const mid = (lo + hi) / 2;
+        seekTl(mid);
+        const opacity = parseFloat(window.getComputedStyle(sceneEl).opacity);
+        if (opacity > 0) hi = mid;
+        else lo = mid;
+      }
+      const exactStart = hi;
+
+      // Binary search right boundary
+      lo = lastVisible;
+      hi = Math.min(duration, lastVisible + SAMPLE_STEP);
+      while (hi - lo > BINARY_PRECISION) {
+        const mid = (lo + hi) / 2;
+        seekTl(mid);
+        const opacity = parseFloat(window.getComputedStyle(sceneEl).opacity);
+        if (opacity > 0) lo = mid;
+        else hi = mid;
+      }
+      const exactEnd = lo;
+
+      results.push({
+        videoId: id,
+        visibleStart: Math.max(0, exactStart),
+        visibleEnd: Math.min(duration, exactEnd),
+      });
+    }
+
+    seekTl(0);
+    return results;
+  }, compositionDuration);
 }
 
 /**

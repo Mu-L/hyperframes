@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
-import type { LeftSidebarHandle } from "./components/sidebar/LeftSidebar";
+import type { LeftSidebarHandle, SidebarTab } from "./components/sidebar/LeftSidebar";
 import { useRenderQueue } from "./components/renders/useRenderQueue";
 import { usePlayerStore } from "./player";
 import { LintModal } from "./components/LintModal";
@@ -12,6 +12,7 @@ import { useManifestPersistence } from "./hooks/useManifestPersistence";
 import { useTimelineEditing } from "./hooks/useTimelineEditing";
 import { useDomEditSession } from "./hooks/useDomEditSession";
 import { useAppHotkeys } from "./hooks/useAppHotkeys";
+import { useClipboard } from "./hooks/useClipboard";
 import { readStudioUiPreferences, writeStudioUiPreferences } from "./utils/studioUiPreferences";
 import { useCaptionDetection } from "./hooks/useCaptionDetection";
 import { useRenderClipContent } from "./hooks/useRenderClipContent";
@@ -25,7 +26,7 @@ import {
   STUDIO_INSPECTOR_PANELS_ENABLED,
   STUDIO_MOTION_PANEL_ENABLED,
 } from "./components/editor/manualEditingAvailability";
-import { getStudioMotionForSelection } from "./components/editor/studioMotion";
+import { readStudioMotionFromElement } from "./components/editor/studioMotion";
 import type { DomEditSelection } from "./components/editor/domEditing";
 import { AskAgentModal } from "./components/AskAgentModal";
 import { StudioGlobalDragOverlay } from "./components/StudioGlobalDragOverlay";
@@ -144,6 +145,8 @@ export function StudioApp() {
     recordEdit: editHistory.recordEdit,
     previewIframeRef,
     activeCompPathRef,
+    domEditSaveTimestampRef,
+    reloadPreview: () => setRefreshKey((k) => k + 1),
   });
 
   const timelineEditing = useTimelineEditing({
@@ -160,15 +163,28 @@ export function StudioApp() {
 
   const clearDomSelectionRef = useRef<() => void>(() => {});
   const domEditSelectionBridgeRef = useRef<DomEditSelection | null>(null);
-  const handleDomEditElementDeleteRef = useRef<(selection: DomEditSelection) => Promise<void>>(
+  const handleDomEditElementDeleteRef = useRef<(s: DomEditSelection) => Promise<void>>(
     async () => {},
   );
-
+  const domEditDeleteBridge = async (s: DomEditSelection) =>
+    handleDomEditElementDeleteRef.current(s);
+  const { handleCopy, handlePaste, handleCut } = useClipboard({
+    projectId,
+    activeCompPath,
+    domEditSelectionRef: domEditSelectionBridgeRef,
+    showToast,
+    writeProjectFile: fileManager.writeProjectFile,
+    recordEdit: editHistory.recordEdit,
+    domEditSaveTimestampRef,
+    reloadPreview,
+    handleTimelineElementDelete: timelineEditing.handleTimelineElementDelete,
+    handleDomEditElementDelete: domEditDeleteBridge,
+    previewIframeRef,
+  });
   const appHotkeys = useAppHotkeys({
     toggleTimelineVisibility,
     handleTimelineElementDelete: timelineEditing.handleTimelineElementDelete,
-    handleDomEditElementDelete: async (s: DomEditSelection) =>
-      handleDomEditElementDeleteRef.current(s),
+    handleDomEditElementDelete: domEditDeleteBridge,
     domEditSelectionRef: domEditSelectionBridgeRef,
     clearDomSelectionRef,
     editHistory,
@@ -180,6 +196,9 @@ export function StudioApp() {
     syncHistoryPreviewAfterApply: manifestPersistence.syncHistoryPreviewAfterApply,
     waitForPendingDomEditSaves: manifestPersistence.waitForPendingDomEditSaves,
     leftSidebarRef,
+    handleCopy,
+    handlePaste,
+    handleCut,
   });
 
   const domEditSession = useDomEditSession({
@@ -197,13 +216,7 @@ export function StudioApp() {
     setRightPanelTab: panelLayout.setRightPanelTab,
     showToast,
     refreshPreviewDocumentVersion,
-    commitStudioManualEditManifestOptimistically:
-      manifestPersistence.commitStudioManualEditManifestOptimistically,
-    commitStudioMotionManifestOptimistically:
-      manifestPersistence.commitStudioMotionManifestOptimistically,
-    applyCurrentStudioManualEditsToPreview:
-      manifestPersistence.applyCurrentStudioManualEditsToPreview,
-    applyCurrentStudioMotionToPreview: manifestPersistence.applyCurrentStudioMotionToPreview,
+    queueDomEditSave: manifestPersistence.queueDomEditSave,
     readProjectFile: fileManager.readProjectFile,
     writeProjectFile: fileManager.writeProjectFile,
     domEditSaveTimestampRef,
@@ -216,10 +229,11 @@ export function StudioApp() {
     refreshKey,
     rightPanelTab: panelLayout.rightPanelTab,
     applyStudioManualEditsToPreviewRef: manifestPersistence.applyStudioManualEditsToPreviewRef,
-    applyStudioMotionToPreviewRef: manifestPersistence.applyStudioMotionToPreviewRef,
     syncPreviewHistoryHotkey: appHotkeys.syncPreviewHistoryHotkey,
     reloadPreview,
     setRefreshKey,
+    openSourceForSelection: fileManager.openSourceForSelection,
+    selectSidebarTab: (tab: SidebarTab) => leftSidebarRef.current?.selectTab(tab),
   });
 
   domEditSelectionBridgeRef.current = domEditSession.domEditSelection;
@@ -293,10 +307,7 @@ export function StudioApp() {
 
   const selectedStudioMotion =
     STUDIO_INSPECTOR_PANELS_ENABLED && domEditSession.domEditSelection
-      ? getStudioMotionForSelection(
-          manifestPersistence.studioMotionManifestRef.current,
-          domEditSession.domEditSelection,
-        )
+      ? readStudioMotionFromElement(domEditSession.domEditSelection.element)
       : null;
   const layersPanelActive =
     STUDIO_INSPECTOR_PANELS_ENABLED && panelLayout.rightPanelTab === "layers";

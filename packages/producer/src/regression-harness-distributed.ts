@@ -18,11 +18,11 @@
  * pass the same quality bar the in-process renderer passes against the
  * same frozen baseline. A separate {@link DISTRIBUTED_SIMULATED_MIN_PSNR_DB}
  * pathology floor catches the case where a fixture authored a permissive
- * threshold and distributed regresses to fully-black output. The §5.1
- * 50 dB target was written for per-render comparison (fresh in-process vs
- * fresh distributed); against the frozen baseline file it's unreachable
- * for either mode due to shared encoder/JPEG-capture jitter, so the
- * harness can't use it as a per-test gate.
+ * threshold and distributed regresses to fully-black output. The 50 dB
+ * "distributed vs in-process" contract is a per-render comparison
+ * (fresh in-process vs fresh distributed); against the frozen baseline
+ * file it's unreachable for either mode due to shared encoder/JPEG-
+ * capture jitter, so the harness can't use it as a per-test gate.
  *
  * Not every fixture can run in distributed-simulated mode. Distributed mode
  * refuses webm, HDR mp4, NTSC framerates, and non-{24,30,60} fps at plan
@@ -36,16 +36,29 @@ import { join } from "node:path";
 import type { Fps } from "@hyperframes/core";
 import { assemble, plan, renderChunk } from "./distributed.js";
 
-/** Two-mode contract that backs `--mode=<value>` on the regression harness CLI. */
-export type HarnessMode = "in-process" | "distributed-simulated";
+/**
+ * Three-mode contract that backs `--mode=<value>` on the regression
+ * harness CLI:
+ *
+ *   - `in-process` — `executeRenderJob`, the same path the CLI takes.
+ *   - `distributed-simulated` — `plan` → `renderChunk` × N → `assemble`
+ *     in-process. No adapter (no Temporal, no Lambda).
+ *   - `lambda-local` — drives the OSS `@hyperframes/aws-lambda` handler
+ *     dispatch through a filesystem-backed fake S3, so every event
+ *     shape SFN sends in production also lands here. Catches regressions
+ *     in event JSON / S3 path conventions without paying for a real AWS
+ *     round-trip.
+ */
+export type HarnessMode = "in-process" | "distributed-simulated" | "lambda-local";
 
 /**
  * Absolute pathology floor for `--mode=distributed-simulated` — catches
  * a chunk that renders fully-black against a fixture authored with a
  * permissive `minPsnr`. Non-pathological drift is caught by the fixture's
  * own threshold; both modes share the same encoder/JPEG-capture jitter
- * floor against the frozen baseline file, so the §5.1 50 dB target is
- * unreachable for either mode and isn't a useful per-test gate.
+ * floor against the frozen baseline file, so the 50 dB distributed-vs-
+ * in-process contract value is unreachable for either mode and isn't a
+ * useful per-test gate.
  */
 export const DISTRIBUTED_SIMULATED_MIN_PSNR_DB = 10;
 
@@ -206,6 +219,8 @@ export async function runDistributedSimulatedRender(
  */
 export function resolveMinPsnrForMode(mode: HarnessMode, fixtureMinPsnr: number): number {
   if (mode === "in-process") return fixtureMinPsnr;
+  // `lambda-local` shares the distributed-simulated pathology floor —
+  // both modes go through the same plan/renderChunk/assemble primitives.
   return Math.max(fixtureMinPsnr, DISTRIBUTED_SIMULATED_MIN_PSNR_DB);
 }
 
@@ -219,10 +234,11 @@ export function resolveMinPsnrForMode(mode: HarnessMode, fixtureMinPsnr: number)
 export function parseHarnessModeFlag(token: string): HarnessMode | null {
   if (token === "--mode=in-process") return "in-process";
   if (token === "--mode=distributed-simulated") return "distributed-simulated";
+  if (token === "--mode=lambda-local") return "lambda-local";
   if (token.startsWith("--mode=")) {
     const value = token.slice("--mode=".length);
     throw new Error(
-      `regression-harness: --mode must be 'in-process' or 'distributed-simulated' (got ${JSON.stringify(value)})`,
+      `regression-harness: --mode must be 'in-process', 'distributed-simulated', or 'lambda-local' (got ${JSON.stringify(value)})`,
     );
   }
   return null;

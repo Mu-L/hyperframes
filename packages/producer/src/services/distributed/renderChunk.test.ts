@@ -21,6 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { HOST_CHROME_FAILURE_PATTERNS } from "./__test_utils__/hostChromeFailures.js";
 import { plan } from "./plan.js";
 import {
   CHUNK_INDEX_OUT_OF_RANGE,
@@ -168,23 +169,7 @@ describe("renderChunk()", () => {
         a = await renderChunk(planDir, 0, outA);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        // Soft-skip patterns we've observed on dev/CI hosts where Chrome's
-        // GL stack can't initialize:
-        //   - `BROWSER_GPU_NOT_SOFTWARE` / `chrome://gpu` / SwiftShader text:
-        //     the SwiftShader assertion can't read the gpu info table.
-        //   - `Target closed` during a `HeadlessExperimental.beginFrame`:
-        //     chrome-headless-shell's GL process exited because the build
-        //     doesn't honor `--use-gl=swiftshader` on this distro
-        //     (`gl_factory.cc:111` errors out before BeginFrame can run).
-        // Production-shaped Docker images (`Dockerfile.test` /
-        // `Dockerfile.chunk-runner`) carry a chrome-headless-shell build
-        // matched to the planDir's `ffmpegVersion`, so the determinism
-        // contract is exercised there.
-        if (
-          /chrome:\/\/gpu|BROWSER_GPU_NOT_SOFTWARE|SwiftShader|HeadlessExperimental\.beginFrame|Target closed/i.test(
-            message,
-          )
-        ) {
+        if (HOST_CHROME_FAILURE_PATTERNS.test(message)) {
           console.warn(
             "[renderChunk.test] skipping byte-identical retry test — host Chrome stack can't render. ",
             "Docker harness covers the determinism contract. Diagnostic:",

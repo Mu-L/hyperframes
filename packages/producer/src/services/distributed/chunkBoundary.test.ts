@@ -25,12 +25,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync }
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { HOST_CHROME_FAILURE_PATTERNS } from "./__test_utils__/hostChromeFailures.js";
 import { assemble } from "./assemble.js";
 import { plan } from "./plan.js";
 import { renderChunk } from "./renderChunk.js";
-
-const HOST_CHROME_FAILURE_PATTERNS =
-  /chrome:\/\/gpu|BROWSER_GPU_NOT_SOFTWARE|SwiftShader|HeadlessExperimental\.beginFrame|Target closed/i;
 
 // Per-adapter fixture directories under `packages/producer/tests/distributed/`.
 // Each must hold `src/index.html`; this test owns the planning + render +

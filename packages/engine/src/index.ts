@@ -49,6 +49,7 @@ export { resolveConfig, DEFAULT_CONFIG, type EngineConfig } from "./config.js";
 export {
   acquireBrowser,
   releaseBrowser,
+  drainBrowserPool,
   resolveHeadlessShellPath,
   resolveBrowserGpuMode,
   buildChromeArgs,
@@ -163,6 +164,8 @@ export {
   SwiftShaderAssertionError,
   BROWSER_GPU_NOT_SOFTWARE,
 } from "./utils/assertSwiftShader.js";
+
+export { readWebGlVendorInfoFromCanvas } from "./utils/readWebGlVendorInfoFromCanvas.js";
 
 export {
   extractMediaMetadata,

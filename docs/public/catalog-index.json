@@ -42,6 +42,227 @@
     "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/blue-sweater-intro-video.png"
   },
   {
+    "name": "caption-clip-wipe",
+    "type": "component",
+    "title": "Clip Wipe",
+    "description": "Left-to-right clip-path wipe reveal per word",
+    "tags": [
+      "captions",
+      "caption-style",
+      "wipe",
+      "clip-path",
+      "reveal"
+    ],
+    "href": "/catalog/components/caption-clip-wipe",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-clip-wipe.png"
+  },
+  {
+    "name": "caption-editorial-emphasis",
+    "type": "component",
+    "title": "Editorial Emphasis",
+    "description": "Dual-font system with dramatic size contrast for emphasis words",
+    "tags": [
+      "captions",
+      "caption-style",
+      "editorial",
+      "typography",
+      "emphasis"
+    ],
+    "href": "/catalog/components/caption-editorial-emphasis",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-editorial-emphasis.png"
+  },
+  {
+    "name": "caption-emoji-pop",
+    "type": "component",
+    "title": "Emoji Pop",
+    "description": "Emoji integration with stroked text and horizontal squeeze entrance",
+    "tags": [
+      "captions",
+      "caption-style",
+      "emoji",
+      "social"
+    ],
+    "href": "/catalog/components/caption-emoji-pop",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-emoji-pop.png"
+  },
+  {
+    "name": "caption-glitch-rgb",
+    "type": "component",
+    "title": "Glitch RGB",
+    "description": "RGB chromatic aberration with CRT scanline overlay",
+    "tags": [
+      "captions",
+      "caption-style",
+      "glitch",
+      "cyber",
+      "tech"
+    ],
+    "href": "/catalog/components/caption-glitch-rgb",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-glitch-rgb.png"
+  },
+  {
+    "name": "caption-gradient-fill",
+    "type": "component",
+    "title": "Gradient Fill",
+    "description": "Gradient-clipped text with elastic bounce entrance",
+    "tags": [
+      "captions",
+      "caption-style",
+      "gradient",
+      "colorful"
+    ],
+    "href": "/catalog/components/caption-gradient-fill",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-gradient-fill.png"
+  },
+  {
+    "name": "caption-highlight",
+    "type": "component",
+    "title": "Highlight",
+    "description": "Red background sweep behind each active word, TikTok-style",
+    "tags": [
+      "captions",
+      "caption-style",
+      "highlight",
+      "social",
+      "tiktok"
+    ],
+    "href": "/catalog/components/caption-highlight",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-highlight.png"
+  },
+  {
+    "name": "caption-kinetic-slam",
+    "type": "component",
+    "title": "Kinetic Slam",
+    "description": "Full-screen single-word display with alternating entrance directions",
+    "tags": [
+      "captions",
+      "caption-style",
+      "kinetic",
+      "typography",
+      "slam"
+    ],
+    "href": "/catalog/components/caption-kinetic-slam",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-kinetic-slam.png"
+  },
+  {
+    "name": "caption-matrix-decode",
+    "type": "component",
+    "title": "Matrix Decode",
+    "description": "Character scramble animation before text reveal",
+    "tags": [
+      "captions",
+      "caption-style",
+      "matrix",
+      "scramble",
+      "decode"
+    ],
+    "href": "/catalog/components/caption-matrix-decode",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-matrix-decode.png"
+  },
+  {
+    "name": "caption-neon-accent",
+    "type": "component",
+    "title": "Neon Accent",
+    "description": "Multi-color neon glow accents with wiggle drift animation",
+    "tags": [
+      "captions",
+      "caption-style",
+      "neon",
+      "glow",
+      "accent"
+    ],
+    "href": "/catalog/components/caption-neon-accent",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-neon-accent.png"
+  },
+  {
+    "name": "caption-neon-glow",
+    "type": "component",
+    "title": "Neon Glow",
+    "description": "Cyan and magenta neon glow with keyword accent colors",
+    "tags": [
+      "captions",
+      "caption-style",
+      "neon",
+      "glow",
+      "gaming"
+    ],
+    "href": "/catalog/components/caption-neon-glow",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-neon-glow.png"
+  },
+  {
+    "name": "caption-parallax-layers",
+    "type": "component",
+    "title": "Parallax Layers",
+    "description": "Behind-subject 3D text layering with vertical stretch effect",
+    "tags": [
+      "captions",
+      "caption-style",
+      "parallax",
+      "3d",
+      "depth"
+    ],
+    "href": "/catalog/components/caption-parallax-layers",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-parallax-layers.png"
+  },
+  {
+    "name": "caption-particle-burst",
+    "type": "component",
+    "title": "Particle Burst",
+    "description": "Keyword words trigger colored particle explosions",
+    "tags": [
+      "captions",
+      "caption-style",
+      "particles",
+      "burst",
+      "effects"
+    ],
+    "href": "/catalog/components/caption-particle-burst",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-particle-burst.png"
+  },
+  {
+    "name": "caption-pill-karaoke",
+    "type": "component",
+    "title": "Pill Karaoke",
+    "description": "Pill-shaped container with per-word karaoke color highlight",
+    "tags": [
+      "captions",
+      "caption-style",
+      "karaoke",
+      "pill"
+    ],
+    "href": "/catalog/components/caption-pill-karaoke",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-pill-karaoke.png"
+  },
+  {
+    "name": "caption-texture-lava",
+    "type": "component",
+    "title": "Texture Lava",
+    "description": "Flowing lava texture mask over large uppercase text",
+    "tags": [
+      "captions",
+      "caption-style",
+      "texture",
+      "lava",
+      "mask"
+    ],
+    "href": "/catalog/components/caption-texture-lava",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-texture-lava.png"
+  },
+  {
+    "name": "caption-weight-shift",
+    "type": "component",
+    "title": "Weight Shift",
+    "description": "Elegant font-weight transition between caption lines",
+    "tags": [
+      "captions",
+      "caption-style",
+      "minimal",
+      "typography"
+    ],
+    "href": "/catalog/components/caption-weight-shift",
+    "preview": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-weight-shift.png"
+  },
+  {
     "name": "chromatic-radial-split",
     "type": "block",
     "title": "Chromatic Radial Split",

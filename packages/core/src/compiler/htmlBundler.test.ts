@@ -381,6 +381,221 @@ describe("bundleToSingleHtml", () => {
     expect(bundled).toContain("__hfNormalizeSelector");
   });
 
+  it("keeps an authored inner root wrapper for root id and class selectors", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><head></head><body>
+  <div id="root" data-composition-id="main" data-width="1920" data-height="1080">
+    <div
+      id="scene-host"
+      data-composition-id="scene"
+      data-composition-src="compositions/scene.html"
+      data-start="0"
+      data-duration="5"></div>
+  </div>
+  <script>window.__timelines={};</script>
+</body></html>`,
+      "compositions/scene.html": `<template id="scene-template">
+  <div id="scene-root" class="scene-root" data-composition-id="scene" data-width="1920" data-height="1080">
+    <style>
+      .scene-root .title { opacity: 0; }
+      #scene-root { font-family: Inter, sans-serif; }
+    </style>
+    <h1 class="title">Scene</h1>
+  </div>
+</template>`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+    const { document } = parseHTML(bundled);
+    const host = document.querySelector("#scene-host");
+    const authoredRoot = host?.querySelector('[data-hf-authored-id="scene-root"]');
+
+    expect(host).toBeTruthy();
+    expect(authoredRoot).toBeTruthy();
+    expect(authoredRoot?.id).toBe("");
+    expect(authoredRoot?.getAttribute("data-composition-id")).toBeNull();
+    expect(authoredRoot?.getAttribute("data-hf-inner-root")).toBe("true");
+    expect(authoredRoot?.getAttribute("data-hf-authored-id")).toBe("scene-root");
+    expect(bundled).toContain('[data-composition-id="scene"] .scene-root .title');
+    expect(bundled).toContain('[data-composition-id="scene"] [data-hf-authored-id="scene-root"]');
+  });
+
+  it("does not keep duplicate authored root ids when the same external composition mounts twice", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><head></head><body>
+  <div id="root" data-composition-id="main" data-width="1920" data-height="1080">
+    <div
+      id="scene-host-a"
+      data-composition-id="scene"
+      data-composition-src="compositions/scene.html"
+      data-start="0"
+      data-duration="5"></div>
+    <div
+      id="scene-host-b"
+      data-composition-id="scene"
+      data-composition-src="compositions/scene.html"
+      data-start="5"
+      data-duration="5"></div>
+  </div>
+  <script>window.__timelines={};</script>
+</body></html>`,
+      "compositions/scene.html": `<template id="scene-template">
+  <div id="scene-root" class="scene-root" data-composition-id="scene" data-width="1920" data-height="1080">
+    <h1 class="title">Scene</h1>
+  </div>
+</template>`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+    const { document } = parseHTML(bundled);
+    const authoredRoots = document.querySelectorAll('[data-hf-authored-id="scene-root"]');
+
+    expect(authoredRoots).toHaveLength(2);
+    expect(document.querySelectorAll("#scene-root")).toHaveLength(0);
+    expect(Array.from(authoredRoots).every((root) => !root.getAttribute("id"))).toBe(true);
+  });
+
+  it("mounts duplicate inline-template hosts instead of only the first one", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><head></head><body>
+  <div id="root" data-composition-id="main" data-width="1920" data-height="1080">
+    <div id="scene-host-a" data-composition-id="scene"></div>
+    <div id="scene-host-b" data-composition-id="scene"></div>
+  </div>
+  <template id="scene-template">
+    <div id="scene-root" data-composition-id="scene" data-width="1920" data-height="1080">
+      <h1 class="title">Scene</h1>
+    </div>
+  </template>
+  <script>window.__timelines={};</script>
+</body></html>`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+    const { document } = parseHTML(bundled);
+    const hostA = document.querySelector("#scene-host-a");
+    const hostB = document.querySelector("#scene-host-b");
+
+    expect(hostA?.querySelector(".title")?.textContent).toBe("Scene");
+    expect(hostB?.querySelector(".title")?.textContent).toBe("Scene");
+    expect(hostA?.getAttribute("data-composition-id")).toBe("scene__hf1");
+    expect(hostB?.getAttribute("data-composition-id")).toBe("scene__hf2");
+    expect(hostA?.getAttribute("data-hf-original-composition-id")).toBe("scene");
+    expect(hostB?.getAttribute("data-hf-original-composition-id")).toBe("scene");
+  });
+
+  it("emits scoped style and script chunks for each duplicate inline-template host", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><head></head><body>
+  <div id="root" data-composition-id="main" data-width="1920" data-height="1080">
+    <div id="scene-host-a" data-composition-id="scene"></div>
+    <div id="scene-host-b" data-composition-id="scene"></div>
+  </div>
+  <template id="scene-template">
+    <div id="scene-root" data-composition-id="scene" data-width="1920" data-height="1080">
+      <style>.title { opacity: 0; }</style>
+      <h1 class="title">Scene</h1>
+      <script>
+        window.__timelines = window.__timelines || {};
+        window.__timelines.scene = { marker: "scene" };
+      </script>
+    </div>
+  </template>
+  <script>window.__timelines={};</script>
+</body></html>`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain('[data-composition-id="scene__hf1"] .title');
+    expect(bundled).toContain('[data-composition-id="scene__hf2"] .title');
+    expect(bundled).toContain('var __hfTimelineCompId = "scene__hf1"');
+    expect(bundled).toContain('var __hfTimelineCompId = "scene__hf2"');
+  });
+
+  it("uniquifies duplicate sub-compositions across inline-template and external hosts", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><head></head><body>
+  <div id="root" data-composition-id="main" data-width="1920" data-height="1080">
+    <div id="scene-host-inline" data-composition-id="scene"></div>
+    <div
+      id="scene-host-external"
+      data-composition-id="scene"
+      data-composition-src="compositions/scene.html"></div>
+  </div>
+  <template id="scene-template">
+    <div data-composition-id="scene" data-width="1920" data-height="1080">
+      <p>Inline scene</p>
+    </div>
+  </template>
+  <script>window.__timelines={};</script>
+</body></html>`,
+      "compositions/scene.html": `<template id="scene-template">
+  <div data-composition-id="scene" data-width="1920" data-height="1080">
+    <p>External scene</p>
+  </div>
+</template>`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+    const { document } = parseHTML(bundled);
+    const inlineHost = document.querySelector("#scene-host-inline");
+    const externalHost = document.querySelector("#scene-host-external");
+
+    expect(inlineHost?.getAttribute("data-composition-id")).toBe("scene__hf1");
+    expect(externalHost?.getAttribute("data-composition-id")).toBe("scene__hf2");
+    expect(inlineHost?.getAttribute("data-hf-original-composition-id")).toBe("scene");
+    expect(externalHost?.getAttribute("data-hf-original-composition-id")).toBe("scene");
+    expect(inlineHost?.querySelector("p")?.textContent).toBe("Inline scene");
+    expect(externalHost?.querySelector("p")?.textContent).toBe("External scene");
+  });
+
+  it("emits per-instance scoped variables for bundled sub-compositions", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><head></head><body>
+  <div id="root" data-composition-id="main" data-width="1920" data-height="1080">
+    <div
+      id="card-a"
+      data-composition-id="card"
+      data-composition-src="compositions/card.html"
+      data-variable-values='{"title":"Pro"}'></div>
+    <div
+      id="card-b"
+      data-composition-id="card"
+      data-composition-src="compositions/card.html"
+      data-variable-values='{"title":"Enterprise"}'></div>
+  </div>
+  <script>window.__timelines={};</script>
+</body></html>`,
+      "compositions/card.html": `<!doctype html>
+<html data-composition-variables='[
+  {"id":"title","type":"string","label":"Title","default":"Default Title"},
+  {"id":"theme","type":"string","label":"Theme","default":"light"}
+]'>
+  <body>
+    <div id="card-root" data-composition-id="card" data-width="1920" data-height="1080">
+      <script>
+        window.__timelines = window.__timelines || {};
+        window.__timelines[document.currentScript?.dataset.slot || "missing"] = __hyperframes.getVariables();
+      </script>
+    </div>
+  </body>
+</html>`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("window.__hfVariablesByComp");
+    expect(bundled).toMatch(/card__hf1[\s\S]*Pro[\s\S]*light/);
+    expect(bundled).toMatch(/card__hf2[\s\S]*Enterprise[\s\S]*light/);
+  });
+
   it("scopes external sub-composition styles and classic scripts", async () => {
     const dir = makeTempProject({
       "index.html": `<!doctype html>
@@ -509,5 +724,219 @@ describe("bundleToSingleHtml", () => {
 
     expect(bundled).toContain('url("fonts/brand.woff2")');
     expect(bundled).not.toContain('url("../fonts/brand.woff2")');
+  });
+
+  it("resolves CSS @import statements when inlining stylesheets", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="styles/canvas.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "styles/canvas.css": `@import url('./tokens.css');\nbody { margin: 0; }`,
+      "styles/tokens.css": `:root { --brand: #ff5728; }`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("--brand: #ff5728");
+    expect(bundled).not.toContain("@import");
+    expect(bundled).toContain("margin: 0");
+  });
+
+  it("resolves nested CSS @import chains", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="styles/main.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "styles/main.css": `@import url('./base.css');\n.main { color: red; }`,
+      "styles/base.css": `@import url('../tokens.css');\n.base { display: flex; }`,
+      "tokens.css": `:root { --tk-teal: #1a3540; }`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("--tk-teal: #1a3540");
+    expect(bundled).toContain("display: flex");
+    expect(bundled).toContain("color: red");
+    expect(bundled).not.toContain("@import");
+  });
+
+  it("wraps @import with media query in @media block", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="print.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "print.css": `@import url('./print-tokens.css') print;\nbody { font-size: 12pt; }`,
+      "print-tokens.css": `.print-only { display: block; }`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("@media print");
+    expect(bundled).toContain("display: block");
+    expect(bundled).not.toContain("@import");
+  });
+
+  it("preserves @import for absolute URLs", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="app.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "app.css": `@import url('https://fonts.googleapis.com/css2?family=Inter');\nbody { margin: 0; }`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("@import url('https://fonts.googleapis.com/css2?family=Inter')");
+    expect(bundled).toContain("margin: 0");
+  });
+
+  it("rebases url() paths in @import-resolved CSS to project root", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="styles/canvas.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "styles/canvas.css": `@import url('./tokens.css');\nbody { margin: 0; }`,
+      "styles/tokens.css": `@font-face { src: url('assets/fonts/brand.woff2') format('woff2'); }`,
+      "styles/assets/fonts/brand.woff2": "fake-font-data",
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("url('styles/assets/fonts/brand.woff2')");
+    expect(bundled).not.toContain("url('assets/fonts/brand.woff2')");
+    expect(bundled).not.toContain("@import");
+  });
+
+  it("rebases url() paths in <link>-inlined CSS from subdirectories", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="theme/styles.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "theme/styles.css": `.bg { background: url('./images/grain.png'); }`,
+      "theme/images/grain.png": "fake-image-data",
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("url('theme/images/grain.png')");
+    expect(bundled).not.toContain("url('./images/grain.png')");
+  });
+
+  it("rebases url() paths with ../ traversal in nested @import", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="styles/main.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "styles/main.css": `@import url('./base/reset.css');`,
+      "styles/base/reset.css": `body { background: url('../../assets/bg.png'); }`,
+      "assets/bg.png": "fake-image",
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("url('assets/bg.png')");
+    expect(bundled).not.toContain("url('../../assets/bg.png')");
+  });
+
+  it("preserves absolute and data url() references during rebasing", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="styles/app.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "styles/app.css": [
+        `@font-face { src: url('https://cdn.example.com/font.woff2'); }`,
+        `.icon { background: url('data:image/svg+xml,<svg/>'); }`,
+        `.local { background: url('./img/bg.png'); }`,
+      ].join("\n"),
+      "styles/img/bg.png": "fake",
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("url('https://cdn.example.com/font.woff2')");
+    expect(bundled).toContain("url('data:image/svg+xml,<svg/>')");
+    expect(bundled).toContain("url('styles/img/bg.png')");
+  });
+
+  it("preserves url() query strings and hash fragments during rebasing", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="styles/icons.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "styles/icons.css": `.icon { background: url('./sprite.png?v=2#section'); }`,
+      "styles/sprite.png": "fake-sprite",
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("url('styles/sprite.png?v=2#section')");
+  });
+
+  it("deduplicates diamond @import (same file imported by two parents)", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="styles/main.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "styles/main.css": `@import url('./a.css');\n@import url('./b.css');`,
+      "styles/a.css": `@import url('./shared.css');\n.a { color: red; }`,
+      "styles/b.css": `@import url('./shared.css');\n.b { color: blue; }`,
+      "styles/shared.css": `:root { --shared: 1; }`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    const sharedCount = (bundled.match(/--shared: 1/g) || []).length;
+    expect(sharedCount).toBe(1);
+    expect(bundled).toContain(".a { color: red; }");
+    expect(bundled).toContain(".b { color: blue; }");
+    expect(bundled).not.toContain("@import");
+  });
+
+  it("does not resolve @import inside CSS comments", async () => {
+    const dir = makeTempProject({
+      "index.html": `<!doctype html>
+<html><body>
+  <link rel="stylesheet" href="app.css">
+  <div data-composition-id="root" data-width="320" data-height="180"></div>
+  <script>window.__timelines = window.__timelines || {}; window.__timelines.root = {}</script>
+</body></html>`,
+      "app.css": `/* @import url('./old.css'); */\nbody { margin: 0; }`,
+      "old.css": `.old { display: none; }`,
+    });
+
+    const bundled = await bundleToSingleHtml(dir);
+
+    expect(bundled).toContain("/* @import url('./old.css'); */");
+    expect(bundled).not.toContain(".old { display: none; }");
   });
 });
