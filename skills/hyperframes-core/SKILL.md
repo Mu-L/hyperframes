@@ -77,6 +77,22 @@ Two root forms; they are **not** interchangeable.
 
 See `references/sub-compositions.md` for the sub-composition file shape and host wiring.
 
+## Choosing an Animation Runtime
+
+HyperFrames seeks 7 animation runtimes natively via its frame-adapter pattern (`packages/core/src/runtime/adapters/`). They are **substitutable siblings** — pick by your library or task. Many compositions combine two (e.g., GSAP timeline + Lottie sub-clip).
+
+| Use case                                      | Skill                        | Trigger surface                       |
+| --------------------------------------------- | ---------------------------- | ------------------------------------- |
+| Tweens / timelines / general motion (default) | `hyperframes-gsap`           | `gsap.to()`, `window.__timelines`     |
+| After Effects exports (`.json` / `.lottie`)   | `hyperframes-lottie`         | `lottie-web`, `window.__hfLottie`     |
+| 3D scenes, WebGL, `AnimationMixer`            | `hyperframes-three`          | `THREE.*`, `hf-seek` event            |
+| GPU compute / WGSL shaders                    | `hyperframes-typegpu`        | `navigator.gpu`, WGSL, `hf-seek`      |
+| Native browser keyframes                      | `hyperframes-waapi`          | `element.animate()`, `KeyframeEffect` |
+| CSS-only motion (no JS)                       | `hyperframes-css-animations` | `@keyframes`, `animation-play-state`  |
+| Anime.js library                              | `hyperframes-animejs`        | `anime` / `animate()`, `__hfAnime`    |
+
+Each runtime exposes its own contract for HyperFrames to seek it deterministically. The **Timeline Contract** below is the GSAP path (default and most common). For other runtimes, the equivalent contract lives in that runtime's skill.
+
 ## Timeline Contract
 
 Every composition registers exactly one GSAP timeline.
