@@ -18,6 +18,22 @@ npx hyperframes init my-video --non-interactive --example blank  # CI/agents —
 
 Templates: `blank`, `warm-grain`, `play-mode`, `swiss-grid`, `vignelli`, `decision-tree`, `kinetic-type`, `product-promo`, `nyt-graph`.
 
+### Scaffold layout
+
+`init` produces a project that looks like:
+
+```
+my-video/
+├── index.html              # root composition
+├── compositions/           # sub-compositions referenced via data-composition-src
+├── assets/                 # ← served static files (fonts, images, audio, video)
+├── snapshots/              # snapshot PNGs land here
+├── package.json
+└── node_modules/.bin/hyperframes
+```
+
+**`assets/` is the served static-file directory.** Drop fonts, images, audio, and video here and reference them with **relative** paths from compositions (`<img src="assets/logo.png">`, `@font-face { src: url("assets/fonts/Inter.woff2") }`). Do **not** use `public/` — that's a Next.js / Vite convention and HyperFrames does not serve it. Do not use absolute paths like `/assets/...` either; the preview and render hosts may mount under a sub-path.
+
 Other useful flags:
 
 - `--resolution` — preset: `landscape` (1920×1080), `portrait` (1080×1920), `landscape-4k`, `portrait-4k`, `square` (1080×1080), `square-4k`. Aliases: `1080p`, `4k`, `uhd`, `1080p-square`, `4k-square`.

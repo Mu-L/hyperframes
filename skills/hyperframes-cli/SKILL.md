@@ -35,6 +35,8 @@ Cross-cutting rules that hold for every command:
 - **CI gating on render**: `--strict` fails on lint errors, `--strict-all` fails on warnings too, `--strict-variables` fails on undeclared `--variables` keys.
 - **Paths in `--json` are redacted** — `$HOME` becomes the literal `$HOME` so output is safe to paste into bug reports and agent contexts.
 - **Post-render verification.** After `render` returns exit 0, confirm the output file exists and has plausible size before reporting success: `[ -s "$OUTPUT" ] || echo "render produced no output"`. The CLI prints `◇  <path>` on success; for long renders also sanity-check duration with `ffprobe -i "$OUTPUT" -show_format -v error`.
+- **Look up framework behavior in skills or `npx hyperframes docs <topic>`.** Do **not** grep `node_modules/hyperframes/dist/` to reverse-engineer behavior — the compiled source is minified, version-specific, and likely to mislead. If a question isn't answered in the skills or `docs`, report the gap instead of spelunking.
+- **Visual QA uses `snapshot`, not draft renders.** Reach for `npx hyperframes snapshot` (PNGs at meaningful timeline states) when you need to eyeball a scene — not `render --quality draft` + `ffmpeg` frame extraction. Snapshot is the supported still-frame path and is orders of magnitude faster than rendering an mp4 just to look at it.
 
 ## Routing
 
