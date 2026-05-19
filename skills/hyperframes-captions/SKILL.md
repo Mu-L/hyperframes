@@ -11,7 +11,7 @@ Use this skill for caption authoring after the composition structure is understo
 
 Pick before authoring:
 
-1. **Install a pre-built style** — the registry has 15 caption components ready to drop in: `caption-pill-karaoke`, `caption-highlight`, `caption-kinetic-slam`, `caption-glitch-rgb`, `caption-gradient-fill`, `caption-neon-glow`, `caption-matrix-decode`, `caption-clip-wipe`, `caption-emoji-pop`, `caption-editorial-emphasis`, `caption-neon-accent`, `caption-parallax-layers`, `caption-particle-burst`, `caption-texture-lava`, `caption-weight-shift`. Run `npx hyperframes catalog --tag captions` to browse, then `npx hyperframes add <name>`. Wiring details live in the `hyperframes-registry` skill.
+1. **Install a pre-built style** — the registry has 15 caption components ready to drop in: `caption-pill-karaoke`, `caption-highlight`, `caption-kinetic-slam`, `caption-glitch-rgb`, `caption-gradient-fill`, `caption-neon-glow`, `caption-matrix-decode`, `caption-clip-wipe`, `caption-emoji-pop`, `caption-editorial-emphasis`, `caption-neon-accent`, `caption-parallax-layers`, `caption-particle-burst`, `caption-texture`, `caption-weight-shift`. Run `npx hyperframes catalog --tag captions` to browse, then `npx hyperframes add <name>`. Wiring details live in the `hyperframes-registry` skill.
 2. **Author from scratch** — when no pre-built style fits or per-word logic is custom. Follow the Workflow below.
 
 ## Workflow

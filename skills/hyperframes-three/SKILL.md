@@ -63,6 +63,29 @@ The adapter sets `window.__hfThreeTime` and dispatches `new CustomEvent("hf-seek
 }
 ```
 
+## Loading Addons (`GLTFLoader`, `OrbitControls`, etc.)
+
+For anything under `three/addons/`, use an importmap so bare specifiers resolve. The HyperFrames lint recognizes both this form and the inline `+esm` import above — pick whichever your composition needs.
+
+```html
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.181.2/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.181.2/examples/jsm/"
+    }
+  }
+</script>
+<script type="module">
+  import * as THREE from "three";
+  import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+  import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+  // ...
+</script>
+```
+
+Pin the `three` version in both entries to the same value. Mixing versions across the map and bare imports causes silent breakage.
+
 ## AnimationMixer Pattern
 
 For GLTF or authored clip animation, seek the mixer directly:
