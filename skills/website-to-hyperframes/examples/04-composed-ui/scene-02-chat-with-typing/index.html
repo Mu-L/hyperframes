@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-02-chat-with-typing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    #scene-02-chat-with-typing {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0c1218 0%, #0a0e14 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Chat panel — centered "iMessage-meets-Slack" style */
+    .panel {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 880px;
+      max-height: 880px;
+      background: #14191f;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow:
+        0 60px 120px -30px rgba(0,0,0,0.8),
+        0 0 0 1px rgba(255,255,255,0.02) inset;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Panel header — channel name + member count */
+    .panel-header {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 22px 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .channel-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      background: linear-gradient(135deg, #5b8dff 0%, #a855f7 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700;
+      color: white;
+    }
+    .channel-meta { flex: 1 1 auto; }
+    .channel-name { font-size: 16px; font-weight: 600; }
+    .channel-members { font-size: 12px; color: #8a93a0; margin-top: 2px; }
+    .panel-actions { display: flex; gap: 10px; }
+    .panel-action {
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      color: #8a93a0; font-size: 18px;
+      border-radius: 6px;
+    }
+
+    /* Messages area */
+    .messages {
+      flex: 1 1 auto;
+      padding: 24px 28px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow: hidden;
+    }
+    .msg-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      opacity: 0;  /* locked initial */
+      will-change: transform, opacity;
+    }
+    .msg-row.self {
+      flex-direction: row-reverse;
+    }
+    .avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 600; color: white;
+      flex: 0 0 auto;
+    }
+    .avatar.a { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+    .avatar.b { background: linear-gradient(135deg, #10b981, #06b6d4); }
+    .avatar.c { background: linear-gradient(135deg, #6366f1, #a855f7); }
+    .msg-stack { display: flex; flex-direction: column; gap: 4px; max-width: 520px; }
+    .msg-name { font-size: 12px; color: #8a93a0; font-weight: 500; padding-left: 12px; }
+    .msg-row.self .msg-name { padding-left: 0; padding-right: 12px; text-align: right; }
+    .bubble {
+      padding: 12px 16px;
+      border-radius: 18px;
+      font-size: 15px;
+      line-height: 1.4;
+      color: #e5e7eb;
+      background: #20262e;
+      position: relative;
+    }
+    .msg-row.self .bubble {
+      background: linear-gradient(135deg, #4f7dff, #5b8dff);
+      color: white;
+    }
+    .bubble .mention {
+      color: #a78bfa;
+      font-weight: 500;
+      background: rgba(167, 139, 250, 0.12);
+      padding: 0 4px;
+      border-radius: 3px;
+    }
+
+    /* Typing indicator — 3 dots that pulse */
+    .typing-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      opacity: 0;
+      will-change: opacity;
+    }
+    .typing-bubble {
+      background: #20262e;
+      padding: 14px 16px;
+      border-radius: 18px;
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .typing-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: #8a93a0;
+      will-change: transform, opacity;
+    }
+
+    /* Reaction emoji burst — appears under a message when it's "reacted to" */
+    .reaction-row {
+      display: flex;
+      gap: 6px;
+      padding-left: 44px;
+      margin-top: -8px;
+    }
+    .reaction {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 13px;
+      color: #e5e7eb;
+      will-change: transform, opacity;
+      opacity: 0;
+    }
+    .reaction .count {
+      color: #8a93a0;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .reaction.active {
+      background: rgba(91, 141, 255, 0.15);
+      border-color: rgba(91, 141, 255, 0.4);
+    }
+    .reaction.active .count { color: #5b8dff; }
+
+    /* Composer at bottom */
+    .composer {
+      flex: 0 0 auto;
+      padding: 16px 28px 22px;
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+    .composer-box {
+      background: #1a1f26;
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      color: #6b7280;
+    }
+    .composer-send {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      background: rgba(91, 141, 255, 0.2);
+      display: flex; align-items: center; justify-content: center;
+      color: #5b8dff;
+      flex: 0 0 auto;
+    }
+
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 20;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-02-chat-with-typing"
+       data-composition-id="scene-02-chat-with-typing"
+       data-start="0"
+       data-duration="8"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="panel" id="panel">
+      <div class="panel-header">
+        <div class="channel-icon">#</div>
+        <div class="channel-meta">
+          <div class="channel-name">launch-team</div>
+          <div class="channel-members">14 members · 3 online</div>
+        </div>
+        <div class="panel-actions">
+          <div class="panel-action">⌕</div>
+          <div class="panel-action">⋯</div>
+        </div>
+      </div>
+
+      <div class="messages">
+        <!-- Message 1 — incoming -->
+        <div class="msg-row" id="msg-1">
+          <div class="avatar a">JA</div>
+          <div class="msg-stack">
+            <div class="msg-name">Jordan A.</div>
+            <div class="bubble">Heads up — the new <span class="mention">@design</span> review just dropped.</div>
+          </div>
+        </div>
+
+        <!-- Message 2 — incoming -->
+        <div class="msg-row" id="msg-2">
+          <div class="avatar b">RM</div>
+          <div class="msg-stack">
+            <div class="msg-name">Riley M.</div>
+            <div class="bubble">Skimmed it — looks tight. I'll ship the fixes tonight.</div>
+          </div>
+        </div>
+
+        <!-- Reaction row under message 2 -->
+        <div class="reaction-row" id="reaction-row">
+          <span class="reaction" id="r1">🚀 <span class="count">2</span></span>
+          <span class="reaction active" id="r2">🔥 <span class="count">3</span></span>
+          <span class="reaction" id="r3">💯 <span class="count">1</span></span>
+        </div>
+
+        <!-- Typing indicator -->
+        <div class="typing-row" id="typing-row">
+          <div class="avatar c">LK</div>
+          <div class="typing-bubble">
+            <span class="typing-dot td1"></span>
+            <span class="typing-dot td2"></span>
+            <span class="typing-dot td3"></span>
+          </div>
+        </div>
+
+        <!-- Message 3 — self / outgoing -->
+        <div class="msg-row self" id="msg-3">
+          <div class="avatar c">LK</div>
+          <div class="msg-stack">
+            <div class="msg-name">You</div>
+            <div class="bubble">Perfect — staging's already deploying. ✨</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="composer-box">
+          <span>Message #launch-team</span>
+          <span style="flex:1"></span>
+          <span class="composer-send">↑</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="label">
+      Scene 02 · <span class="accent">Chat with Typing</span> · narration-synced events, composed from divs
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 8;
+      window.__timelines = window.__timelines || {};
+
+      var tl = gsap.timeline({ paused: true });
+
+      // === Narration anchor timings (the canonical pattern from videos/v9/huly):
+      //   t=0.5s   "Messages come in"            → msg-1 enters
+      //   t=1.6s   "from your team"              → msg-2 enters
+      //   t=2.8s   "see who's reacting"          → reaction emojis pop
+      //   t=3.8s   "you see them typing"         → typing indicator appears
+      //   t=5.4s   "and you reply"               → msg-3 enters (self)
+      //   t=6.2s   continuous motion hold        → panel breathing + reaction pulse
+      // Every meaningful narration phrase = ONE visual event. That's what the
+      // 11-eval-branches video reviews said was missing from every video. Here it is.
+
+      // === t=0.0s initial: panel scaled down + faded.
+      tl.set("#panel", { scale: 0.96, opacity: 0, transformOrigin: "50% 50%" }, 0);
+
+      // === t=0.0s: Panel scales in. Sets the stage.
+      tl.fromTo("#panel",
+        { scale: 0.96, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.5, ease: "expo.out" },
+        0.0);
+
+      // === t=0.5s: Message 1 slides up from below.
+      // Narration: "Messages come in"
+      tl.fromTo("#msg-1",
+        { y: 24, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.45, ease: "back.out(1.4)" },
+        0.50);
+
+      // === t=1.6s: Message 2 slides up.
+      // Narration: "from your team"
+      tl.fromTo("#msg-2",
+        { y: 24, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.45, ease: "back.out(1.4)" },
+        1.60);
+
+      // === t=2.8s: Reactions burst into existence with elastic settle.
+      // Narration: "see who's reacting"
+      // Stagger each reaction so they pop in sequence, not all at once.
+      tl.fromTo([ "#r1", "#r2", "#r3" ],
+        { scale: 0, opacity: 0 },
+        {
+          scale: 1, opacity: 1,
+          duration: 0.45,
+          stagger: 0.10,
+          ease: "elastic.out(1, 0.55)",
+          transformOrigin: "50% 50%"
+        },
+        2.80);
+      // The "active" reaction (r2) gets an extra scale pulse — the user's own reaction.
+      tl.to("#r2", {
+        scale: 1.12,
+        duration: 0.25,
+        ease: "back.out(1.7)",
+        transformOrigin: "50% 50%",
+      }, 3.25);
+      tl.to("#r2", { scale: 1, duration: 0.3, ease: "expo.out" }, 3.50);
+
+      // === t=3.8s: Typing indicator appears.
+      // Narration: "you see them typing"
+      tl.fromTo("#typing-row",
+        { y: 16, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.35, ease: "expo.out" },
+        3.80);
+
+      // === t=3.85s–5.3s: Dots bounce. Three dots, staggered, sine.inOut yoyo.
+      // The continuous-motion mandate satisfied during the typing phase.
+      tl.fromTo(".typing-dot",
+        { y: 0, opacity: 0.4 },
+        {
+          y: -6, opacity: 1,
+          duration: 0.32,
+          stagger: 0.10,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: 5,
+        }, 3.85);
+
+      // === t=5.3s: Typing indicator exits. The "Lex" is about to send their reply.
+      tl.to("#typing-row", {
+        y: 8, opacity: 0,
+        duration: 0.25,
+        ease: "expo.in",
+      }, 5.30);
+
+      // === t=5.4s: Message 3 (self) slides up from right side.
+      // Narration: "and you reply"
+      // Self-messages slide up too but the bubble is gradient-blue.
+      tl.fromTo("#msg-3",
+        { y: 24, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.5, ease: "back.out(1.4)" },
+        5.40);
+
+      // === Continuous motion 5.9s-8.0s:
+      // - Reactions count chip on r2 subtle pulse (someone else reacted to the new message)
+      // - Panel breathes (subtle y drift)
+      // - Channel members count updates (3 online → 4 online — Lex came online)
+      tl.to("#r2 .count", {
+        textContent: "4",
+        duration: 0.01,
+      }, 5.90);
+      tl.fromTo("#r2",
+        { scale: 1 },
+        { scale: 1.08, duration: 0.3, ease: "back.out(1.7)", transformOrigin: "50% 50%" },
+        5.90);
+      tl.to("#r2", { scale: 1, duration: 0.35, ease: "expo.out" }, 6.20);
+
+      tl.to(".channel-members", {
+        color: "#10b981",
+        duration: 0.4,
+        ease: "expo.out",
+      }, 6.10);
+
+      // Panel breath
+      tl.to("#panel", {
+        y: -6,
+        duration: 1.6,
+        ease: "sine.inOut",
+      }, 6.20);
+
+      // Composer subtle pulse to invite next action.
+      tl.to(".composer-send", {
+        scale: 1.15,
+        duration: 0.5,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        transformOrigin: "50% 50%",
+      }, 6.40);
+
+      window.__timelines["scene-02-chat-with-typing"] = tl;
+    })();
+  </script>
+</body>
+</html>

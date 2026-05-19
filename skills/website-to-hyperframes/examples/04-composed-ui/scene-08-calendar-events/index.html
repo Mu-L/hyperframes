@@ -1,0 +1,857 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-08-calendar-events</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    #scene-08-calendar-events {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0d1117 0%, #0a0d12 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #e5e7eb;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* App window chrome */
+    .window {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1640px;
+      height: 920px;
+      border-radius: 16px;
+      background: #11151b;
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow:
+        0 60px 120px -30px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(255,255,255,0.02) inset;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .window-header {
+      height: 52px;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #28c941; }
+    .crumbs {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-size: 13px;
+      color: #8a93a0;
+      margin-left: 8px;
+    }
+    .crumbs .sep { opacity: 0.4; }
+    .crumbs .current { color: #d6dde6; font-weight: 500; }
+
+    .toolbar {
+      height: 64px;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .toolbar-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .toolbar h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #f5f5f5;
+    }
+    .week-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #8a93a0;
+      font-size: 13px;
+    }
+    .nav-btn {
+      width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      color: #d6dde6;
+      font-size: 13px;
+    }
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #8a93a0;
+    }
+    .toolbar .pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+    }
+    .toolbar .pill.active {
+      background: rgba(91, 141, 255, 0.12);
+      border-color: rgba(91, 141, 255, 0.3);
+      color: #b8cdff;
+    }
+    .toolbar .btn {
+      padding: 7px 14px;
+      border-radius: 8px;
+      background: #5b8dff;
+      color: white;
+      font-weight: 500;
+    }
+
+    /* Calendar root */
+    .calendar {
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: 70px repeat(7, 1fr);
+      grid-template-rows: 56px repeat(9, 78px);
+      position: relative;
+      background: #0e1218;
+      overflow: hidden;
+    }
+
+    /* Header row */
+    .header-cell {
+      grid-row: 1;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      border-right: 1px solid rgba(255,255,255,0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 8px 0;
+    }
+    .header-cell.corner {
+      grid-column: 1;
+      border-right: 1px solid rgba(255,255,255,0.06);
+    }
+    .header-cell .day-name {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: #8a93a0;
+    }
+    .header-cell .day-date {
+      font-size: 19px;
+      font-weight: 600;
+      color: #d6dde6;
+      font-variant-numeric: tabular-nums;
+    }
+    .header-cell.today .day-name { color: #5b8dff; }
+    .header-cell.today .day-date {
+      color: #ffffff;
+      background: #5b8dff;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    /* Time column on left */
+    .time-cell {
+      grid-column: 1;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      padding: 6px 10px 0 0;
+      font-size: 11px;
+      color: #6b7280;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.04em;
+    }
+
+    /* Grid cells */
+    .grid-cell {
+      border-right: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      position: relative;
+    }
+
+    /* Today column highlight overlay */
+    .today-col-highlight {
+      grid-column: 4;       /* Wednesday */
+      grid-row: 2 / span 9; /* covers all hour rows */
+      background: linear-gradient(180deg, rgba(91,141,255,0.08) 0%, rgba(91,141,255,0.03) 100%);
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    /* Time-indicator "now" line (horizontal bar across today's column area) */
+    .now-line {
+      position: absolute;
+      left: 70px;
+      right: 0;
+      top: 0;
+      height: 2px;
+      background: linear-gradient(90deg, rgba(248, 113, 113, 0.0) 0%, rgba(248, 113, 113, 0.6) 8%, rgba(248, 113, 113, 0.9) 50%, rgba(248, 113, 113, 0.6) 92%, rgba(248, 113, 113, 0.0) 100%);
+      pointer-events: none;
+      opacity: 0;
+      z-index: 5;
+    }
+    .now-line::before {
+      content: "";
+      position: absolute;
+      left: 35.7%;        /* lands inside Wed column (col 4 of 7, center) */
+      top: -5px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #f87171;
+      box-shadow: 0 0 12px rgba(248, 113, 113, 0.7);
+    }
+
+    /* Events */
+    .event {
+      position: absolute;
+      left: 6px;
+      right: 6px;
+      top: 4px;
+      bottom: 4px;
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      overflow: hidden;
+      opacity: 0;
+      will-change: transform, opacity;
+      z-index: 2;
+    }
+    .event .ev-time {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      opacity: 0.8;
+      font-variant-numeric: tabular-nums;
+    }
+    .event .ev-title {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.25;
+      color: #f5f5f5;
+    }
+    .event .ev-meta {
+      font-size: 11px;
+      color: rgba(255,255,255,0.7);
+      margin-top: auto;
+    }
+
+    /* Per-event accents */
+    .ev-blue {
+      background: linear-gradient(135deg, rgba(91,141,255,0.22) 0%, rgba(91,141,255,0.12) 100%);
+      border-left: 3px solid #5b8dff;
+      color: #cfdcff;
+    }
+    .ev-blue .ev-time { color: #b8cdff; }
+
+    .ev-violet {
+      background: linear-gradient(135deg, rgba(167,139,250,0.22) 0%, rgba(167,139,250,0.12) 100%);
+      border-left: 3px solid #a78bfa;
+      color: #ddd2ff;
+    }
+    .ev-violet .ev-time { color: #cfbfff; }
+
+    .ev-green {
+      background: linear-gradient(135deg, rgba(16,185,129,0.22) 0%, rgba(16,185,129,0.12) 100%);
+      border-left: 3px solid #10b981;
+      color: #b8eed7;
+    }
+    .ev-green .ev-time { color: #8fe0bf; }
+
+    .ev-amber {
+      background: linear-gradient(135deg, rgba(245,158,11,0.22) 0%, rgba(245,158,11,0.12) 100%);
+      border-left: 3px solid #f59e0b;
+      color: #ffdfa9;
+    }
+    .ev-amber .ev-time { color: #ffd58a; }
+
+    .ev-pink {
+      background: linear-gradient(135deg, rgba(244,114,182,0.22) 0%, rgba(244,114,182,0.12) 100%);
+      border-left: 3px solid #f472b6;
+      color: #ffd1ea;
+    }
+    .ev-pink .ev-time { color: #ffbcdc; }
+
+    /* Past event — faded */
+    .ev-past {
+      opacity: 0.45 !important; /* GSAP target uses initial-fromTo so this is overridden during entrance, but kept low after */
+    }
+
+    /* Now event extra glow base layer (the pulse gets added by GSAP) */
+    .ev-now {
+      box-shadow: 0 0 0 1.5px rgba(167, 139, 250, 0.5), 0 8px 24px -8px rgba(167, 139, 250, 0.4);
+    }
+
+    /* Avatars row */
+    .ev-avatars {
+      display: flex;
+      gap: -4px;
+      margin-top: 2px;
+    }
+    .mini-avatar {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      font-size: 9px;
+      font-weight: 600;
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      border: 1.5px solid rgba(20,25,31,1);
+      margin-left: -4px;
+    }
+    .mini-avatar:first-child { margin-left: 0; }
+    .ma-a { background: linear-gradient(135deg, #6366f1, #a855f7); }
+    .ma-b { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+    .ma-c { background: linear-gradient(135deg, #10b981, #06b6d4); }
+    .ma-d { background: linear-gradient(135deg, #ec4899, #f97316); }
+
+    /* Grid positions (1-indexed, header is row 1, so 9am is row 2) */
+    /* col 2 = Mon, 3 = Tue, 4 = Wed, 5 = Thu, 6 = Fri, 7 = Sat, 8 = Sun */
+    .pos-standup,
+    .pos-oneonone,
+    .pos-designrev,
+    .pos-sprint,
+    .pos-coffee,
+    .pos-demoprep {
+      position: relative;
+      z-index: 3;
+    }
+    .pos-standup    { grid-column: 2; grid-row: 2; }                  /* Mon 9-9:30 (half of 9am row) */
+    .pos-oneonone   { grid-column: 3; grid-row: 3; }                  /* Tue 10-10:30 (half of 10am row) */
+    .pos-designrev  { grid-column: 4; grid-row: 4 / span 2; }         /* Wed 11-12:30 (1.5 rows visual) */
+    .pos-sprint     { grid-column: 4; grid-row: 7 / span 2; }         /* Wed 2-3:30 */
+    .pos-coffee     { grid-column: 5; grid-row: 3; }                  /* Thu 10-11 */
+    .pos-demoprep   { grid-column: 6; grid-row: 8; }                  /* Fri 3-4 */
+
+    /* Standup & 1:1 are 30min — squeeze visual to half row */
+    .pos-standup .event,
+    .pos-oneonone .event {
+      bottom: 50%;
+    }
+    /* Design review is 11-12:30, spans 2 rows but only fills 1.5 */
+    .pos-designrev .event {
+      bottom: 33%;
+    }
+    /* Sprint planning 2-3:30 same — spans 2 rows, fills 1.5 */
+    .pos-sprint .event {
+      bottom: 33%;
+    }
+    /* Demo prep "upcoming" extra ring */
+    .ev-upcoming {
+      box-shadow:
+        0 0 0 1.5px rgba(244, 114, 182, 0.5),
+        0 6px 18px -6px rgba(244, 114, 182, 0.4);
+    }
+
+    /* Popover for design review details */
+    .popover {
+      position: absolute;
+      top: 380px;
+      left: 920px;
+      width: 280px;
+      background: #1a2030;
+      border: 1px solid rgba(167, 139, 250, 0.3);
+      border-radius: 12px;
+      padding: 16px 18px;
+      box-shadow:
+        0 24px 60px -10px rgba(0,0,0,0.7),
+        0 0 0 1px rgba(167, 139, 250, 0.15);
+      opacity: 0;
+      will-change: transform, opacity;
+      z-index: 30;
+    }
+    .popover::before {
+      content: "";
+      position: absolute;
+      left: -7px;
+      top: 32px;
+      width: 14px; height: 14px;
+      background: #1a2030;
+      transform: rotate(45deg);
+      border-left: 1px solid rgba(167,139,250,0.3);
+      border-bottom: 1px solid rgba(167,139,250,0.3);
+    }
+    .pop-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #f5f5f5;
+      letter-spacing: -0.005em;
+      margin-bottom: 4px;
+    }
+    .pop-when {
+      font-size: 12px;
+      color: #cfbfff;
+      font-weight: 500;
+      margin-bottom: 12px;
+    }
+    .pop-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #c1c8d4;
+      margin-bottom: 6px;
+    }
+    .pop-row .icon {
+      width: 14px; height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #8a93a0;
+      font-size: 12px;
+    }
+    .pop-attendees {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    .pop-attendees .mini-avatar { width: 22px; height: 22px; font-size: 10px; }
+    .pop-attendees .count {
+      font-size: 11px;
+      color: #8a93a0;
+      margin-left: 4px;
+    }
+    .pop-link {
+      margin-top: 12px;
+      padding: 7px 10px;
+      background: rgba(91, 141, 255, 0.12);
+      border: 1px solid rgba(91, 141, 255, 0.25);
+      border-radius: 7px;
+      color: #b8cdff;
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .pop-link .arrow { opacity: 0.7; }
+
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 36px;
+      font-size: 15px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 50;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-08-calendar-events"
+       data-composition-id="scene-08-calendar-events"
+       data-start="0"
+       data-duration="8"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="window" id="window">
+      <!-- Top window chrome -->
+      <div class="window-header">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <div class="crumbs">
+          <span>Calendar</span><span class="sep">/</span>
+          <span class="current">Week 20 · May 18 – 24, 2026</span>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <h1>May 2026</h1>
+          <div class="week-nav">
+            <span class="nav-btn">‹</span>
+            <span>Today</span>
+            <span class="nav-btn">›</span>
+          </div>
+        </div>
+        <div class="toolbar-actions">
+          <span class="pill">Day</span>
+          <span class="pill active">Week</span>
+          <span class="pill">Month</span>
+          <span class="btn">+ Create</span>
+        </div>
+      </div>
+
+      <!-- Calendar grid -->
+      <div class="calendar" id="calendar">
+        <!-- Header row -->
+        <div class="header-cell corner"></div>
+        <div class="header-cell" style="grid-column:2;"><span class="day-name">Mon</span><span class="day-date">18</span></div>
+        <div class="header-cell" style="grid-column:3;"><span class="day-name">Tue</span><span class="day-date">19</span></div>
+        <div class="header-cell today" style="grid-column:4;" id="today-header"><span class="day-name">Wed</span><span class="day-date">20</span></div>
+        <div class="header-cell" style="grid-column:5;"><span class="day-name">Thu</span><span class="day-date">21</span></div>
+        <div class="header-cell" style="grid-column:6;"><span class="day-name">Fri</span><span class="day-date">22</span></div>
+        <div class="header-cell" style="grid-column:7;"><span class="day-name">Sat</span><span class="day-date">23</span></div>
+        <div class="header-cell" style="grid-column:8;"><span class="day-name">Sun</span><span class="day-date">24</span></div>
+
+        <!-- Time column rows (9 AM through 5 PM) -->
+        <div class="time-cell" style="grid-row:2;">9 AM</div>
+        <div class="time-cell" style="grid-row:3;">10 AM</div>
+        <div class="time-cell" style="grid-row:4;">11 AM</div>
+        <div class="time-cell" style="grid-row:5;">12 PM</div>
+        <div class="time-cell" style="grid-row:6;">1 PM</div>
+        <div class="time-cell" style="grid-row:7;">2 PM</div>
+        <div class="time-cell" style="grid-row:8;">3 PM</div>
+        <div class="time-cell" style="grid-row:9;">4 PM</div>
+        <div class="time-cell" style="grid-row:10;">5 PM</div>
+
+        <!-- Empty grid cells (9 rows x 7 cols = 63 cells) -->
+        <!-- We don't need to write each cell individually for layout — grid auto-flow works,
+             but explicit borders need real elements. Generate via repeated divs. -->
+        <!-- Row 2 (9 AM) -->
+        <div class="grid-cell" style="grid-column:2; grid-row:2;"></div>
+        <div class="grid-cell" style="grid-column:3; grid-row:2;"></div>
+        <div class="grid-cell" style="grid-column:4; grid-row:2;"></div>
+        <div class="grid-cell" style="grid-column:5; grid-row:2;"></div>
+        <div class="grid-cell" style="grid-column:6; grid-row:2;"></div>
+        <div class="grid-cell" style="grid-column:7; grid-row:2;"></div>
+        <div class="grid-cell" style="grid-column:8; grid-row:2;"></div>
+        <!-- Row 3 (10 AM) -->
+        <div class="grid-cell" style="grid-column:2; grid-row:3;"></div>
+        <div class="grid-cell" style="grid-column:3; grid-row:3;"></div>
+        <div class="grid-cell" style="grid-column:4; grid-row:3;"></div>
+        <div class="grid-cell" style="grid-column:5; grid-row:3;"></div>
+        <div class="grid-cell" style="grid-column:6; grid-row:3;"></div>
+        <div class="grid-cell" style="grid-column:7; grid-row:3;"></div>
+        <div class="grid-cell" style="grid-column:8; grid-row:3;"></div>
+        <!-- Row 4 (11 AM) -->
+        <div class="grid-cell" style="grid-column:2; grid-row:4;"></div>
+        <div class="grid-cell" style="grid-column:3; grid-row:4;"></div>
+        <div class="grid-cell" style="grid-column:4; grid-row:4;"></div>
+        <div class="grid-cell" style="grid-column:5; grid-row:4;"></div>
+        <div class="grid-cell" style="grid-column:6; grid-row:4;"></div>
+        <div class="grid-cell" style="grid-column:7; grid-row:4;"></div>
+        <div class="grid-cell" style="grid-column:8; grid-row:4;"></div>
+        <!-- Row 5 (12 PM) -->
+        <div class="grid-cell" style="grid-column:2; grid-row:5;"></div>
+        <div class="grid-cell" style="grid-column:3; grid-row:5;"></div>
+        <div class="grid-cell" style="grid-column:4; grid-row:5;"></div>
+        <div class="grid-cell" style="grid-column:5; grid-row:5;"></div>
+        <div class="grid-cell" style="grid-column:6; grid-row:5;"></div>
+        <div class="grid-cell" style="grid-column:7; grid-row:5;"></div>
+        <div class="grid-cell" style="grid-column:8; grid-row:5;"></div>
+        <!-- Row 6 (1 PM) -->
+        <div class="grid-cell" style="grid-column:2; grid-row:6;"></div>
+        <div class="grid-cell" style="grid-column:3; grid-row:6;"></div>
+        <div class="grid-cell" style="grid-column:4; grid-row:6;"></div>
+        <div class="grid-cell" style="grid-column:5; grid-row:6;"></div>
+        <div class="grid-cell" style="grid-column:6; grid-row:6;"></div>
+        <div class="grid-cell" style="grid-column:7; grid-row:6;"></div>
+        <div class="grid-cell" style="grid-column:8; grid-row:6;"></div>
+        <!-- Row 7 (2 PM) -->
+        <div class="grid-cell" style="grid-column:2; grid-row:7;"></div>
+        <div class="grid-cell" style="grid-column:3; grid-row:7;"></div>
+        <div class="grid-cell" style="grid-column:4; grid-row:7;"></div>
+        <div class="grid-cell" style="grid-column:5; grid-row:7;"></div>
+        <div class="grid-cell" style="grid-column:6; grid-row:7;"></div>
+        <div class="grid-cell" style="grid-column:7; grid-row:7;"></div>
+        <div class="grid-cell" style="grid-column:8; grid-row:7;"></div>
+        <!-- Row 8 (3 PM) -->
+        <div class="grid-cell" style="grid-column:2; grid-row:8;"></div>
+        <div class="grid-cell" style="grid-column:3; grid-row:8;"></div>
+        <div class="grid-cell" style="grid-column:4; grid-row:8;"></div>
+        <div class="grid-cell" style="grid-column:5; grid-row:8;"></div>
+        <div class="grid-cell" style="grid-column:6; grid-row:8;"></div>
+        <div class="grid-cell" style="grid-column:7; grid-row:8;"></div>
+        <div class="grid-cell" style="grid-column:8; grid-row:8;"></div>
+        <!-- Row 9 (4 PM) -->
+        <div class="grid-cell" style="grid-column:2; grid-row:9;"></div>
+        <div class="grid-cell" style="grid-column:3; grid-row:9;"></div>
+        <div class="grid-cell" style="grid-column:4; grid-row:9;"></div>
+        <div class="grid-cell" style="grid-column:5; grid-row:9;"></div>
+        <div class="grid-cell" style="grid-column:6; grid-row:9;"></div>
+        <div class="grid-cell" style="grid-column:7; grid-row:9;"></div>
+        <div class="grid-cell" style="grid-column:8; grid-row:9;"></div>
+        <!-- Row 10 (5 PM) -->
+        <div class="grid-cell" style="grid-column:2; grid-row:10;"></div>
+        <div class="grid-cell" style="grid-column:3; grid-row:10;"></div>
+        <div class="grid-cell" style="grid-column:4; grid-row:10;"></div>
+        <div class="grid-cell" style="grid-column:5; grid-row:10;"></div>
+        <div class="grid-cell" style="grid-column:6; grid-row:10;"></div>
+        <div class="grid-cell" style="grid-column:7; grid-row:10;"></div>
+        <div class="grid-cell" style="grid-column:8; grid-row:10;"></div>
+
+        <!-- Today column highlight overlay (animated in mid-beat) -->
+        <div class="today-col-highlight" id="today-col-highlight"></div>
+
+        <!-- Events positioned via grid wrapper divs -->
+        <div class="pos-standup">
+          <div class="event ev-blue" id="ev-standup">
+            <div class="ev-time">9:00 – 9:30 AM</div>
+            <div class="ev-title">Stand-up</div>
+          </div>
+        </div>
+
+        <div class="pos-oneonone">
+          <div class="event ev-violet ev-past" id="ev-oneonone">
+            <div class="ev-time">10:00 – 10:30 AM</div>
+            <div class="ev-title">1:1 with Alex</div>
+          </div>
+        </div>
+
+        <div class="pos-designrev">
+          <div class="event ev-violet ev-now" id="ev-designrev">
+            <div class="ev-time">11:00 AM – 12:30 PM</div>
+            <div class="ev-title">Design review</div>
+            <div class="ev-avatars">
+              <span class="mini-avatar ma-a">LK</span>
+              <span class="mini-avatar ma-b">JA</span>
+              <span class="mini-avatar ma-c">RM</span>
+              <span class="mini-avatar ma-d">SV</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pos-sprint">
+          <div class="event ev-green" id="ev-sprint">
+            <div class="ev-time">2:00 – 3:30 PM</div>
+            <div class="ev-title">Sprint planning</div>
+            <div class="ev-avatars">
+              <span class="mini-avatar ma-a">LK</span>
+              <span class="mini-avatar ma-c">RM</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pos-coffee">
+          <div class="event ev-amber" id="ev-coffee">
+            <div class="ev-time">10:00 – 11:00 AM</div>
+            <div class="ev-title">Coffee w/ Jamie</div>
+          </div>
+        </div>
+
+        <div class="pos-demoprep">
+          <div class="event ev-pink ev-upcoming" id="ev-demoprep">
+            <div class="ev-time">3:00 – 4:00 PM</div>
+            <div class="ev-title">Demo prep</div>
+            <div class="ev-meta">Upcoming · Friday</div>
+          </div>
+        </div>
+
+        <!-- Time-indicator "now" line — moves slowly across today's column -->
+        <div class="now-line" id="now-line"></div>
+      </div>
+
+      <!-- Popover with design review details -->
+      <div class="popover" id="popover">
+        <div class="pop-title">Design review</div>
+        <div class="pop-when">Today, 11:00 AM – 12:30 PM</div>
+        <div class="pop-row"><span class="icon">●</span><span>Conf room · Atlas</span></div>
+        <div class="pop-row"><span class="icon">◆</span><span>Sprint 24 prep</span></div>
+        <div class="pop-attendees">
+          <span class="mini-avatar ma-a">LK</span>
+          <span class="mini-avatar ma-b">JA</span>
+          <span class="mini-avatar ma-c">RM</span>
+          <span class="mini-avatar ma-d">SV</span>
+          <span class="count">+ 2 more</span>
+        </div>
+        <div class="pop-link">
+          <span>Join meet.acme.co/atlas</span>
+          <span class="arrow">↗</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="label">
+      Scene 08 · <span class="accent">Calendar Events</span> · weekly grid with animated events, now indicator, popover
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 8;
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // === t=0 initial: window scaled + faded; events hidden; popover hidden;
+      //                 today-col highlight hidden; now-line hidden.
+      tl.set("#window", { scale: 0.97, opacity: 0, transformOrigin: "50% 50%" }, 0);
+      tl.set("#today-col-highlight", { opacity: 0 }, 0);
+      tl.set("#now-line", { opacity: 0, scaleX: 0.6, transformOrigin: "0% 50%" }, 0);
+      tl.set("#popover", { opacity: 0, y: 30, scale: 0.92, transformOrigin: "0% 50%" }, 0);
+
+      // Set events to hidden+scaled BEFORE the fromTo entrance (locks initial).
+      var allEvents = [
+        "#ev-standup", "#ev-oneonone", "#ev-designrev",
+        "#ev-sprint", "#ev-coffee", "#ev-demoprep"
+      ];
+      tl.set(allEvents, { opacity: 0, y: 18, scale: 0.95, transformOrigin: "50% 50%" }, 0);
+
+      // === t=0.0-0.5s: Calendar grid fades in (window + structure).
+      tl.fromTo("#window",
+        { scale: 0.97, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.55, ease: "expo.out" },
+        0.0);
+
+      // === t=0.5-2.5s: Events slide in staggered with back.out (the spec's required ease).
+      // Order chosen for visual rhythm: left-to-right across the week,
+      // but the "now" event (designrev) lands last to set up the next beat.
+      // Each fromTo uses a different starting state to add subtle variety.
+      tl.fromTo("#ev-standup",
+        { opacity: 0, y: 18, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: "back.out(1.7)" },
+        0.55);
+
+      // Past event: lands faded.
+      tl.fromTo("#ev-oneonone",
+        { opacity: 0, y: 18, scale: 0.95 },
+        { opacity: 0.5, y: 0, scale: 1, duration: 0.45, ease: "back.out(1.7)" },
+        0.80);
+
+      tl.fromTo("#ev-coffee",
+        { opacity: 0, y: 18, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: "back.out(1.7)" },
+        1.05);
+
+      tl.fromTo("#ev-sprint",
+        { opacity: 0, y: 18, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "back.out(1.7)" },
+        1.30);
+
+      // Demoprep ("upcoming") gets a soft expo.out for differentiation
+      tl.fromTo("#ev-demoprep",
+        { opacity: 0, y: 18, scale: 0.95 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "expo.out" },
+        1.55);
+
+      // Designrev ("now") lands last and a little punchier.
+      tl.fromTo("#ev-designrev",
+        { opacity: 0, y: 18, scale: 0.93 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "back.out(1.8)" },
+        1.85);
+
+      // === t=2.5-3.5s: Today's column highlight ramps in.
+      tl.fromTo("#today-col-highlight",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.9, ease: "expo.inOut" },
+        2.50);
+
+      // Today date chip also brightens at this moment for emphasis.
+      tl.fromTo("#today-header .day-date",
+        { scale: 1 },
+        { scale: 1.12, duration: 0.4, ease: "back.out(1.7)", transformOrigin: "50% 50%" },
+        2.50);
+      tl.to("#today-header .day-date",
+        { scale: 1, duration: 0.45, ease: "expo.out" },
+        2.95);
+
+      // === t=3.5-4.5s: "Happening now" pulse begins on the design review event.
+      // Box-shadow ramps to a glowing violet, then yoyos back. This is the START
+      // of a continuous pulse loop that lasts the rest of the beat.
+      // Subtle scale "breathing" 1.00 -> 1.015 -> 1.00, repeated.
+      tl.fromTo("#ev-designrev",
+        { boxShadow: "0 0 0 1.5px rgba(167, 139, 250, 0.5), 0 8px 24px -8px rgba(167, 139, 250, 0.4)" },
+        {
+          boxShadow: "0 0 0 2.5px rgba(167, 139, 250, 0.85), 0 0 36px rgba(167, 139, 250, 0.55), 0 10px 28px -8px rgba(167, 139, 250, 0.5)",
+          duration: 0.75,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: 5,    // continues through end of beat (~0.75 * 12 = 9s of loop window)
+        },
+        3.50);
+
+      // Scale breathing — a separate target (transform) so it doesn't conflict with the box-shadow tween.
+      tl.to("#ev-designrev",
+        {
+          scale: 1.02,
+          duration: 0.9,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: 4,
+          transformOrigin: "50% 50%",
+        },
+        3.50);
+
+      // === t=4.5-6.0s: Popover slides up from the design review event with details.
+      tl.fromTo("#popover",
+        { opacity: 0, y: 30, scale: 0.92 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.5)" },
+        4.50);
+
+      // Tiny stagger on internal popover rows for polish.
+      tl.fromTo("#popover .pop-row",
+        { opacity: 0, x: -10 },
+        { opacity: 1, x: 0, duration: 0.35, stagger: 0.08, ease: "expo.out" },
+        4.85);
+
+      tl.fromTo("#popover .pop-attendees .mini-avatar",
+        { opacity: 0, scale: 0.4 },
+        { opacity: 1, scale: 1, duration: 0.4, stagger: 0.06, ease: "elastic.out(1, 0.6)", transformOrigin: "50% 50%" },
+        5.15);
+
+      tl.fromTo("#popover .pop-link",
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.4, ease: "power4.out" },
+        5.40);
+
+      // === t=6.0-8.0s: Continuous motion phase.
+      // Now-line fades in at t=6.0, stretches across to full width, and drifts vertically
+      // (simulating clock advance through the design review block). All in one fromTo to
+      // avoid overlapping tweens on shared properties.
+      tl.fromTo("#now-line",
+        { opacity: 0, scaleX: 0.6, top: 320 },
+        { opacity: 1, scaleX: 1, top: 360, duration: 2.0, ease: "expo.out" },
+        6.00);
+
+      // Subtle popover breath — y rises and falls slightly during hold.
+      tl.to("#popover",
+        { y: -4, duration: 1.4, ease: "sine.inOut", yoyo: true, repeat: 1 },
+        6.20);
+
+      // Window subtle camera drift through the back half — keeps the frame alive.
+      tl.to("#window",
+        { y: -6, duration: 1.6, ease: "sine.inOut" },
+        6.40);
+
+      // Today date chip subtle pulse to keep "now" rhythm alive.
+      tl.to("#today-header .day-date",
+        { scale: 1.06, duration: 0.7, ease: "sine.inOut", yoyo: true, repeat: 1, transformOrigin: "50% 50%" },
+        6.60);
+
+      window.__timelines["scene-08-calendar-events"] = tl;
+    })();
+  </script>
+</body>
+</html>

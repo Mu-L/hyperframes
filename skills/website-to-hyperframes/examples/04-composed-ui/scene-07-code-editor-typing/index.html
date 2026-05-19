@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-07-code-editor-typing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    #scene-07-code-editor-typing {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0c1014 0%, #08090c 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #d4d4d4;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Editor window — VS Code dark+ vibes */
+    .editor {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1500px;
+      height: 820px;
+      background: #1e1e1e;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow:
+        0 60px 120px -30px rgba(0, 0, 0, 0.85),
+        0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Title bar / window chrome */
+    .titlebar {
+      flex: 0 0 auto;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 18px;
+      background: #323233;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.4);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #28c941; }
+    .titlebar-title {
+      flex: 1;
+      text-align: center;
+      font-size: 13px;
+      color: #cccccc;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+
+    /* Tab bar */
+    .tabs {
+      flex: 0 0 auto;
+      height: 40px;
+      display: flex;
+      background: #252526;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 16px;
+      font-size: 13px;
+      color: #969696;
+      border-right: 1px solid #1e1e1e;
+      cursor: default;
+      position: relative;
+    }
+    .tab.active {
+      background: #1e1e1e;
+      color: #ffffff;
+    }
+    .tab.active::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #007acc;
+    }
+    .tab-icon {
+      width: 14px; height: 14px;
+      border-radius: 2px;
+      background: linear-gradient(135deg, #3178c6 0%, #2563b0 100%);
+      font-size: 9px;
+      font-weight: 700;
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tab-close {
+      font-size: 14px;
+      color: #6e6e6e;
+      margin-left: 4px;
+      padding: 0 4px;
+    }
+    .tab .dirty-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #cccccc;
+      margin-left: 4px;
+    }
+
+    /* Editor body — gutter + code area */
+    .editor-body {
+      flex: 1 1 auto;
+      display: flex;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* Line number gutter */
+    .gutter {
+      flex: 0 0 auto;
+      width: 60px;
+      padding: 18px 0 18px;
+      background: #1e1e1e;
+      border-right: 1px solid rgba(255, 255, 255, 0.02);
+      font-family: "JetBrains Mono", "Menlo", monospace;
+      font-size: 16px;
+      color: #6e6e6e;
+      text-align: right;
+      user-select: none;
+    }
+    .gutter .ln {
+      height: 32px;
+      line-height: 32px;
+      padding-right: 18px;
+      font-variant-numeric: tabular-nums;
+    }
+    .gutter .ln.active {
+      color: #c6c6c6;
+    }
+
+    /* Code area */
+    .code {
+      flex: 1 1 auto;
+      padding: 18px 0 18px 24px;
+      font-family: "JetBrains Mono", "Menlo", monospace;
+      font-size: 18px;
+      line-height: 32px;
+      color: #d4d4d4;
+      position: relative;
+      white-space: pre;
+    }
+    .code .line {
+      height: 32px;
+      position: relative;
+      white-space: pre;
+    }
+    /* Active line highlight */
+    .code .line.active::before {
+      content: "";
+      position: absolute;
+      left: -24px;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.04);
+      pointer-events: none;
+    }
+
+    /* Per-char span — locked invisible until GSAP brings them in */
+    .code .char {
+      display: inline-block;
+      white-space: pre;
+      opacity: 0;
+      will-change: opacity;
+      vertical-align: top;
+    }
+
+    /* Syntax colors — VS Code Dark+ palette */
+    .kw   { color: #569cd6; }   /* keywords: function, return */
+    .name { color: #dcdcaa; }   /* function names */
+    .var  { color: #9cdcfe; }   /* variables, identifiers */
+    .type { color: #4ec9b0; }   /* types: User */
+    .str  { color: #ce9178; }   /* strings */
+    .tpl  { color: #ce9178; }   /* template literal text */
+    .tplx { color: #d7ba7d; }   /* template ${} braces */
+    .com  { color: #6a9955; font-style: italic; } /* comments */
+    .punc { color: #d4d4d4; }   /* punctuation */
+    .num  { color: #b5cea8; }
+
+    /* Cursor — blinking caret */
+    .cursor {
+      position: absolute;
+      width: 2px;
+      height: 24px;
+      background: #aeafad;
+      top: 4px;
+      left: 0;
+      will-change: opacity, transform;
+      box-shadow: 0 0 6px rgba(174, 175, 173, 0.4);
+    }
+
+    /* Error squiggle — sits under the typo word.
+       Pattern made with a stacked SVG-style gradient. */
+    .squiggle {
+      position: absolute;
+      left: 0;
+      bottom: 2px;
+      height: 4px;
+      width: 56px;
+      background-image:
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='4' viewBox='0 0 8 4'><path d='M0 2 Q2 0 4 2 T8 2' stroke='%23f14c4c' stroke-width='1.2' fill='none'/></svg>");
+      background-repeat: repeat-x;
+      background-size: 8px 4px;
+      opacity: 0;
+      will-change: opacity, transform;
+      pointer-events: none;
+    }
+
+    /* Error tooltip — red badge near the error */
+    .err-tooltip {
+      position: absolute;
+      top: 130px;
+      left: 320px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #1e1e1e;
+      border: 1px solid #f14c4c;
+      border-radius: 4px;
+      font-family: "Inter", sans-serif;
+      font-size: 12px;
+      color: #e0e0e0;
+      box-shadow:
+        0 8px 24px -8px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(241, 76, 76, 0.2);
+      opacity: 0;
+      will-change: opacity, transform;
+      z-index: 6;
+    }
+    .err-tooltip::before {
+      content: "";
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #f14c4c;
+      flex: 0 0 auto;
+      box-shadow: 0 0 8px rgba(241, 76, 76, 0.55);
+    }
+    .err-tooltip .err-code {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 10px;
+      color: #f14c4c;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding-left: 6px;
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      margin-left: 4px;
+    }
+
+    /* Status bar at bottom */
+    .statusbar {
+      flex: 0 0 auto;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      background: #007acc;
+      font-size: 11px;
+      color: #ffffff;
+      letter-spacing: 0.02em;
+      gap: 16px;
+    }
+    .statusbar.err {
+      background: #f14c4c;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-item .err-count {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 0 6px;
+      border-radius: 8px;
+      font-weight: 600;
+    }
+    .status-right {
+      margin-left: auto;
+      display: flex;
+      gap: 16px;
+    }
+
+    /* Sidebar activity bar (very thin) */
+    .activity-bar {
+      position: absolute;
+      left: 0;
+      top: 84px;
+      bottom: 28px;
+      width: 48px;
+      background: #333333;
+      border-right: 1px solid rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 12px;
+      gap: 18px;
+      z-index: 2;
+    }
+    .act-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #969696;
+      font-size: 16px;
+    }
+    .act-icon.active {
+      color: #ffffff;
+      border-left: 2px solid #ffffff;
+      margin-left: -2px;
+    }
+
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 20;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-07-code-editor-typing"
+       data-composition-id="scene-07-code-editor-typing"
+       data-start="0"
+       data-duration="8"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="editor" id="editor">
+      <!-- Title bar -->
+      <div class="titlebar">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+        <span class="titlebar-title">user.ts — launch-platform</span>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab active" id="tab-active">
+          <span class="tab-icon">TS</span>
+          <span>user.ts</span>
+          <span class="dirty-dot" id="dirty-dot"></span>
+        </div>
+        <div class="tab">
+          <span class="tab-icon">TS</span>
+          <span>index.ts</span>
+          <span class="tab-close">×</span>
+        </div>
+      </div>
+
+      <!-- Body: activity bar + gutter + code -->
+      <div class="editor-body">
+        <div class="activity-bar">
+          <div class="act-icon active">▤</div>
+          <div class="act-icon">⌕</div>
+          <div class="act-icon">⎇</div>
+          <div class="act-icon">▶</div>
+        </div>
+
+        <div style="width:48px; flex:0 0 auto;"></div>
+
+        <div class="gutter" id="gutter">
+          <div class="ln" data-ln="1">1</div>
+          <div class="ln" data-ln="2">2</div>
+          <div class="ln" data-ln="3">3</div>
+          <div class="ln" data-ln="4">4</div>
+          <div class="ln" data-ln="5">5</div>
+          <div class="ln" data-ln="6">6</div>
+        </div>
+
+        <div class="code" id="code">
+          <!-- Line 1: comment -->
+          <div class="line" data-line="1" id="line-1"><span class="com"><span class="char">/</span><span class="char">/</span><span class="char"> </span><span class="char">u</span><span class="char">s</span><span class="char">e</span><span class="char">r</span><span class="char">.</span><span class="char">t</span><span class="char">s</span></span></div>
+
+          <!-- Line 2: function welcome(user: User) { -->
+          <div class="line" data-line="2" id="line-2"><span class="kw"><span class="char">f</span><span class="char">u</span><span class="char">n</span><span class="char">c</span><span class="char">t</span><span class="char">i</span><span class="char">o</span><span class="char">n</span></span><span class="punc"><span class="char"> </span></span><span class="name"><span class="char">w</span><span class="char">e</span><span class="char">l</span><span class="char">c</span><span class="char">o</span><span class="char">m</span><span class="char">e</span></span><span class="punc"><span class="char">(</span></span><span class="var"><span class="char">u</span><span class="char">s</span><span class="char">e</span><span class="char">r</span></span><span class="punc"><span class="char">:</span><span class="char"> </span></span><span class="type"><span class="char">U</span><span class="char">s</span><span class="char">e</span><span class="char">r</span></span><span class="punc"><span class="char">)</span><span class="char"> </span><span class="char">{</span></span></div>
+
+          <!-- Line 3: return `Hello, ${usre.name}` — has typo "usre" (will be fixed) -->
+          <div class="line" data-line="3" id="line-3"><span class="punc"><span class="char"> </span><span class="char"> </span></span><span class="kw"><span class="char">r</span><span class="char">e</span><span class="char">t</span><span class="char">u</span><span class="char">r</span><span class="char">n</span></span><span class="punc"><span class="char"> </span></span><span class="tpl"><span class="char">`</span><span class="char">H</span><span class="char">e</span><span class="char">l</span><span class="char">l</span><span class="char">o</span><span class="char">,</span><span class="char"> </span></span><span class="tplx"><span class="char">$</span><span class="char">{</span></span><span class="var" id="typo-word"><span class="char">u</span><span class="char" id="typo-char-1">s</span><span class="char" id="typo-char-2">r</span><span class="char">e</span></span><span class="punc"><span class="char">.</span></span><span class="var"><span class="char">n</span><span class="char">a</span><span class="char">m</span><span class="char">e</span></span><span class="tplx"><span class="char">}</span></span><span class="tpl"><span class="char">`</span></span><span class="punc"><span class="char">;</span></span></div>
+
+          <!-- Line 4: closing brace -->
+          <div class="line" data-line="4" id="line-4"><span class="punc"><span class="char">}</span></span></div>
+
+          <!-- Line 5: blank (no chars) -->
+          <div class="line" data-line="5" id="line-5"></div>
+
+          <!-- Line 6: blank (no chars) -->
+          <div class="line" data-line="6" id="line-6"></div>
+
+          <!-- Cursor — absolutely positioned, GSAP moves it line by line -->
+          <div class="cursor" id="cursor"></div>
+
+          <!-- Error squiggle — under the typo "usre" on line 3 -->
+          <div class="squiggle" id="squiggle"></div>
+        </div>
+      </div>
+
+      <!-- Error tooltip -->
+      <div class="err-tooltip" id="err-tooltip">
+        <span>Cannot find name 'usre'. Did you mean 'user'?</span>
+        <span class="err-code">TS2552</span>
+      </div>
+
+      <!-- Status bar -->
+      <div class="statusbar" id="statusbar">
+        <div class="status-item">⎇ main</div>
+        <div class="status-item" id="status-errors">
+          <span>⚠</span>
+          <span class="err-count" id="err-count">0</span>
+          <span>errors</span>
+        </div>
+        <div class="status-right">
+          <div class="status-item">Ln <span id="status-ln">1</span>, Col <span id="status-col">1</span></div>
+          <div class="status-item">TypeScript</div>
+          <div class="status-item">UTF-8</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="label">
+      Scene 07 · <span class="accent">Code Editor Typing</span> · syntax-colored multi-line type-on with error fix
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 8;
+      window.__timelines = window.__timelines || {};
+
+      var tl = gsap.timeline({ paused: true });
+
+      // Each line's chars in DOM order
+      var line1 = document.querySelectorAll('#line-1 .char');
+      var line2 = document.querySelectorAll('#line-2 .char');
+      var line3 = document.querySelectorAll('#line-3 .char');
+      var line4 = document.querySelectorAll('#line-4 .char');
+
+      // Line vertical positions in px (top of each line within the .code box).
+      // .code has padding-top:18px and line-height:32px, lines are 32px tall.
+      // Line 1 top = 18, line 2 = 50, line 3 = 82, line 4 = 114, etc.
+      function lineTop(n) { return 18 + (n - 1) * 32; }
+
+      // Approximate column width for the monospace 18px font.
+      // JetBrains Mono at 18px ≈ 10.8px per char. We use 10.8 as the multiplier.
+      var CW = 10.8;
+      function colX(c) { return 24 /* code padding-left */ + c * CW; }
+
+      // === t=0 initial state ===
+      tl.set('#editor', { scale: 0.97, opacity: 0, transformOrigin: '50% 50%' }, 0);
+      tl.set('#cursor', { x: colX(0), y: lineTop(1), opacity: 1 }, 0);
+      tl.set('#squiggle', { opacity: 0 }, 0);
+      tl.set('#err-tooltip', { opacity: 0, y: -6, scale: 0.96, transformOrigin: '50% 100%' }, 0);
+      tl.set('#dirty-dot', { opacity: 0 }, 0);
+
+      // === t=0.0s — 0.5s: Editor fades in.
+      tl.fromTo('#editor',
+        { scale: 0.97, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.5, ease: 'expo.out' },
+        0);
+
+      // === Cursor blink running throughout the whole beat (continuous motion).
+      // steps(1) gives the hard on/off CRT-style blink — perfect editor caret.
+      tl.fromTo('#cursor',
+        { opacity: 1 },
+        { opacity: 0.15, duration: 0.5, repeat: 15, yoyo: true, ease: 'steps(1)' },
+        0);
+
+      // === 0.5s: highlight line 1 as the active row (cursor arrives there).
+      tl.to('#line-1', { className: 'line active' }, 0.5);
+      tl.to('.gutter .ln[data-ln="1"]', { className: 'ln active' }, 0.5);
+
+      // === 0.55–1.05s: Line 1 (the // user.ts comment) types in. 10 chars.
+      // Stepped opacity (steps(1)) so each char appears instantly with stagger.
+      tl.to(line1, {
+        opacity: 1,
+        duration: 0.05,
+        stagger: 0.045,
+        ease: 'steps(1)',
+      }, 0.55);
+      // Cursor sweeps right along line 1 in sync with the typing — power1.out is mechanical.
+      tl.to('#cursor', {
+        x: colX(line1.length),
+        duration: line1.length * 0.045,
+        ease: 'power1.out',
+      }, 0.55);
+
+      // === ~1.10s: Cursor jumps to start of line 2.
+      tl.to('#cursor', {
+        x: colX(0),
+        y: lineTop(2),
+        duration: 0.18,
+        ease: 'power4.out',
+      }, 1.10);
+      tl.to('#line-1', { className: 'line' }, 1.10);
+      tl.to('#line-2', { className: 'line active' }, 1.10);
+      tl.to('.gutter .ln[data-ln="1"]', { className: 'ln' }, 1.10);
+      tl.to('.gutter .ln[data-ln="2"]', { className: 'ln active' }, 1.10);
+      tl.set('#status-ln', { textContent: '2' }, 1.10);
+
+      // === 1.30–2.40s: Line 2 — function welcome(user: User) { — 28 chars
+      tl.to(line2, {
+        opacity: 1,
+        duration: 0.05,
+        stagger: 0.038,
+        ease: 'steps(1)',
+      }, 1.30);
+      tl.to('#cursor', {
+        x: colX(line2.length),
+        duration: line2.length * 0.038,
+        ease: 'power1.out',
+      }, 1.30);
+
+      // Dirty dot appears after first real edits — file marked unsaved.
+      tl.fromTo('#dirty-dot',
+        { opacity: 0, scale: 0.5 },
+        { opacity: 1, scale: 1, duration: 0.3, ease: 'back.out(1.7)', transformOrigin: '50% 50%' },
+        2.20);
+
+      // === ~2.45s: cursor jumps to line 3.
+      tl.to('#cursor', {
+        x: colX(0),
+        y: lineTop(3),
+        duration: 0.18,
+        ease: 'power4.out',
+      }, 2.45);
+      tl.to('#line-2', { className: 'line' }, 2.45);
+      tl.to('#line-3', { className: 'line active' }, 2.45);
+      tl.to('.gutter .ln[data-ln="2"]', { className: 'ln' }, 2.45);
+      tl.to('.gutter .ln[data-ln="3"]', { className: 'ln active' }, 2.45);
+      tl.set('#status-ln', { textContent: '3' }, 2.45);
+
+      // === 2.65–3.40s: Line 3 — return `Hello, ${usre.name}`; — 24 chars
+      tl.to(line3, {
+        opacity: 1,
+        duration: 0.05,
+        stagger: 0.032,
+        ease: 'steps(1)',
+      }, 2.65);
+      tl.to('#cursor', {
+        x: colX(line3.length),
+        duration: line3.length * 0.032,
+        ease: 'power1.out',
+      }, 2.65);
+
+      // === ~3.45s: cursor jumps to line 4 to type closing brace.
+      tl.to('#cursor', {
+        x: colX(0),
+        y: lineTop(4),
+        duration: 0.16,
+        ease: 'power4.out',
+      }, 3.45);
+      tl.to('#line-3', { className: 'line' }, 3.45);
+      tl.to('#line-4', { className: 'line active' }, 3.45);
+      tl.to('.gutter .ln[data-ln="3"]', { className: 'ln' }, 3.45);
+      tl.to('.gutter .ln[data-ln="4"]', { className: 'ln active' }, 3.45);
+      tl.set('#status-ln', { textContent: '4' }, 3.45);
+
+      // Line 4 — 1 char "}"
+      tl.to(line4, {
+        opacity: 1,
+        duration: 0.05,
+        stagger: 0.04,
+        ease: 'steps(1)',
+      }, 3.55);
+      tl.to('#cursor', {
+        x: colX(1),
+        duration: 0.1,
+        ease: 'power1.out',
+      }, 3.55);
+
+      // === 3.85–4.45s: ERROR DETECTED on line 3.
+      // Cursor returns to line 3 to inspect.
+      tl.to('#cursor', {
+        x: colX(16), // approx position of "usre" in line 3
+        y: lineTop(3),
+        duration: 0.22,
+        ease: 'power4.out',
+      }, 3.85);
+      tl.to('#line-4', { className: 'line' }, 3.85);
+      tl.to('#line-3', { className: 'line active' }, 3.85);
+      tl.to('.gutter .ln[data-ln="4"]', { className: 'ln' }, 3.85);
+      tl.to('.gutter .ln[data-ln="3"]', { className: 'ln active' }, 3.85);
+      tl.set('#status-ln', { textContent: '3' }, 3.85);
+
+      // Position the squiggle under the typo word "usre" on line 3.
+      // line 3 starts with "  return `Hello, ${" = 19 chars before "usre". CW = 10.8.
+      // So x ≈ 24 + 19*10.8 = ~229. y = top of line 3 = 82, height 32, so squiggle bottom = 82+30.
+      tl.set('#squiggle', {
+        x: 24 + 19 * 10.8,
+        y: 82 + 24,
+        width: 4 * 10.8,
+      }, 4.05);
+
+      // Squiggle fades in.
+      tl.fromTo('#squiggle',
+        { opacity: 0, scaleY: 0.3 },
+        { opacity: 1, scaleY: 1, duration: 0.35, ease: 'back.out(1.7)', transformOrigin: '50% 100%' },
+        4.05);
+
+      // Error tooltip slides in just below the error.
+      tl.fromTo('#err-tooltip',
+        { opacity: 0, y: -8, scale: 0.94 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.6)', transformOrigin: '0% 0%' },
+        4.15);
+
+      // Status bar flashes red — "1 error".
+      tl.to('#statusbar', { className: 'statusbar err', duration: 0 }, 4.05);
+      tl.set('#err-count', { textContent: '1' }, 4.05);
+      tl.fromTo('#status-errors',
+        { scale: 1 },
+        { scale: 1.15, duration: 0.25, ease: 'back.out(1.8)', yoyo: true, repeat: 1, transformOrigin: '50% 50%' },
+        4.05);
+
+      // Squiggle continuous pulse during the error state.
+      tl.to('#squiggle', {
+        opacity: 0.55,
+        duration: 0.55,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: 2,
+      }, 4.45);
+
+      // === 4.65s: cursor jumps to the wrong char (between 's' and 'r') to fix typo.
+      // "usre" — to swap 'r' and 'e' we'll just delete one char and retype the right one.
+      // Position cursor at the typo char position (col 19 + 2 = 21).
+      tl.to('#cursor', {
+        x: 24 + 21 * 10.8,
+        y: lineTop(3),
+        duration: 0.22,
+        ease: 'power4.out',
+      }, 4.65);
+
+      // === 4.95s: Delete the wrong char 'r' — fade it out (simulating backspace).
+      tl.to('#typo-char-2', {
+        opacity: 0,
+        duration: 0.12,
+        ease: 'power1.out',
+      }, 4.95);
+      // Tooltip nudges down 1px to feel "live".
+      tl.to('#err-tooltip', {
+        y: 2,
+        duration: 0.15,
+        ease: 'expo.out',
+      }, 4.95);
+
+      // === 5.20s: Type the correct char 'e' (swap s/r → s/e).
+      // Update the existing 'r' char to 'e' via tl.set on textContent, then fade in.
+      tl.set('#typo-char-2', { textContent: 'e' }, 5.20);
+      tl.to('#typo-char-2', {
+        opacity: 1,
+        duration: 0.12,
+        ease: 'power1.out',
+        overwrite: 'auto',
+      }, 5.20);
+
+      // Also fix the next char "e" → "r" — we have "usre" with chars [u,s,r,e].
+      // After typo-char-1 (s) and typo-char-2 (was r → now e), we still have 'e' at index 3
+      // which should become 'r' to spell "user".  Actually wait — we want "user", so:
+      //   index 0: u
+      //   index 1: s
+      //   index 2: e  (was r)
+      //   index 3: r  (was e)
+      // So we also need to fix the last 'e' to 'r'. Use the parent #typo-word's last char.
+      tl.set('#typo-word .char:last-child', { textContent: 'r' }, 5.20);
+
+      // Move cursor slightly past to look natural.
+      tl.to('#cursor', {
+        x: 24 + 23 * 10.8,
+        duration: 0.16,
+        ease: 'power1.out',
+      }, 5.20);
+
+      // === 5.40s: Squiggle disappears, tooltip slides out, status bar back to blue.
+      tl.to('#squiggle', {
+        opacity: 0,
+        scaleY: 0.4,
+        duration: 0.3,
+        ease: 'expo.out',
+        transformOrigin: '50% 100%',
+      }, 5.40);
+      tl.to('#err-tooltip', {
+        opacity: 0,
+        y: -6,
+        scale: 0.96,
+        duration: 0.35,
+        ease: 'expo.in',
+        transformOrigin: '0% 0%',
+      }, 5.40);
+      tl.to('#statusbar', { className: 'statusbar', duration: 0 }, 5.55);
+      tl.set('#err-count', { textContent: '0' }, 5.55);
+
+      // === 5.80s: success pulse on the fixed line — a green-tinted glow flash.
+      // We use a temporary background flash via fromTo on the .line ::before would be hard,
+      // so we pulse opacity on the whole line and add a soft scale beat.
+      tl.fromTo('#line-3',
+        { backgroundColor: 'rgba(78, 201, 176, 0)' },
+        { backgroundColor: 'rgba(78, 201, 176, 0.12)', duration: 0.35, ease: 'expo.out' },
+        5.80);
+      tl.to('#line-3', {
+        backgroundColor: 'rgba(78, 201, 176, 0)',
+        duration: 0.6,
+        ease: 'expo.out',
+      }, 6.20);
+
+      // === Continuous motion 6.0s — 8.0s — the fixed-line highlight pulse + editor breath.
+      // Highlight pulses subtly on line 3 (continuous attention on the fix).
+      tl.fromTo('#line-3',
+        { backgroundColor: 'rgba(78, 201, 176, 0)' },
+        { backgroundColor: 'rgba(78, 201, 176, 0.08)', duration: 0.7, ease: 'sine.inOut', yoyo: true, repeat: 1 },
+        6.85);
+
+      // Cursor settles at the fixed location and slowly pulses.
+      tl.to('#cursor', {
+        x: 24 + 24 * 10.8,
+        duration: 0.4,
+        ease: 'expo.out',
+      }, 5.80);
+
+      // Subtle editor drift (camera move) for the hold.
+      tl.to('#editor', {
+        y: -6,
+        duration: 1.8,
+        ease: 'sine.inOut',
+      }, 6.00);
+
+      // Dirty dot pulses to suggest "saved/unsaved" state staying alive.
+      tl.to('#dirty-dot', {
+        scale: 1.25,
+        duration: 0.5,
+        ease: 'sine.inOut',
+        yoyo: true,
+        repeat: 2,
+        transformOrigin: '50% 50%',
+      }, 6.30);
+
+      window.__timelines['scene-07-code-editor-typing'] = tl;
+    })();
+  </script>
+</body>
+</html>

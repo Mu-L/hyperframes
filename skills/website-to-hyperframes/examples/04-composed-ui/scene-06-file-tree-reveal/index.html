@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-06-file-tree-reveal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    #scene-06-file-tree-reveal {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, #181818 0%, #141414 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #cccccc;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Window chrome — VS Code style */
+    .window {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1600px;
+      height: 880px;
+      border-radius: 12px;
+      background: #1e1e1e;
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow:
+        0 60px 120px -30px rgba(0,0,0,0.8),
+        0 0 0 1px rgba(255,255,255,0.02) inset;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Title bar */
+    .titlebar {
+      height: 36px;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      background: #181818;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .traffic { display: flex; gap: 8px; }
+    .traffic-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .traffic-dot.red { background: #ff5f57; }
+    .traffic-dot.yellow { background: #ffbd2e; }
+    .traffic-dot.green { background: #28c941; }
+    .title-text {
+      flex: 1;
+      text-align: center;
+      font-size: 12px;
+      color: #858585;
+      letter-spacing: 0.02em;
+    }
+
+    /* Body layout — sidebar + editor */
+    .body {
+      flex: 1 1 auto;
+      display: flex;
+      min-height: 0;
+    }
+
+    /* Activity bar (icon column on far left) */
+    .activity-bar {
+      width: 48px;
+      flex: 0 0 auto;
+      background: #181818;
+      border-right: 1px solid rgba(255,255,255,0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 0;
+      gap: 4px;
+    }
+    .activity-icon {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #858585;
+      font-size: 18px;
+      border-radius: 4px;
+      position: relative;
+    }
+    .activity-icon.active {
+      color: #ffffff;
+    }
+    .activity-icon.active::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      bottom: 6px;
+      width: 2px;
+      background: #ffffff;
+      border-radius: 2px;
+    }
+
+    /* Sidebar — file tree container */
+    .sidebar {
+      width: 360px;
+      flex: 0 0 auto;
+      background: #1e1e1e;
+      border-right: 1px solid rgba(255,255,255,0.04);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      will-change: transform, opacity;
+    }
+    .sidebar-header {
+      flex: 0 0 auto;
+      padding: 12px 18px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sidebar-title {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #858585;
+      font-weight: 600;
+    }
+    .sidebar-actions {
+      display: flex;
+      gap: 4px;
+      color: #858585;
+      font-size: 13px;
+    }
+
+    /* Tree rows */
+    .tree {
+      flex: 1 1 auto;
+      padding: 4px 0;
+      font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+      font-size: 14px;
+      line-height: 22px;
+      color: #cccccc;
+      position: relative;
+    }
+    .row {
+      position: relative;
+      display: flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 18px 0 0;
+      cursor: default;
+      opacity: 0; /* locked initial — GSAP brings each row in */
+      will-change: transform, opacity;
+    }
+    .row .indent {
+      flex: 0 0 auto;
+      display: inline-block;
+    }
+    .arrow {
+      width: 14px;
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #858585;
+      font-size: 9px;
+      transform-origin: 50% 50%;
+      will-change: transform;
+    }
+    .arrow.placeholder { visibility: hidden; }
+    .icon {
+      width: 18px;
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 6px;
+      font-size: 13px;
+    }
+    .name {
+      flex: 1 1 auto;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .row.folder .name { color: #cccccc; }
+    .row.file .name { color: #d4d4d4; }
+    .row .badge {
+      font-size: 10px;
+      font-weight: 600;
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 8px;
+      flex: 0 0 auto;
+      opacity: 0;
+      will-change: opacity, transform;
+    }
+    .badge.modified { color: #e2c08d; }
+    .badge.added { color: #81b88b; }
+
+    /* Indent depths */
+    .depth-0 { padding-left: 12px; }
+    .depth-1 { padding-left: 28px; }
+    .depth-2 { padding-left: 44px; }
+    .depth-3 { padding-left: 60px; }
+
+    /* Folder icon colors */
+    .icon.folder-icon { color: #dcb67a; }
+    .icon.file-ts { color: #519aba; }
+    .icon.file-json { color: #cbcb41; }
+    .icon.file-md { color: #519aba; }
+    .icon.file-test { color: #cbcb41; }
+
+    /* Selection bar — slides into place behind selected file */
+    .selection-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 24px;
+      background: #094771;
+      border-left: 2px solid #007acc;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+    .row.selected .name {
+      color: #ffffff;
+    }
+    .row { z-index: 1; }
+    .row > * { position: relative; z-index: 2; }
+
+    /* Tree-line guides (subtle vertical lines for indented children) */
+    .tree-guide {
+      position: absolute;
+      left: 22px;
+      top: 26px;
+      width: 1px;
+      background: rgba(255,255,255,0.06);
+      z-index: 0;
+      opacity: 0;
+    }
+
+    /* Editor pane — placeholder, shows when "parse.ts" is selected */
+    .editor {
+      flex: 1 1 auto;
+      background: #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+    .tabs {
+      height: 36px;
+      flex: 0 0 auto;
+      display: flex;
+      background: #181818;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .tab {
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #858585;
+      background: #1e1e1e;
+      border-right: 1px solid rgba(255,255,255,0.04);
+      font-family: "JetBrains Mono", monospace;
+      opacity: 0;
+      will-change: opacity, transform;
+    }
+    .tab .tab-icon { color: #519aba; }
+    .tab.active { color: #ffffff; background: #1e1e1e; border-top: 1px solid #007acc; margin-top: -1px; }
+    .editor-body {
+      flex: 1 1 auto;
+      padding: 18px 24px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 14px;
+      line-height: 22px;
+      color: #d4d4d4;
+      overflow: hidden;
+    }
+    .editor-line {
+      display: flex;
+      gap: 24px;
+      opacity: 0;
+      will-change: opacity, transform;
+    }
+    .line-num {
+      width: 28px;
+      color: #858585;
+      text-align: right;
+      flex: 0 0 auto;
+      font-variant-numeric: tabular-nums;
+    }
+    .line-content {
+      flex: 1 1 auto;
+      white-space: pre;
+    }
+    .kw { color: #569cd6; }
+    .fn { color: #dcdcaa; }
+    .str { color: #ce9178; }
+    .com { color: #6a9955; font-style: italic; }
+    .var { color: #9cdcfe; }
+    .pn { color: #4ec9b0; }
+
+    /* Status bar */
+    .statusbar {
+      height: 28px;
+      flex: 0 0 auto;
+      background: #007acc;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      font-size: 12px;
+      gap: 16px;
+      opacity: 0;
+      will-change: opacity;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-sep { flex: 1; }
+
+    /* Cursor blink in editor */
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 16px;
+      background: #d4d4d4;
+      vertical-align: middle;
+      margin-left: 1px;
+      will-change: opacity;
+    }
+
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 20;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-06-file-tree-reveal"
+       data-composition-id="scene-06-file-tree-reveal"
+       data-start="0"
+       data-duration="8"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="window" id="window">
+      <div class="titlebar">
+        <div class="traffic">
+          <span class="traffic-dot red"></span>
+          <span class="traffic-dot yellow"></span>
+          <span class="traffic-dot green"></span>
+        </div>
+        <div class="title-text">project-root — Visual Studio Code</div>
+        <div style="width:60px"></div>
+      </div>
+
+      <div class="body">
+        <!-- Activity bar -->
+        <div class="activity-bar">
+          <div class="activity-icon active">▤</div>
+          <div class="activity-icon">⌕</div>
+          <div class="activity-icon">⎇</div>
+          <div class="activity-icon">▷</div>
+          <div class="activity-icon">⚙</div>
+        </div>
+
+        <!-- Sidebar (file tree) -->
+        <div class="sidebar" id="sidebar">
+          <div class="sidebar-header">
+            <div class="sidebar-title">Explorer</div>
+            <div class="sidebar-actions">⋯</div>
+          </div>
+
+          <div class="tree" id="tree">
+            <!-- Selection bar — absolutely positioned, slides to selected row -->
+            <div class="selection-bar" id="selection-bar"></div>
+
+            <!-- Row: project-root/ (depth 0, expanded) -->
+            <div class="row folder depth-0" data-row="root">
+              <span class="arrow" data-arrow="root">▶</span>
+              <span class="icon folder-icon">▤</span>
+              <span class="name">project-root/</span>
+            </div>
+
+            <!-- Row: src/ (depth 1, expanded) -->
+            <div class="row folder depth-1" data-row="src">
+              <span class="arrow" data-arrow="src">▶</span>
+              <span class="icon folder-icon">▤</span>
+              <span class="name">src/</span>
+            </div>
+
+            <!-- Row: components/ (depth 2, collapsed) -->
+            <div class="row folder depth-2" data-row="components">
+              <span class="arrow" data-arrow="components">▶</span>
+              <span class="icon folder-icon">▤</span>
+              <span class="name">components/</span>
+            </div>
+
+            <!-- Row: utils/ (depth 2, expanded) -->
+            <div class="row folder depth-2" data-row="utils">
+              <span class="arrow" data-arrow="utils">▶</span>
+              <span class="icon folder-icon">▤</span>
+              <span class="name">utils/</span>
+            </div>
+
+            <!-- Row: utils/format.ts (depth 3) -->
+            <div class="row file depth-3" data-row="format">
+              <span class="arrow placeholder">▸</span>
+              <span class="icon file-ts">TS</span>
+              <span class="name">format.ts</span>
+            </div>
+
+            <!-- Row: utils/parse.ts (depth 3) — SELECTED later -->
+            <div class="row file depth-3" data-row="parse" id="row-parse">
+              <span class="arrow placeholder">▸</span>
+              <span class="icon file-ts">TS</span>
+              <span class="name">parse.ts</span>
+              <span class="badge modified" data-badge="parse">M</span>
+            </div>
+
+            <!-- Row: src/index.ts (depth 2) -->
+            <div class="row file depth-2" data-row="index">
+              <span class="arrow placeholder">▸</span>
+              <span class="icon file-ts">TS</span>
+              <span class="name">index.ts</span>
+            </div>
+
+            <!-- Row: tests/ (depth 1, expanded) -->
+            <div class="row folder depth-1" data-row="tests">
+              <span class="arrow" data-arrow="tests">▶</span>
+              <span class="icon folder-icon">▤</span>
+              <span class="name">tests/</span>
+            </div>
+
+            <!-- Row: tests/unit.test.ts (depth 2) -->
+            <div class="row file depth-2" data-row="unit">
+              <span class="arrow placeholder">▸</span>
+              <span class="icon file-test">TS</span>
+              <span class="name">unit.test.ts</span>
+              <span class="badge added" data-badge="unit">A</span>
+            </div>
+
+            <!-- Row: tests/integration.test.ts (depth 2) -->
+            <div class="row file depth-2" data-row="integration">
+              <span class="arrow placeholder">▸</span>
+              <span class="icon file-test">TS</span>
+              <span class="name">integration.test.ts</span>
+            </div>
+
+            <!-- Row: package.json (depth 1) -->
+            <div class="row file depth-1" data-row="pkg">
+              <span class="arrow placeholder">▸</span>
+              <span class="icon file-json">{ }</span>
+              <span class="name">package.json</span>
+              <span class="badge modified" data-badge="pkg">M</span>
+            </div>
+
+            <!-- Row: README.md (depth 1) -->
+            <div class="row file depth-1" data-row="readme">
+              <span class="arrow placeholder">▸</span>
+              <span class="icon file-md">MD</span>
+              <span class="name">README.md</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Editor pane -->
+        <div class="editor">
+          <div class="tabs">
+            <div class="tab active" id="tab-parse">
+              <span class="tab-icon">TS</span>
+              <span>parse.ts</span>
+              <span style="color:#858585; margin-left:8px">×</span>
+            </div>
+          </div>
+          <div class="editor-body" id="editor-body">
+            <div class="editor-line" data-line="1">
+              <span class="line-num">1</span>
+              <span class="line-content"><span class="com">// parse user input into a typed AST</span></span>
+            </div>
+            <div class="editor-line" data-line="2">
+              <span class="line-num">2</span>
+              <span class="line-content"><span class="kw">import</span> { <span class="var">Token</span> } <span class="kw">from</span> <span class="str">"./format"</span>;</span>
+            </div>
+            <div class="editor-line" data-line="3">
+              <span class="line-num">3</span>
+              <span class="line-content"></span>
+            </div>
+            <div class="editor-line" data-line="4">
+              <span class="line-num">4</span>
+              <span class="line-content"><span class="kw">export function</span> <span class="fn">parse</span>(<span class="var">input</span>: <span class="pn">string</span>): <span class="pn">Token</span>[] {</span>
+            </div>
+            <div class="editor-line" data-line="5">
+              <span class="line-num">5</span>
+              <span class="line-content">  <span class="kw">const</span> <span class="var">tokens</span> = <span class="var">input</span>.<span class="fn">split</span>(<span class="str">" "</span>);</span>
+            </div>
+            <div class="editor-line" data-line="6">
+              <span class="line-num">6</span>
+              <span class="line-content">  <span class="kw">return</span> <span class="var">tokens</span>.<span class="fn">map</span>(<span class="fn">toToken</span>);<span class="cursor" id="cursor"></span></span>
+            </div>
+            <div class="editor-line" data-line="7">
+              <span class="line-num">7</span>
+              <span class="line-content">}</span>
+            </div>
+          </div>
+
+          <div class="statusbar" id="statusbar">
+            <div class="status-item">⎇ main</div>
+            <div class="status-item">⊘ 0</div>
+            <div class="status-item">⚠ 0</div>
+            <div class="status-sep"></div>
+            <div class="status-item">Ln 6, Col 28</div>
+            <div class="status-item">TypeScript</div>
+            <div class="status-item">UTF-8</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="label">
+      Scene 06 · <span class="accent">File Tree Reveal</span> · indented folder/file structure with progressive expand
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 8;
+      window.__timelines = window.__timelines || {};
+
+      var tl = gsap.timeline({ paused: true });
+
+      // === All rows in DOM order (this is the tree layout — children animate in based on parent expansion).
+      // Row heights are 24px each; the selection bar slides to the y-position of the selected row inside the tree.
+      // Tree padding-top = 4px (.tree padding: 4px 0).
+
+      // Y positions inside .tree for each row (used by the selection bar):
+      //   row 0 (root):        y=4
+      //   row 1 (src):         y=28
+      //   row 2 (components):  y=52
+      //   row 3 (utils):       y=76
+      //   row 4 (format):      y=100
+      //   row 5 (parse):       y=124   ← selected
+      //   row 6 (index):       y=148
+      //   row 7 (tests):       y=172
+      //   row 8 (unit):        y=196
+      //   row 9 (integration): y=220
+      //   row 10 (pkg):        y=244
+      //   row 11 (readme):     y=268
+
+      // === t=0 initial state. EVERYTHING is locked off-screen / hidden via GSAP set.
+      tl.set("#window", { opacity: 0, scale: 0.97, transformOrigin: "50% 50%" }, 0);
+      tl.set("#sidebar", { x: -360, opacity: 0 }, 0);
+      tl.set(".row", { opacity: 0, x: -20 }, 0);
+      // All arrows start collapsed (pointing right ▶ = rotation 0). Expanded = rotation 90deg.
+      tl.set("[data-arrow]", { rotation: 0, transformOrigin: "50% 50%" }, 0);
+      // Selection bar starts hidden, parked at y=4
+      tl.set("#selection-bar", { y: 4, opacity: 0, scaleX: 0.6, transformOrigin: "0% 50%" }, 0);
+      // Editor stuff hidden
+      tl.set("#tab-parse", { opacity: 0, y: -8 }, 0);
+      tl.set(".editor-line", { opacity: 0, x: 12 }, 0);
+      tl.set("#statusbar", { opacity: 0 }, 0);
+      tl.set(".badge", { opacity: 0, scale: 0.4 }, 0);
+      tl.set("#cursor", { opacity: 0 }, 0);
+
+      // === t=0.0s: Window fades in with a subtle scale up. Sets the stage.
+      tl.fromTo("#window",
+        { opacity: 0, scale: 0.97 },
+        { opacity: 1, scale: 1, duration: 0.45, ease: "expo.out" },
+        0.0);
+
+      // === t=0.0s–0.5s: Sidebar slides in from the left. expo.out for the snappy IDE feel.
+      tl.fromTo("#sidebar",
+        { x: -360, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.55, ease: "expo.out" },
+        0.0);
+
+      // === t=0.5s: Root folder row appears, then arrow rotates 90deg ("expanded").
+      tl.fromTo('[data-row="root"]',
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, duration: 0.35, ease: "power4.out" },
+        0.50);
+      tl.to('[data-arrow="root"]',
+        { rotation: 90, duration: 0.28, ease: "back.out(1.6)" },
+        0.78);
+
+      // === t=0.95s: src/ folder row appears, arrow rotates.
+      tl.fromTo('[data-row="src"]',
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, duration: 0.35, ease: "power4.out" },
+        0.95);
+      tl.to('[data-arrow="src"]',
+        { rotation: 90, duration: 0.28, ease: "back.out(1.6)" },
+        1.22);
+
+      // === t=1.5s–3.0s: src/ children stagger in.
+      //   components/ (collapsed — arrow stays ▶)
+      //   utils/      (will expand at 3.0s)
+      //   index.ts
+      tl.fromTo(['[data-row="components"]', '[data-row="utils"]', '[data-row="index"]'],
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, duration: 0.4, stagger: 0.18, ease: "back.out(1.4)" },
+        1.50);
+
+      // === t=3.0s: utils/ expands — arrow rotates 90deg, its 2 children slide in.
+      tl.to('[data-arrow="utils"]',
+        { rotation: 90, duration: 0.3, ease: "back.out(1.6)" },
+        3.00);
+      tl.fromTo(['[data-row="format"]', '[data-row="parse"]'],
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, duration: 0.4, stagger: 0.14, ease: "back.out(1.4)" },
+        3.10);
+
+      // === t=4.5s: Selection bar slides in to "parse.ts" row.
+      // Selection starts off-screen (scaleX: 0.6) and grows to fill width.
+      // Y-position is row index 5 → y = 4 + (5 * 24) = 124
+      tl.fromTo("#selection-bar",
+        { y: 124, scaleX: 0.6, opacity: 0, x: -40 },
+        { y: 124, scaleX: 1, opacity: 1, x: 0, duration: 0.42, ease: "expo.out" },
+        4.50);
+      // Mark the row "selected" so its name text turns white.
+      tl.to("#row-parse .name", { color: "#ffffff", duration: 0.2, ease: "power2.out" }, 4.55);
+
+      // === t=4.7s: Modified badge on parse.ts pops in (it's the selected, modified file).
+      tl.fromTo('[data-badge="parse"]',
+        { opacity: 0, scale: 0.4 },
+        { opacity: 1, scale: 1, duration: 0.32, ease: "back.out(1.7)", transformOrigin: "50% 50%" },
+        4.70);
+
+      // === t=4.8s: Editor tab fades in for parse.ts.
+      tl.fromTo("#tab-parse",
+        { opacity: 0, y: -8 },
+        { opacity: 1, y: 0, duration: 0.35, ease: "expo.out" },
+        4.80);
+
+      // === t=4.95s: Editor code lines stagger in. Mechanical power1.out for code typing feel.
+      tl.fromTo(".editor-line",
+        { opacity: 0, x: 12 },
+        { opacity: 1, x: 0, duration: 0.32, stagger: 0.08, ease: "power1.out" },
+        4.95);
+
+      // === t=5.5s: Status bar slides up.
+      tl.fromTo("#statusbar",
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.32, ease: "expo.out" },
+        5.50);
+
+      // === t=5.6s: Cursor in editor starts blinking — continuous motion during hold.
+      tl.fromTo("#cursor",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.15, ease: "none" },
+        5.60);
+      // Cursor blink: 4 blinks across the rest of the timeline (sine.inOut yoyo).
+      tl.to("#cursor", {
+        opacity: 0,
+        duration: 0.5,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 4,
+      }, 5.75);
+
+      // === t=5.35s: tests/ folder row itself slides in (it lived in layout but was hidden).
+      tl.fromTo('[data-row="tests"]',
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, duration: 0.38, ease: "power4.out" },
+        5.35);
+      // === t=5.5s: tests/ folder expands — arrow rotates, test files slide in.
+      tl.to('[data-arrow="tests"]',
+        { rotation: 90, duration: 0.3, ease: "back.out(1.6)" },
+        5.55);
+      tl.fromTo(['[data-row="unit"]', '[data-row="integration"]'],
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, duration: 0.4, stagger: 0.16, ease: "back.out(1.4)" },
+        5.65);
+
+      // === t=6.4s: Bottom-level files at root depth — package.json + README.md slide in.
+      tl.fromTo(['[data-row="pkg"]', '[data-row="readme"]'],
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, duration: 0.4, stagger: 0.14, ease: "power4.out" },
+        6.40);
+
+      // === t=7.0s–8.0s: Hold — git modified/added badges pop in on the relevant files.
+      // unit.test.ts gets an "A" (added) badge
+      tl.fromTo('[data-badge="unit"]',
+        { opacity: 0, scale: 0.4 },
+        { opacity: 1, scale: 1, duration: 0.32, ease: "elastic.out(1, 0.5)", transformOrigin: "50% 50%" },
+        7.00);
+      // package.json gets an "M" (modified) badge
+      tl.fromTo('[data-badge="pkg"]',
+        { opacity: 0, scale: 0.4 },
+        { opacity: 1, scale: 1, duration: 0.32, ease: "elastic.out(1, 0.5)", transformOrigin: "50% 50%" },
+        7.18);
+
+      // === t=7.0s–8.0s: Continuous motion — selection bar subtle breath (alive feel).
+      tl.to("#selection-bar", {
+        opacity: 0.85,
+        duration: 0.6,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 7.00);
+
+      // === t=7.2s–8.0s: Window subtle drift (Ken Burns / camera move) for ambient motion.
+      tl.to("#window", {
+        y: -6,
+        duration: 0.8,
+        ease: "sine.inOut",
+      }, 7.20);
+
+      // === t=7.5s: Modified badge on parse.ts gets a subtle pulse to remind viewer of selected file's state.
+      tl.to('[data-badge="parse"]', {
+        scale: 1.25,
+        duration: 0.35,
+        ease: "back.out(1.7)",
+        transformOrigin: "50% 50%",
+        yoyo: true,
+        repeat: 1,
+      }, 7.50);
+
+      window.__timelines["scene-06-file-tree-reveal"] = tl;
+    })();
+  </script>
+</body>
+</html>

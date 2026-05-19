@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-03-terminal-typeon</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@500;600&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    #scene-03-terminal-typeon {
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 50% 55%, #0d141b 0%, #050709 70%),
+        linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.4) 100%);
+      font-family: "JetBrains Mono", "Menlo", monospace;
+      color: #d4f1ff;
+    }
+
+    /* Scanline overlay — CRT/terminal ambiance + continuous motion. */
+    .scanlines {
+      position: absolute;
+      inset: 0;
+      background-image: repeating-linear-gradient(
+        0deg,
+        rgba(255,255,255,0.0) 0px,
+        rgba(255,255,255,0.0) 2px,
+        rgba(255,255,255,0.025) 2px,
+        rgba(255,255,255,0.025) 4px
+      );
+      pointer-events: none;
+      mix-blend-mode: screen;
+      will-change: transform;
+      z-index: 30;
+    }
+
+    /* Soft green floor glow under the terminal — emphasises the "build succeeded" finish */
+    .floor-glow {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1400px;
+      height: 280px;
+      background: radial-gradient(ellipse at center top, rgba(16, 185, 129, 0.18) 0%, transparent 70%);
+      pointer-events: none;
+      filter: blur(8px);
+      opacity: 0;
+    }
+
+    /* Terminal window chrome — composed entirely from divs, NOT a screenshot. */
+    .terminal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1480px;
+      border: 1px solid rgba(120, 180, 220, 0.18);
+      border-radius: 14px;
+      background: linear-gradient(180deg, #0d1318 0%, #06090c 100%);
+      box-shadow:
+        0 60px 120px -30px rgba(8, 60, 100, 0.5),
+        inset 0 1px 0 rgba(255,255,255,0.03);
+      overflow: hidden;
+      will-change: transform, opacity, box-shadow;
+    }
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 22px;
+      border-bottom: 1px solid rgba(120, 180, 220, 0.12);
+      background: rgba(15, 25, 35, 0.5);
+    }
+    /* Traffic-light dots */
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red    { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green  { background: #28c941; }
+    .terminal-title {
+      flex: 1;
+      text-align: center;
+      font-family: "Inter", sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: #5c6c7a;
+      letter-spacing: 0.02em;
+    }
+
+    .terminal-body {
+      padding: 36px 44px 56px;
+      min-height: 540px;
+      position: relative;
+      font-size: 30px;
+      line-height: 1.55;
+    }
+
+    /* Prompt line — "$" then the command being typed */
+    .cmd-row {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+    .prompt {
+      color: #4ade80;
+      font-weight: 600;
+      flex: 0 0 auto;
+    }
+    .typed {
+      color: #e9f3ff;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+      display: inline;
+      white-space: pre-wrap;
+    }
+    .typed .char {
+      display: inline-block;
+      white-space: pre;
+      opacity: 0;  /* locked initial — GSAP brings them in with steps(1) */
+      will-change: opacity;
+    }
+    /* The blinking cursor at the command's right edge */
+    .cursor {
+      display: inline-block;
+      width: 14px;
+      height: 30px;
+      background: #4ade80;
+      vertical-align: -5px;
+      margin-left: 4px;
+      box-shadow: 0 0 14px rgba(74, 222, 128, 0.55);
+      will-change: opacity;
+    }
+
+    /* Each output line is a separate host with pre-split chars. */
+    .out-line {
+      color: #5be584;       /* default success-green */
+      font-weight: 400;
+      font-size: 22px;
+      line-height: 1.6;
+      letter-spacing: 0.005em;
+      display: block;
+      white-space: pre-wrap;
+      min-height: 36px;
+    }
+    .out-line .char {
+      display: inline-block;
+      white-space: pre;
+      opacity: 0;           /* locked initial */
+      will-change: opacity;
+    }
+    .out-line.dim { color: #6f8a99; }
+    .out-line.warn { color: #fbbf24; }
+    .out-line.muted { color: #4a5d6d; }
+    .out-line.bright { color: #93f7b8; font-weight: 500; }
+
+    /* Spacer between command and output lines */
+    .out-spacer { height: 24px; }
+
+    /* Exit-code badge — elastic settle at the end. Pre-built, hidden via opacity:0. */
+    .badge-row {
+      position: absolute;
+      left: 44px;
+      bottom: 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 16px 9px 14px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #5be584;
+      font-family: "Inter", sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      opacity: 0;           /* locked initial */
+      will-change: transform, opacity;
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+    .badge .check {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: #10b981;
+      color: #052016;
+      font-size: 12px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+    }
+    .badge .exit {
+      color: #a5e6cd;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0.85;
+      letter-spacing: 0.02em;
+    }
+
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #5c6c7a;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      font-family: "Inter", sans-serif;
+      z-index: 40;
+    }
+    .label .accent { color: #d4f1ff; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-03-terminal-typeon"
+       data-composition-id="scene-03-terminal-typeon"
+       data-start="0"
+       data-duration="7"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="floor-glow" id="floor-glow"></div>
+
+    <div class="terminal" id="terminal">
+      <div class="terminal-header">
+        <span class="dot red"></span>
+        <span class="dot yellow"></span>
+        <span class="dot green"></span>
+        <span class="terminal-title">~/projects/launch ── zsh</span>
+      </div>
+
+      <div class="terminal-body">
+        <!-- Command line: $ <typed command> -->
+        <div class="cmd-row">
+          <span class="prompt">$</span>
+          <span class="typed" id="cmd-host"></span>
+          <span class="cursor" id="cursor"></span>
+        </div>
+
+        <div class="out-spacer"></div>
+
+        <!-- Each output line is its own host. JS pre-splits chars into spans. -->
+        <div class="out-line dim"    id="out-1"></div>
+        <div class="out-line"        id="out-2"></div>
+        <div class="out-line"        id="out-3"></div>
+        <div class="out-line muted"  id="out-4"></div>
+        <div class="out-line bright" id="out-5"></div>
+
+        <!-- Exit-code badge — popped in at the end with elastic settle -->
+        <div class="badge-row">
+          <span class="badge" id="badge">
+            <span class="check">✓</span>
+            <span>Built in 2.4s</span>
+            <span class="exit">exit 0</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="scanlines" id="scanlines"></div>
+
+    <div class="label">
+      Scene 03 · <span class="accent">Terminal Typeon</span> · multi-line command + output, exit badge
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 7;
+      window.__timelines = window.__timelines || {};
+
+      // ===== Pre-split helper: splits a string into per-char spans, returns the array.
+      // We do this synchronously at module load so the snapshot tool has DOM at t=0.
+      function splitInto(host, text) {
+        var spans = [];
+        var frag = document.createDocumentFragment();
+        Array.from(text).forEach(function (ch) {
+          var span = document.createElement("span");
+          span.className = "char";
+          span.textContent = ch === " " ? " " : ch;
+          frag.appendChild(span);
+          spans.push(span);
+        });
+        host.replaceChildren(frag);
+        return spans;
+      }
+
+      // ===== Pre-build ALL DOM upfront — no tl.call() mutation.
+      // The command + each output line is split into chars. Chars are opacity:0
+      // via CSS-locked initial state. GSAP brings them in via steps(1) ease.
+      var cmdChars = splitInto(
+        document.getElementById("cmd-host"),
+        "npm run build"
+      );
+
+      var line1Chars = splitInto(
+        document.getElementById("out-1"),
+        "> launch@0.4.0 build"
+      );
+      var line2Chars = splitInto(
+        document.getElementById("out-2"),
+        "▲ Compiling 142 modules ..."
+      );
+      var line3Chars = splitInto(
+        document.getElementById("out-3"),
+        "✓ Type-check passed (38 files, 0 errors)"
+      );
+      var line4Chars = splitInto(
+        document.getElementById("out-4"),
+        "  bundled  index.js   142.6 kb  →  41.2 kb gzip"
+      );
+      var line5Chars = splitInto(
+        document.getElementById("out-5"),
+        "✓ Build complete · artifacts in dist/"
+      );
+
+      var tl = gsap.timeline({ paused: true });
+
+      // ============================================================
+      // CONTINUOUS MOTION (entire 7s) — scanlines drift + cursor blink.
+      // Anchors a "the screen is alive" feel even during typing pauses.
+      // ============================================================
+      tl.fromTo("#scanlines",
+        { y: 0 },
+        { y: 8, duration: 0.7, ease: "none", repeat: 9, yoyo: true },
+        0);
+
+      tl.fromTo("#cursor",
+        { opacity: 1 },
+        { opacity: 0.15, duration: 0.45, repeat: 14, yoyo: true, ease: "steps(1)" },
+        0);
+
+      // ============================================================
+      // BEAT t=0.0s — Terminal scales in. Sets the stage.
+      // expo.out → soft-land entrance for the whole window.
+      // ============================================================
+      tl.set("#terminal", { scale: 0.96, opacity: 0, transformOrigin: "50% 50%" }, 0);
+      tl.fromTo("#terminal",
+        { scale: 0.96, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.55, ease: "expo.out" },
+        0.10);
+
+      // ============================================================
+      // BEAT t=0.6s — Command types in char-by-char.
+      // "npm run build" — 13 chars.
+      // steps(1) ease + small stagger = mechanical, terminal-feel typing.
+      // ============================================================
+      tl.to(cmdChars, {
+        opacity: 1,
+        duration: 0.04,
+        stagger: 0.055,        // 13 chars * 0.055 ≈ 0.72s of typing
+        ease: "steps(1)",
+      }, 0.60);
+
+      // Typing finishes ~ t=1.33s. Brief hold (the "enter" pause) before output prints.
+
+      // ============================================================
+      // BEAT t=1.55s — Cursor hops to a new line. Subtle "enter" feedback:
+      // a quick green flash on the prompt as if the shell acknowledged.
+      // power4.out for a snappy UI feel.
+      // ============================================================
+      tl.fromTo(".prompt",
+        { color: "#4ade80", textShadow: "0 0 0 rgba(74,222,128,0)" },
+        {
+          color: "#a8ffc8",
+          textShadow: "0 0 12px rgba(74, 222, 128, 0.7)",
+          duration: 0.25,
+          ease: "power4.out",
+        },
+        1.55);
+      tl.to(".prompt", {
+        color: "#4ade80",
+        textShadow: "0 0 0 rgba(74,222,128,0)",
+        duration: 0.5,
+        ease: "expo.out",
+      }, 1.85);
+
+      // ============================================================
+      // BEAT t=1.7s+ — Output prints line-by-line.
+      // Each line uses steps(1) char stagger, but lines themselves
+      // are sequenced at successive timestamps so output rolls out.
+      // power1.out + steps(1) gives that "machine printing" feel.
+      // ============================================================
+
+      // Line 1 — "> launch@0.4.0 build" (dim, header echo)
+      tl.to(line1Chars, {
+        opacity: 1,
+        duration: 0.03,
+        stagger: 0.018,        // fast — header echo prints quickly
+        ease: "steps(1)",
+      }, 1.75);
+
+      // Line 2 — "▲ Compiling 142 modules ..."
+      tl.to(line2Chars, {
+        opacity: 1,
+        duration: 0.03,
+        stagger: 0.022,
+        ease: "steps(1)",
+      }, 2.45);
+
+      // Subtle compile-progress hint: the "▲" pulses while bundling.
+      // Continuous motion during the long output beat.
+      tl.fromTo(line2Chars[0],
+        { color: "#5be584" },
+        {
+          color: "#fbbf24",
+          duration: 0.5,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: 3,
+        },
+        3.10);
+
+      // Line 3 — "✓ Type-check passed ..."
+      tl.to(line3Chars, {
+        opacity: 1,
+        duration: 0.03,
+        stagger: 0.016,
+        ease: "steps(1)",
+      }, 3.35);
+
+      // Line 4 — bundle size (muted gray, smaller visual weight)
+      tl.to(line4Chars, {
+        opacity: 1,
+        duration: 0.03,
+        stagger: 0.014,
+        ease: "steps(1)",
+      }, 4.25);
+
+      // Line 5 — "✓ Build complete" — the climax line, bright green
+      tl.to(line5Chars, {
+        opacity: 1,
+        duration: 0.03,
+        stagger: 0.018,
+        ease: "steps(1)",
+      }, 5.10);
+
+      // Final line gets a per-char soft brighten — emphasises the success.
+      tl.to(line5Chars, {
+        textShadow: "0 0 10px rgba(147, 247, 184, 0.6)",
+        duration: 0.45,
+        stagger: 0.012,
+        ease: "expo.out",
+      }, 5.75);
+
+      // ============================================================
+      // BEAT t=5.95s — Exit-code badge pops in with elastic settle.
+      // back.out → overshoot on entrance, elastic → final spring.
+      // Two tweens chained (scale + opacity together, then scale settle).
+      // ============================================================
+      tl.fromTo("#badge",
+        { opacity: 0, scale: 0.5, y: 10 },
+        {
+          opacity: 1, scale: 1.15, y: 0,
+          duration: 0.32,
+          ease: "back.out(2)",
+          transformOrigin: "50% 50%",
+        },
+        5.95);
+      tl.to("#badge", {
+        scale: 1,
+        duration: 0.55,
+        ease: "elastic.out(1, 0.5)",
+        transformOrigin: "50% 50%",
+        overwrite: "auto",
+      }, 6.27);
+
+      // Badge gets a slow green halo glow that ramps up — sells "success".
+      // Applied to the parent .badge-row so the box-shadow tween doesn't
+      // collide with the scale-spring on #badge.
+      tl.to(".badge-row", {
+        filter: "drop-shadow(0 0 18px rgba(16,185,129,0.45))",
+        duration: 0.6,
+        ease: "expo.out",
+      }, 6.10);
+
+      // ============================================================
+      // CONTINUOUS MOTION 6.0s-7.0s — floor glow blooms in, terminal drifts.
+      // "none" ease for ambient drift; expo.out for the glow bloom.
+      // ============================================================
+      tl.fromTo("#floor-glow",
+        { opacity: 0, scaleY: 0.7 },
+        { opacity: 1, scaleY: 1, duration: 0.85, ease: "expo.out", transformOrigin: "50% 100%" },
+        5.95);
+
+      tl.to("#terminal", {
+        y: -6,
+        duration: 1.0,
+        ease: "none",
+      }, 6.00);
+
+      window.__timelines["scene-03-terminal-typeon"] = tl;
+    })();
+  </script>
+</body>
+</html>

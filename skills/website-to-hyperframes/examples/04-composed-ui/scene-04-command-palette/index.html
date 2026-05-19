@@ -1,0 +1,823 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-04-command-palette</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    #scene-04-command-palette {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0b0f17 0%, #070a10 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ---------- Backdrop app behind the palette ---------- */
+    .app-backdrop {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      will-change: filter, opacity;
+    }
+    /* Sidebar of fake app */
+    .bd-sidebar {
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 260px;
+      background: rgba(255,255,255,0.025);
+      border-right: 1px solid rgba(255,255,255,0.04);
+      padding: 28px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .bd-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 15px; font-weight: 700; color: #e5e7eb;
+      margin-bottom: 18px;
+    }
+    .bd-logo-mark {
+      width: 26px; height: 26px; border-radius: 7px;
+      background: linear-gradient(135deg, #5b8dff, #a855f7);
+    }
+    .bd-nav-item {
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #8a93a0;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .bd-nav-item.active { color: #e5e7eb; background: rgba(255,255,255,0.04); }
+    .bd-nav-dot { width: 8px; height: 8px; border-radius: 50%; background: #5b8dff; flex: 0 0 auto; }
+
+    /* Main area cards */
+    .bd-main {
+      position: absolute;
+      top: 0; left: 260px; right: 0; bottom: 0;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .bd-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 14px;
+    }
+    .bd-title {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #d6dde6;
+    }
+    .bd-actions { display: flex; gap: 10px; }
+    .bd-chip {
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #8a93a0;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .bd-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+    .bd-card {
+      height: 180px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .bd-card-label { font-size: 11px; color: #8a93a0; text-transform: uppercase; letter-spacing: 0.1em; }
+    .bd-card-value { font-size: 30px; font-weight: 600; color: #e5e7eb; font-variant-numeric: tabular-nums; }
+    .bd-card-delta { font-size: 12px; color: #34d399; }
+
+    .bd-rows {
+      flex: 1 1 auto;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 14px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .bd-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      font-size: 13px;
+      color: #8a93a0;
+    }
+    .bd-row-dot { width: 8px; height: 8px; border-radius: 50%; background: #5b8dff; flex: 0 0 auto; }
+    .bd-row-name { color: #d6dde6; flex: 1 1 auto; }
+    .bd-row-meta { color: #6b7280; }
+
+    /* Dim overlay on top of backdrop */
+    .scrim {
+      position: absolute;
+      inset: 0;
+      background: rgba(5, 8, 14, 0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      will-change: opacity;
+      opacity: 0;
+    }
+
+    /* ---------- Command palette ---------- */
+    .palette {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 760px;
+      transform: translate(-50%, -50%);
+      background: rgba(20, 24, 32, 0.95);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      box-shadow:
+        0 60px 120px -30px rgba(0,0,0,0.85),
+        0 0 0 1px rgba(255,255,255,0.02) inset,
+        0 0 60px rgba(91, 141, 255, 0.06);
+      overflow: hidden;
+      will-change: transform, opacity;
+      opacity: 0;
+    }
+
+    /* Search input area */
+    .palette-search {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      position: relative;
+    }
+    .palette-search-icon {
+      width: 18px; height: 18px;
+      color: #8a93a0;
+      font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .palette-input {
+      flex: 1 1 auto;
+      font-size: 18px;
+      color: #f5f5f5;
+      font-weight: 400;
+      font-family: inherit;
+      letter-spacing: -0.005em;
+      position: relative;
+      min-height: 24px;
+      display: flex;
+      align-items: center;
+    }
+    .palette-placeholder {
+      color: #5b6472;
+      will-change: opacity;
+    }
+    .palette-query {
+      color: #f5f5f5;
+      position: absolute;
+      left: 0; top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+    }
+    .palette-query .ch {
+      display: inline-block;
+      opacity: 0;
+    }
+    .palette-caret {
+      display: inline-block;
+      width: 2px;
+      height: 22px;
+      background: #5b8dff;
+      margin-left: 2px;
+      vertical-align: middle;
+      will-change: opacity;
+    }
+    .palette-kbd-hint {
+      display: flex; align-items: center; gap: 6px;
+      color: #6b7280;
+      font-size: 11px;
+    }
+    .kbd {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 22px; height: 22px;
+      padding: 0 6px;
+      border-radius: 5px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 11px;
+      color: #d6dde6;
+      font-weight: 500;
+    }
+
+    /* Sub-text under input */
+    .palette-meta {
+      padding: 10px 24px;
+      font-size: 12px;
+      color: #8a93a0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.01);
+    }
+    .palette-meta-count {
+      color: #d6dde6;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Command rows */
+    .palette-list {
+      padding: 8px;
+      max-height: 480px;
+      overflow: hidden;
+    }
+    .cmd-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      will-change: transform, opacity, background-color;
+      position: relative;
+    }
+    .cmd-row.focused {
+      background: rgba(91, 141, 255, 0.10);
+    }
+    .cmd-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      flex: 0 0 auto;
+      font-weight: 600;
+    }
+    .cmd-icon.ic-deploy { background: rgba(91, 141, 255, 0.15); color: #5b8dff; }
+    .cmd-icon.ic-task   { background: rgba(167, 139, 250, 0.15); color: #a78bfa; }
+    .cmd-icon.ic-build  { background: rgba(52, 211, 153, 0.15); color: #34d399; }
+    .cmd-icon.ic-doc    { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+    .cmd-icon.ic-rollback { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+    .cmd-icon.ic-search { background: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+    .cmd-icon.ic-team   { background: rgba(236, 72, 153, 0.15); color: #ec4899; }
+    .cmd-icon.ic-settings { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+
+    .cmd-body {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .cmd-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #e5e7eb;
+      letter-spacing: -0.005em;
+    }
+    .cmd-sub {
+      font-size: 12px;
+      color: #8a93a0;
+    }
+    .cmd-shortcut {
+      display: flex; align-items: center; gap: 4px;
+      flex: 0 0 auto;
+    }
+
+    /* Focus ring on the top-result */
+    .focus-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 10px;
+      border: 1.5px solid rgba(91, 141, 255, 0);
+      box-shadow: 0 0 0 0 rgba(91, 141, 255, 0);
+      pointer-events: none;
+      will-change: border-color, box-shadow, opacity;
+    }
+
+    /* ---------- Action card that appears after the command runs ---------- */
+    .action-toast {
+      position: absolute;
+      top: 90px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-30px);
+      width: 480px;
+      background: linear-gradient(135deg, rgba(91, 141, 255, 0.15), rgba(167, 139, 250, 0.12));
+      border: 1px solid rgba(91, 141, 255, 0.30);
+      border-radius: 14px;
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 20px 50px -20px rgba(91, 141, 255, 0.5);
+      will-change: transform, opacity;
+      opacity: 0;
+      z-index: 5;
+    }
+    .toast-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: rgba(91, 141, 255, 0.25);
+      color: #5b8dff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+    .toast-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
+    .toast-title { font-size: 14px; font-weight: 600; color: #f5f5f5; }
+    .toast-sub { font-size: 12px; color: #b6c1d0; }
+    .toast-progress {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 3px;
+      background: rgba(91, 141, 255, 0.2);
+      overflow: hidden;
+    }
+    .toast-progress-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 0;
+      background: linear-gradient(90deg, #5b8dff, #a78bfa);
+      will-change: width;
+    }
+
+    /* Status pulse dot on the running task */
+    .task-status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 12px rgba(52, 211, 153, 0.6);
+    }
+
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 20;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-04-command-palette"
+       data-composition-id="scene-04-command-palette"
+       data-start="0"
+       data-duration="7"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <!-- Backdrop app — visible behind the dimmed scrim -->
+    <div class="app-backdrop" id="app-backdrop">
+      <div class="bd-sidebar">
+        <div class="bd-logo">
+          <div class="bd-logo-mark"></div>
+          <span>Console</span>
+        </div>
+        <div class="bd-nav-item active"><span class="bd-nav-dot"></span>Overview</div>
+        <div class="bd-nav-item"><span class="bd-nav-dot" style="background:#34d399"></span>Deployments</div>
+        <div class="bd-nav-item"><span class="bd-nav-dot" style="background:#fbbf24"></span>Tasks</div>
+        <div class="bd-nav-item"><span class="bd-nav-dot" style="background:#a78bfa"></span>Activity</div>
+        <div class="bd-nav-item"><span class="bd-nav-dot" style="background:#f87171"></span>Incidents</div>
+        <div class="bd-nav-item"><span class="bd-nav-dot" style="background:#94a3b8"></span>Settings</div>
+      </div>
+
+      <div class="bd-main">
+        <div class="bd-topbar">
+          <div class="bd-title">Overview</div>
+          <div class="bd-actions">
+            <div class="bd-chip">Last 24h</div>
+            <div class="bd-chip">Production</div>
+          </div>
+        </div>
+
+        <div class="bd-cards">
+          <div class="bd-card">
+            <div class="bd-card-label">Deploys</div>
+            <div class="bd-card-value">42</div>
+            <div class="bd-card-delta">+12% vs last week</div>
+          </div>
+          <div class="bd-card">
+            <div class="bd-card-label">Open tasks</div>
+            <div class="bd-card-value">18</div>
+            <div class="bd-card-delta" style="color:#fbbf24">3 blocked</div>
+          </div>
+          <div class="bd-card">
+            <div class="bd-card-label">Uptime</div>
+            <div class="bd-card-value">99.98%</div>
+            <div class="bd-card-delta">all systems nominal</div>
+          </div>
+        </div>
+
+        <div class="bd-rows" id="bd-rows">
+          <div class="bd-row"><span class="bd-row-dot"></span><span class="bd-row-name">api-gateway · v2.41.0</span><span class="bd-row-meta">2m ago</span></div>
+          <div class="bd-row"><span class="bd-row-dot" style="background:#fbbf24"></span><span class="bd-row-name">worker-pool · scaling</span><span class="bd-row-meta">7m ago</span></div>
+          <div class="bd-row"><span class="bd-row-dot" style="background:#34d399"></span><span class="bd-row-name">edge-cache · healthy</span><span class="bd-row-meta">14m ago</span></div>
+          <div class="bd-row" id="bd-row-new"><span class="bd-row-dot task-status-dot"></span><span class="bd-row-name">deploy-staging · launched</span><span class="bd-row-meta">just now</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scrim" id="scrim"></div>
+
+    <!-- The command palette modal -->
+    <div class="palette" id="palette">
+      <div class="palette-search">
+        <span class="palette-search-icon">⌕</span>
+        <div class="palette-input">
+          <span class="palette-placeholder" id="placeholder">Search commands...</span>
+          <span class="palette-query" id="query">
+            <span class="ch" data-i="0">d</span>
+            <span class="ch" data-i="1">e</span>
+            <span class="ch" data-i="2">p</span>
+            <span class="ch" data-i="3">l</span>
+            <span class="ch" data-i="4">o</span>
+            <span class="ch" data-i="5">y</span>
+            <span class="palette-caret" id="caret"></span>
+          </span>
+        </div>
+        <div class="palette-kbd-hint">
+          <span class="kbd">esc</span>
+          <span>to close</span>
+        </div>
+      </div>
+
+      <div class="palette-meta">
+        <span class="palette-meta-count" id="result-count">8</span>
+        <span id="result-label">commands</span>
+      </div>
+
+      <div class="palette-list" id="cmd-list">
+        <!-- Top match (deploy) — will become focused -->
+        <div class="cmd-row" id="row-deploy" data-match="deploy">
+          <div class="cmd-icon ic-deploy">▲</div>
+          <div class="cmd-body">
+            <div class="cmd-label">Deploy to staging</div>
+            <div class="cmd-sub">Push current branch to staging environment</div>
+          </div>
+          <div class="cmd-shortcut">
+            <span class="kbd">⌘</span><span class="kbd">D</span>
+          </div>
+          <div class="focus-ring" id="focus-ring"></div>
+        </div>
+
+        <!-- Second match (deploy) -->
+        <div class="cmd-row" id="row-rollback" data-match="deploy">
+          <div class="cmd-icon ic-rollback">↶</div>
+          <div class="cmd-body">
+            <div class="cmd-label">Rollback last deploy</div>
+            <div class="cmd-sub">Revert production to previous build</div>
+          </div>
+          <div class="cmd-shortcut">
+            <span class="kbd">⌘</span><span class="kbd">⇧</span><span class="kbd">R</span>
+          </div>
+        </div>
+
+        <!-- Third match (deploy) -->
+        <div class="cmd-row" id="row-build" data-match="deploy">
+          <div class="cmd-icon ic-build">⚙</div>
+          <div class="cmd-body">
+            <div class="cmd-label">Trigger build pipeline</div>
+            <div class="cmd-sub">Run CI for the deploy queue</div>
+          </div>
+          <div class="cmd-shortcut">
+            <span class="kbd">⌘</span><span class="kbd">B</span>
+          </div>
+        </div>
+
+        <!-- Non-matching rows (will filter out) -->
+        <div class="cmd-row" id="row-task" data-match="other">
+          <div class="cmd-icon ic-task">✓</div>
+          <div class="cmd-body">
+            <div class="cmd-label">Create new task</div>
+            <div class="cmd-sub">Add a task to Sprint 24 backlog</div>
+          </div>
+          <div class="cmd-shortcut">
+            <span class="kbd">⌘</span><span class="kbd">T</span>
+          </div>
+        </div>
+
+        <div class="cmd-row" id="row-doc" data-match="other">
+          <div class="cmd-icon ic-doc">📄</div>
+          <div class="cmd-body">
+            <div class="cmd-label">Open documentation</div>
+            <div class="cmd-sub">Jump to internal handbook</div>
+          </div>
+          <div class="cmd-shortcut">
+            <span class="kbd">?</span>
+          </div>
+        </div>
+
+        <div class="cmd-row" id="row-search" data-match="other">
+          <div class="cmd-icon ic-search">⌕</div>
+          <div class="cmd-body">
+            <div class="cmd-label">Search files</div>
+            <div class="cmd-sub">Full-text search across repo</div>
+          </div>
+          <div class="cmd-shortcut">
+            <span class="kbd">⌘</span><span class="kbd">P</span>
+          </div>
+        </div>
+
+        <div class="cmd-row" id="row-team" data-match="other">
+          <div class="cmd-icon ic-team">👥</div>
+          <div class="cmd-body">
+            <div class="cmd-label">Invite teammate</div>
+            <div class="cmd-sub">Send an invite link via email</div>
+          </div>
+          <div class="cmd-shortcut">
+            <span class="kbd">⌘</span><span class="kbd">I</span>
+          </div>
+        </div>
+
+        <div class="cmd-row" id="row-settings" data-match="other">
+          <div class="cmd-icon ic-settings">⚙</div>
+          <div class="cmd-body">
+            <div class="cmd-label">Open settings</div>
+            <div class="cmd-sub">Workspace preferences and integrations</div>
+          </div>
+          <div class="cmd-shortcut">
+            <span class="kbd">⌘</span><span class="kbd">,</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action toast that lands after the command runs -->
+    <div class="action-toast" id="action-toast">
+      <div class="toast-icon">▲</div>
+      <div class="toast-body">
+        <div class="toast-title">Deploying to staging</div>
+        <div class="toast-sub">api-gateway · main@a1f3c20 · ETA 42s</div>
+      </div>
+      <div class="toast-progress">
+        <div class="toast-progress-fill" id="toast-fill"></div>
+      </div>
+    </div>
+
+    <div class="label">
+      Scene 04 · <span class="accent">Command Palette</span> · Cmd+K with filtering and keystroke entry
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 7;
+      window.__timelines = window.__timelines || {};
+
+      var tl = gsap.timeline({ paused: true });
+
+      // === t=0 initial state — everything locked. We rely on CSS opacity:0
+      // for the palette, scrim, toast, and per-character spans. GSAP brings
+      // them in via fromTo().
+      tl.set("#palette", { scale: 0.94, opacity: 0, y: -8, transformOrigin: "50% 50%" }, 0);
+      tl.set("#scrim", { opacity: 0 }, 0);
+      tl.set("#action-toast", { opacity: 0, x: "-50%", y: -30 }, 0);
+      tl.set("#bd-row-new", { opacity: 0, y: -8 }, 0);
+      tl.set(".bd-row:not(#bd-row-new)", { opacity: 1 }, 0);
+
+      // === 0.0s–0.6s: Backdrop is visible immediately (sets the stage)
+      // and gets a subtle blur as the palette arrives. The dim scrim and
+      // the palette modal handle the actual "command palette opening" feel.
+      tl.set("#app-backdrop", { opacity: 1, filter: "blur(0px)" }, 0);
+      tl.to("#app-backdrop",
+        { filter: "blur(2px)", duration: 0.5, ease: "expo.out" },
+        0.05);
+
+      tl.fromTo("#scrim",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.45, ease: "expo.out" },
+        0.10);
+
+      // Palette enters with a small Y drop + scale-up — iOS modal feel.
+      tl.fromTo("#palette",
+        { scale: 0.94, opacity: 0, y: -8 },
+        { scale: 1, opacity: 1, y: 0, duration: 0.55, ease: "back.out(1.4)" },
+        0.15);
+
+      // Caret blink — sine.inOut yoyo through the typing phase. Continuous motion.
+      tl.fromTo("#caret",
+        { opacity: 1 },
+        { opacity: 0.15, duration: 0.4, ease: "sine.inOut", yoyo: true, repeat: 8 },
+        0.60);
+
+      // === 0.6s–2.0s: User types "deploy" character by character.
+      // Each char fades in and the placeholder text dims with the first keystroke.
+      // We use a fromTo with stagger across all .ch spans (6 chars × 0.22s = 1.32s).
+      // Mechanical "power1.out" — terminal-like feel for typing.
+      tl.to("#placeholder", { opacity: 0, duration: 0.15, ease: "power1.out" }, 0.60);
+
+      tl.fromTo(".palette-query .ch",
+        { opacity: 0, y: -4 },
+        {
+          opacity: 1, y: 0,
+          duration: 0.05,
+          stagger: 0.22,
+          ease: "power1.out",
+        },
+        0.65);
+
+      // === 2.0s–3.5s: As query reaches recognizable "dep…ploy", non-matching
+      // rows fade/slide out and result count updates. Matching rows stay.
+      // First wave at ~2.0s when "dep" is typed — non-matches start dimming.
+      tl.to('[data-match="other"]',
+        { opacity: 0.25, x: 8, duration: 0.4, ease: "expo.out", stagger: 0.04 },
+        1.95);
+
+      // Update sub-count meta to reflect filtering: 8 → 5 → 3 as filtering proceeds.
+      tl.set("#result-count", { textContent: "5" }, 2.10);
+      tl.fromTo("#result-count",
+        { scale: 1.25, color: "#5b8dff" },
+        { scale: 1, color: "#d6dde6", duration: 0.4, ease: "back.out(1.6)", transformOrigin: "50% 50%" },
+        2.10);
+
+      // Second wave at ~2.6s: non-matching rows fully exit — translateY + collapse.
+      tl.to('[data-match="other"]',
+        {
+          opacity: 0,
+          y: -8,
+          height: 0,
+          paddingTop: 0,
+          paddingBottom: 0,
+          marginTop: 0,
+          marginBottom: 0,
+          duration: 0.5,
+          ease: "expo.inOut",
+          stagger: 0.05,
+        },
+        2.55);
+
+      // Result count drops to 3 (the deploy matches).
+      tl.set("#result-count", { textContent: "3" }, 2.80);
+      tl.fromTo("#result-count",
+        { scale: 1.3, color: "#5b8dff" },
+        { scale: 1, color: "#d6dde6", duration: 0.35, ease: "back.out(1.6)", transformOrigin: "50% 50%" },
+        2.80);
+      tl.set("#result-label", { textContent: "matching commands" }, 2.80);
+
+      // === 3.0s: Focus ring lands on top result (row-deploy).
+      // Border colors fade in + a soft box-shadow glow.
+      tl.fromTo("#focus-ring",
+        {
+          borderColor: "rgba(91, 141, 255, 0)",
+          boxShadow: "0 0 0 0 rgba(91, 141, 255, 0)",
+        },
+        {
+          borderColor: "rgba(91, 141, 255, 0.6)",
+          boxShadow: "0 0 24px rgba(91, 141, 255, 0.25), inset 0 0 0 1px rgba(91, 141, 255, 0.15)",
+          duration: 0.5,
+          ease: "expo.out",
+        },
+        3.00);
+
+      // Top row gets the "focused" background tint.
+      tl.fromTo("#row-deploy",
+        { backgroundColor: "rgba(91, 141, 255, 0)" },
+        { backgroundColor: "rgba(91, 141, 255, 0.12)", duration: 0.45, ease: "expo.out" },
+        3.00);
+
+      // Subtle pulse on the focus ring to keep it alive during the hover-before-enter beat.
+      tl.to("#focus-ring", {
+        boxShadow: "0 0 32px rgba(91, 141, 255, 0.45), inset 0 0 0 1px rgba(91, 141, 255, 0.25)",
+        duration: 0.6,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 3.15);
+
+      // === 3.5s–4.5s: User presses Enter (↵). The selected row flashes,
+      // caret blinks off, and the palette slides up + fades out.
+      // Bright flash on the focused row — scale tick + brighter bg.
+      tl.to("#row-deploy", {
+        backgroundColor: "rgba(91, 141, 255, 0.35)",
+        scale: 1.015,
+        duration: 0.18,
+        ease: "power4.out",
+        transformOrigin: "50% 50%",
+      }, 3.55);
+      tl.to("#row-deploy", {
+        backgroundColor: "rgba(91, 141, 255, 0.18)",
+        scale: 1,
+        duration: 0.3,
+        ease: "expo.out",
+      }, 3.75);
+
+      // Focus ring pulses to "fire" — a punchy expansion.
+      tl.fromTo("#focus-ring",
+        { scale: 1, opacity: 1 },
+        { scale: 1.06, opacity: 0, duration: 0.45, ease: "expo.out", transformOrigin: "50% 50%" },
+        3.55);
+
+      // Palette exits — slides up + scales down + fades.
+      tl.to("#palette", {
+        y: -32,
+        scale: 0.96,
+        opacity: 0,
+        duration: 0.5,
+        ease: "expo.inOut",
+      }, 4.00);
+
+      // Scrim fades back out as palette dismisses (modal context ends).
+      tl.to("#scrim", {
+        opacity: 0,
+        duration: 0.5,
+        ease: "expo.out",
+      }, 4.05);
+
+      // Backdrop unblurs as the app returns to focus.
+      tl.to("#app-backdrop", {
+        filter: "blur(0px)",
+        duration: 0.55,
+        ease: "expo.out",
+      }, 4.05);
+
+      // === 4.5s–7.0s: Command executes. Toast lands at top, new bd-row appears
+      // in the activity feed (the deploy is happening), and progress bar fills.
+      tl.fromTo("#action-toast",
+        { opacity: 0, x: "-50%", y: -30, scale: 0.95 },
+        {
+          opacity: 1, x: "-50%", y: 0, scale: 1,
+          duration: 0.55,
+          ease: "back.out(1.5)",
+          transformOrigin: "50% 50%",
+        },
+        4.55);
+
+      // Toast icon pulse — subtle continuous breathing while the deploy progresses.
+      tl.to(".toast-icon", {
+        scale: 1.08,
+        duration: 0.7,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 3,
+        transformOrigin: "50% 50%",
+      }, 4.80);
+
+      // Progress bar fills 0 → 100% over the remaining ~2s.
+      tl.fromTo("#toast-fill",
+        { width: "0%" },
+        { width: "100%", duration: 2.0, ease: "power2.inOut" },
+        4.80);
+
+      // The new activity row appears in the underlying app — emphasises
+      // "the command actually ran." Slides down + fades in.
+      tl.fromTo("#bd-row-new",
+        { opacity: 0, y: -8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "back.out(1.5)" },
+        5.20);
+
+      // Pulse the green status dot on the new row for "live" feel.
+      tl.fromTo("#bd-row-new .task-status-dot",
+        { scale: 1, boxShadow: "0 0 12px rgba(52, 211, 153, 0.6)" },
+        {
+          scale: 1.3,
+          boxShadow: "0 0 22px rgba(52, 211, 153, 0.9)",
+          duration: 0.55,
+          ease: "sine.inOut",
+          yoyo: true,
+          repeat: 2,
+          transformOrigin: "50% 50%",
+        },
+        5.50);
+
+      // Subtle Ken-Burns drift on the app backdrop — continuous ambient motion.
+      tl.to("#app-backdrop", {
+        scale: 1.015,
+        duration: 2.2,
+        ease: "none",
+        transformOrigin: "50% 50%",
+      }, 4.80);
+
+      window.__timelines["scene-04-command-palette"] = tl;
+    })();
+  </script>
+</body>
+</html>

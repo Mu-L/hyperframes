@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-05-dashboard-counters</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #07090d; }
+
+    #scene-05-dashboard-counters {
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse at 30% 20%, rgba(91, 141, 255, 0.10) 0%, transparent 55%),
+        radial-gradient(ellipse at 75% 85%, rgba(167, 139, 250, 0.08) 0%, transparent 60%),
+        linear-gradient(180deg, #0c1118 0%, #07090d 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Dashboard frame */
+    .dash {
+      position: absolute;
+      top: 60px;
+      left: 60px;
+      right: 60px;
+      bottom: 140px;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap: 22px;
+    }
+
+    /* Dashboard title bar (above grid) */
+    .dash-header {
+      position: absolute;
+      top: 0;
+      left: 60px;
+      right: 60px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      opacity: 0;
+    }
+    .dash-title {
+      font-size: 14px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #8a93a0;
+      font-weight: 600;
+    }
+    .dash-title .name { color: #e5e7eb; font-weight: 700; margin-left: 6px; }
+    .dash-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: #8a93a0;
+      letter-spacing: 0.04em;
+    }
+    .dash-meta .live-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.10);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      color: #34d399;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .dash-meta .live-tag::before {
+      content: "";
+      width: 6px; height: 6px; border-radius: 50%; background: #34d399;
+      box-shadow: 0 0 10px #34d399;
+    }
+
+    .card {
+      position: relative;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.005) 100%),
+        #11161e;
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 18px;
+      padding: 26px 28px;
+      display: flex;
+      flex-direction: column;
+      box-shadow:
+        0 30px 60px -30px rgba(0,0,0,0.6),
+        0 0 0 1px rgba(255,255,255,0.015) inset;
+      opacity: 0;  /* GSAP brings each card in */
+      will-change: transform, opacity;
+      overflow: hidden;
+    }
+
+    /* All cards have a small status row at the top */
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .card-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: #8a93a0;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5);
+      will-change: transform, box-shadow;
+    }
+
+    /* === CARD 1: Big counter (top-left, spans 2 rows) === */
+    .card-counter {
+      grid-row: span 2;
+      justify-content: space-between;
+    }
+    .counter-value {
+      font-size: 180px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+      color: #f5f5f5;
+      background: linear-gradient(180deg, #ffffff 0%, #c4cad4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-top: 12px;
+    }
+    .counter-unit {
+      font-size: 56px;
+      font-weight: 600;
+      color: #8a93a0;
+      letter-spacing: -0.02em;
+      margin-left: 4px;
+      -webkit-text-fill-color: #8a93a0;
+    }
+    .counter-sub {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 28px;
+    }
+    .growth {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(52, 211, 153, 0.10);
+      border: 1px solid rgba(52, 211, 153, 0.25);
+      color: #34d399;
+      font-size: 16px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+    .growth-arrow {
+      width: 0; height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-bottom: 7px solid #34d399;
+    }
+    .counter-caption {
+      font-size: 15px;
+      color: #8a93a0;
+      letter-spacing: 0.01em;
+    }
+
+    /* Mini bar chart strip at bottom of counter card */
+    .bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      height: 56px;
+      margin-top: 24px;
+    }
+    .bar {
+      flex: 1;
+      background: linear-gradient(180deg, #5b8dff 0%, #4f7dff 100%);
+      border-radius: 4px 4px 0 0;
+      transform-origin: bottom center;
+      opacity: 0.85;
+      will-change: transform;
+    }
+    .bar:last-child {
+      background: linear-gradient(180deg, #a78bfa 0%, #8b5cf6 100%);
+    }
+
+    /* === CARD 2: Sparkline (top-right) === */
+    .spark-title {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #e5e7eb;
+      margin-top: 4px;
+    }
+    .spark-sub {
+      font-size: 13px;
+      color: #8a93a0;
+      margin-top: 4px;
+    }
+    .spark-wrap {
+      flex: 1 1 auto;
+      margin-top: 14px;
+      position: relative;
+    }
+    .spark-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .spark-path {
+      fill: none;
+      stroke: #60a5fa;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.35));
+    }
+    .spark-fill {
+      fill: url(#sparkGrad);
+      opacity: 0;
+      will-change: opacity;
+    }
+    .spark-dot {
+      fill: #60a5fa;
+      opacity: 0;
+      will-change: opacity, transform;
+      transform-origin: center center;
+      transform-box: fill-box;
+    }
+    .spark-dot.last {
+      fill: #f5f5f5;
+      filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.7));
+    }
+    .spark-axis {
+      stroke: rgba(255,255,255,0.04);
+      stroke-width: 1;
+    }
+
+    /* === CARD 3: Donut (bottom-left position - actually it's bottom-right grid cell) === */
+    .donut-card {
+      align-items: stretch;
+    }
+    .donut-wrap {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-top: 8px;
+    }
+    .donut-svg {
+      width: 200px; height: 200px;
+      flex: 0 0 auto;
+    }
+    .donut-track {
+      fill: none;
+      stroke: rgba(255,255,255,0.06);
+      stroke-width: 14;
+    }
+    .donut-fill {
+      fill: none;
+      stroke: url(#donutGrad);
+      stroke-width: 14;
+      stroke-linecap: round;
+      will-change: stroke-dashoffset;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+    .donut-center {
+      font-size: 44px;
+      font-weight: 700;
+      fill: #f5f5f5;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+    .donut-center-sub {
+      font-size: 11px;
+      fill: #8a93a0;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      letter-spacing: 0.10em;
+      font-weight: 600;
+    }
+    .donut-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1 1 auto;
+    }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: #c4cad4;
+    }
+    .legend-row .swatch {
+      width: 12px; height: 12px; border-radius: 3px;
+    }
+    .legend-row .label-text { flex: 1 1 auto; }
+    .legend-row .value {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: #f5f5f5;
+    }
+
+    /* === CARD 4: Multi-stat (bottom-right) === */
+    .multi-grid {
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+      margin-top: 6px;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 6px 4px;
+      border-left: 2px solid rgba(255,255,255,0.06);
+      padding-left: 14px;
+    }
+    .stat:first-child {
+      border-left-color: #60a5fa;
+    }
+    .stat:nth-child(2) {
+      border-left-color: #a78bfa;
+    }
+    .stat:nth-child(3) {
+      border-left-color: #34d399;
+    }
+    .stat-value {
+      font-size: 56px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #f5f5f5;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: #8a93a0;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    .stat-delta {
+      font-size: 12px;
+      color: #34d399;
+      font-weight: 600;
+      margin-top: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-delta.down { color: #f87171; }
+
+    .label {
+      position: absolute;
+      left: 60px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 20;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-05-dashboard-counters"
+       data-composition-id="scene-05-dashboard-counters"
+       data-start="0"
+       data-duration="10"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="dash-header" id="dash-header">
+      <div class="dash-title">Acme Analytics <span class="name">/ Realtime</span></div>
+      <div class="dash-meta">
+        <span>Updated just now</span>
+        <span class="live-tag" id="live-tag">Live</span>
+      </div>
+    </div>
+
+    <div class="dash">
+
+      <!-- CARD 1: Big counter (top-left, spans both rows) -->
+      <div class="card card-counter" id="card-1">
+        <div>
+          <div class="card-head">
+            <div class="card-label">Total Active Users</div>
+            <div class="status-dot" id="dot-1"></div>
+          </div>
+          <div class="counter-value">
+            <span id="counter-big">0</span><span class="counter-unit">K</span>
+          </div>
+          <div class="counter-sub">
+            <div class="growth" id="growth-1">
+              <span class="growth-arrow"></span>
+              <span>+12.4%</span>
+            </div>
+            <span class="counter-caption">vs. last 7 days</span>
+          </div>
+        </div>
+        <div class="bars" id="bars">
+          <div class="bar" style="height: 24%"></div>
+          <div class="bar" style="height: 38%"></div>
+          <div class="bar" style="height: 32%"></div>
+          <div class="bar" style="height: 52%"></div>
+          <div class="bar" style="height: 46%"></div>
+          <div class="bar" style="height: 68%"></div>
+          <div class="bar" style="height: 60%"></div>
+          <div class="bar" style="height: 84%"></div>
+          <div class="bar" style="height: 76%"></div>
+          <div class="bar" style="height: 100%"></div>
+        </div>
+      </div>
+
+      <!-- CARD 2: Sparkline (top-right) -->
+      <div class="card" id="card-2">
+        <div class="card-head">
+          <div class="card-label">Sessions / Hour</div>
+          <div class="status-dot" id="dot-2"></div>
+        </div>
+        <div class="spark-title"><span id="spark-num">0</span><span style="font-size:18px;color:#8a93a0;font-weight:500;margin-left:8px;">last 12h</span></div>
+        <div class="spark-sub">Peak <span style="color:#c4cad4;font-weight:600;">3,920</span> · Avg <span style="color:#c4cad4;font-weight:600;">2,140</span></div>
+        <div class="spark-wrap">
+          <svg class="spark-svg" viewBox="0 0 460 150" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#60a5fa" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- axis line -->
+            <line class="spark-axis" x1="0" y1="140" x2="460" y2="140"/>
+            <!-- area fill (revealed after path draws) -->
+            <path class="spark-fill" id="spark-fill"
+                  d="M0,120 L40,100 L80,108 L120,82 L160,90 L200,64 L240,72 L280,48 L320,56 L360,30 L400,38 L440,18 L460,22 L460,140 L0,140 Z"/>
+            <!-- main path - drawn via dashoffset -->
+            <path class="spark-path" id="spark-path"
+                  d="M0,120 L40,100 L80,108 L120,82 L160,90 L200,64 L240,72 L280,48 L320,56 L360,30 L400,38 L440,18 L460,22"/>
+            <!-- dots at each data point -->
+            <circle class="spark-dot" cx="0"   cy="120" r="4" id="sd-0"/>
+            <circle class="spark-dot" cx="40"  cy="100" r="4" id="sd-1"/>
+            <circle class="spark-dot" cx="80"  cy="108" r="4" id="sd-2"/>
+            <circle class="spark-dot" cx="120" cy="82"  r="4" id="sd-3"/>
+            <circle class="spark-dot" cx="160" cy="90"  r="4" id="sd-4"/>
+            <circle class="spark-dot" cx="200" cy="64"  r="4" id="sd-5"/>
+            <circle class="spark-dot" cx="240" cy="72"  r="4" id="sd-6"/>
+            <circle class="spark-dot" cx="280" cy="48"  r="4" id="sd-7"/>
+            <circle class="spark-dot" cx="320" cy="56"  r="4" id="sd-8"/>
+            <circle class="spark-dot" cx="360" cy="30"  r="4" id="sd-9"/>
+            <circle class="spark-dot" cx="400" cy="38"  r="4" id="sd-10"/>
+            <circle class="spark-dot" cx="440" cy="18"  r="4" id="sd-11"/>
+            <circle class="spark-dot last" cx="460" cy="22" r="6" id="sd-12"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- CARD 3: Donut (bottom-right grid cell - actually right column, bottom row) -->
+      <div class="card donut-card" id="card-3">
+        <div class="card-head">
+          <div class="card-label">Conversion Rate</div>
+          <div class="status-dot" id="dot-3"></div>
+        </div>
+        <div class="donut-wrap">
+          <svg class="donut-svg" viewBox="0 0 100 100">
+            <defs>
+              <linearGradient id="donutGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%"  stop-color="#a78bfa"/>
+                <stop offset="100%" stop-color="#5b8dff"/>
+              </linearGradient>
+            </defs>
+            <!-- track -->
+            <circle class="donut-track" cx="50" cy="50" r="42"/>
+            <!-- fill, dasharray = full circumference (2*pi*42 ≈ 263.89) -->
+            <circle class="donut-fill" id="donut-fill"
+                    cx="50" cy="50" r="42"
+                    stroke-dasharray="263.89"
+                    stroke-dashoffset="263.89"/>
+            <!-- center text -->
+            <text class="donut-center" x="50" y="48" id="donut-pct">0%</text>
+            <text class="donut-center-sub" x="50" y="62">CONVERTED</text>
+          </svg>
+          <div class="donut-legend">
+            <div class="legend-row">
+              <span class="swatch" style="background:linear-gradient(135deg,#a78bfa,#5b8dff);"></span>
+              <span class="label-text">Converted</span>
+              <span class="value" id="legend-converted">0</span>
+            </div>
+            <div class="legend-row">
+              <span class="swatch" style="background:rgba(255,255,255,0.10);"></span>
+              <span class="label-text">Visited</span>
+              <span class="value" id="legend-visited">0</span>
+            </div>
+            <div class="legend-row" style="margin-top:6px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.05);">
+              <span class="label-text" style="color:#8a93a0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;">Target</span>
+              <span class="value" style="color:#34d399;">85%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 4: Multi-stat (bottom-right cell) - wait actually with grid 2col x 2row,
+           card-1 spans 2 rows (left), card-2 is top-right, card-3 is bottom-right.
+           We need a 4th. Let me restructure -> use 2col x 2row but card-1 spans rows,
+           leaving 2 right cells. Add card-4 in a different position?
+
+           Actually, we need 4 cards. Solution: use 3 columns x 2 rows so:
+           - card-1 spans col 1, both rows
+           - card-2 top, cols 2-3
+           - card-3 bottom-left of right area (col 2)
+           - card-4 bottom-right of right area (col 3)
+
+           Re-do grid template. -->
+      <div class="card" id="card-4">
+        <div class="card-head">
+          <div class="card-label">Engagement Metrics</div>
+          <div class="status-dot" id="dot-4"></div>
+        </div>
+        <div class="multi-grid">
+          <div class="stat">
+            <div class="stat-value" id="stat-a">0</div>
+            <div class="stat-label">New Today</div>
+            <div class="stat-delta">+8 since 9am</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="stat-b">0</div>
+            <div class="stat-label">Active Now</div>
+            <div class="stat-delta">+24 last hr</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="stat-c">0</div>
+            <div class="stat-label">Avg Session</div>
+            <div class="stat-delta down">-3% wk</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="label">
+      Scene 05 · <span class="accent">Dashboard Counters</span> · animated KPIs, sparklines, gauge — composed from divs/SVG
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 10;
+      window.__timelines = window.__timelines || {};
+
+      var tl = gsap.timeline({ paused: true });
+
+      // Adjust grid template at runtime so card-1 (big counter) spans both rows on the left,
+      // and the right side has 2 rows of 2 small cards.  Layout:
+      //
+      //  +---------+-----+-----+
+      //  |         | C2  spark|
+      //  |   C1    +-----+-----+
+      //  | counter | C3 donut C4 multi-stat
+      //  +---------+-----+-----+
+      //
+      // Using 3 cols x 2 rows.
+      var dash = document.querySelector(".dash");
+      if (dash) {
+        dash.style.gridTemplateColumns = "1.4fr 1fr 1fr";
+        dash.style.gridTemplateRows = "1fr 1fr";
+      }
+      var c1 = document.getElementById("card-1");
+      if (c1) {
+        c1.style.gridColumn = "1 / 2";
+        c1.style.gridRow = "1 / 3";
+      }
+      var c2 = document.getElementById("card-2");
+      if (c2) {
+        c2.style.gridColumn = "2 / 4";
+        c2.style.gridRow = "1 / 2";
+      }
+      var c3 = document.getElementById("card-3");
+      if (c3) {
+        c3.style.gridColumn = "2 / 3";
+        c3.style.gridRow = "2 / 3";
+      }
+      var c4 = document.getElementById("card-4");
+      if (c4) {
+        c4.style.gridColumn = "3 / 4";
+        c4.style.gridRow = "2 / 3";
+      }
+
+      // === t=0 initial state ============================================
+      tl.set("#dash-header", { opacity: 0, y: -10 }, 0);
+      tl.set(".card", { opacity: 0, y: 30, scale: 0.96 }, 0);
+      tl.set("#growth-1", { opacity: 0, y: 6, scale: 0.9 }, 0);
+      tl.set(".bar", { scaleY: 0, transformOrigin: "bottom center" }, 0);
+      tl.set(".spark-dot", { opacity: 0, scale: 0 }, 0);
+
+      // Sparkline path length is ~512 (12 segments of varied length). Use a safe upper bound.
+      var SPARK_LEN = 560;
+      tl.set("#spark-path", { strokeDasharray: SPARK_LEN, strokeDashoffset: SPARK_LEN }, 0);
+
+      // === t=0.10s: header fades in ====================================
+      tl.fromTo("#dash-header",
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" },
+        0.10);
+
+      // === t=0.30s–1.20s: cards enter staggered, back.out, 0.08s stagger ==
+      tl.fromTo(["#card-1", "#card-2", "#card-3", "#card-4"],
+        { opacity: 0, y: 30, scale: 0.96 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.55, stagger: 0.08, ease: "back.out(1.5)" },
+        0.30);
+
+      // === t=1.20s: bars grow up from bottom (in CARD 1) =================
+      tl.fromTo(".bar",
+        { scaleY: 0 },
+        { scaleY: 1, duration: 0.6, stagger: 0.04, ease: "power4.out" },
+        1.20);
+
+      // === t=1.50s: BIG COUNTER 0 → 128 (displayed as "128K") ===========
+      // Use 30 discrete tl.set() steps over 3.5s — smooth-looking but seekable.
+      // Values are in thousands; we display them with .toFixed(1) for fractional smoothness
+      // at low values, then integer K once we're at the big numbers.
+      var bigSteps = [
+        0,    0.5,  1.2,  3,    7,    14,   24,   38,   54,   72,
+        90,   105,  116,  122,  125,  127,  127.6,127.9,128,  128,
+        128,  128,  128,  128,  128,  128,  128,  128,  128,  128
+      ];
+      var bigStart = 1.50;
+      var bigEnd   = 5.00;
+      var bigDur   = bigEnd - bigStart;
+      bigSteps.forEach(function (v, i) {
+        var t = bigStart + (i / (bigSteps.length - 1)) * bigDur;
+        var display;
+        if (v < 1) {
+          display = v.toFixed(1);
+        } else if (v < 10) {
+          display = v.toFixed(1);
+        } else {
+          display = Math.round(v).toString();
+        }
+        tl.set("#counter-big", { textContent: display }, t);
+      });
+
+      // Growth pill enters after counter lands.
+      tl.fromTo("#growth-1",
+        { opacity: 0, y: 6, scale: 0.9 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, ease: "back.out(1.7)" },
+        4.50);
+
+      // === t=1.70s: SPARK NUMBER 0 → 3920 (peak) ========================
+      var sparkSteps = [
+        0,   180,  430, 740, 1080, 1420, 1760, 2100, 2400, 2680,
+        2900,3100, 3280,3440,3580, 3700, 3800, 3870, 3905, 3920
+      ];
+      var sparkStart = 1.70;
+      var sparkEnd   = 4.40;
+      var sparkDur   = sparkEnd - sparkStart;
+      sparkSteps.forEach(function (v, i) {
+        var t = sparkStart + (i / (sparkSteps.length - 1)) * sparkDur;
+        tl.set("#spark-num", { textContent: v.toLocaleString() }, t);
+      });
+
+      // Sparkline path draws on, 1.7s long, expo.out for that satellite-photo "scanning" feel
+      tl.to("#spark-path", {
+        strokeDashoffset: 0,
+        duration: 1.7,
+        ease: "expo.out",
+      }, 1.70);
+
+      // Sparkline area fill fades in after path completes (more depth)
+      tl.to("#spark-fill", {
+        opacity: 1,
+        duration: 0.6,
+        ease: "power2.out",
+      }, 3.20);
+
+      // Dots pop in along the path as it draws — staggered by index
+      var DOT_IDS = ["#sd-0","#sd-1","#sd-2","#sd-3","#sd-4","#sd-5","#sd-6","#sd-7","#sd-8","#sd-9","#sd-10","#sd-11","#sd-12"];
+      DOT_IDS.forEach(function (sel, i) {
+        var t = 1.70 + (i / (DOT_IDS.length - 1)) * 1.70;
+        tl.fromTo(sel,
+          { opacity: 0, scale: 0 },
+          { opacity: 1, scale: 1, duration: 0.25, ease: "back.out(2)" },
+          t);
+      });
+
+      // === t=2.00s: DONUT fills from 0% to 87% ==========================
+      // Full circumference = 263.89. 87% means stroke-dashoffset = 263.89 * (1 - 0.87) = 34.31
+      tl.to("#donut-fill", {
+        strokeDashoffset: 34.31,
+        duration: 2.4,
+        ease: "expo.out",
+      }, 2.00);
+
+      // Donut center % counter
+      var donutSteps = [0, 4, 12, 24, 38, 52, 64, 73, 79, 83, 85, 86, 87, 87, 87];
+      var donutStart = 2.00;
+      var donutEnd   = 4.40;
+      var donutDur   = donutEnd - donutStart;
+      donutSteps.forEach(function (v, i) {
+        var t = donutStart + (i / (donutSteps.length - 1)) * donutDur;
+        tl.set("#donut-pct", { textContent: v + "%" }, t);
+      });
+
+      // Donut legend values
+      var convertedSteps = [
+        0,    140,  420,  900, 1480, 2100, 2740, 3340, 3900, 4360,
+        4720, 4980, 5160, 5260, 5320
+      ];
+      var visitedSteps = [
+        0,    160,  480, 1040, 1700, 2410, 3140, 3840, 4480, 5020,
+        5430, 5740, 5960, 6080, 6120
+      ];
+      convertedSteps.forEach(function (v, i) {
+        var t = donutStart + (i / (convertedSteps.length - 1)) * donutDur;
+        tl.set("#legend-converted", { textContent: v.toLocaleString() }, t);
+      });
+      visitedSteps.forEach(function (v, i) {
+        var t = donutStart + (i / (visitedSteps.length - 1)) * donutDur;
+        tl.set("#legend-visited", { textContent: v.toLocaleString() }, t);
+      });
+
+      // === t=2.20s: MULTI-STAT counters =================================
+      // stat-a: 0 → 24
+      // stat-b: 0 → 312
+      // stat-c: 0 → 1.2k
+      var mStart = 2.20;
+      var mEnd   = 4.60;
+      var mDur   = mEnd - mStart;
+
+      var statASteps = [0, 1, 3, 5, 8, 11, 14, 17, 19, 21, 22, 23, 24, 24, 24];
+      var statBSteps = [0, 12, 38, 75, 124, 178, 220, 252, 278, 294, 304, 310, 312, 312, 312];
+      var statCStepsRaw = [0, 60, 180, 350, 540, 720, 880, 1020, 1110, 1160, 1185, 1195, 1200, 1200, 1200];
+
+      statASteps.forEach(function (v, i) {
+        var t = mStart + (i / (statASteps.length - 1)) * mDur;
+        tl.set("#stat-a", { textContent: v.toString() }, t);
+      });
+      statBSteps.forEach(function (v, i) {
+        var t = mStart + (i / (statBSteps.length - 1)) * mDur;
+        tl.set("#stat-b", { textContent: v.toString() }, t);
+      });
+      statCStepsRaw.forEach(function (v, i) {
+        var t = mStart + (i / (statCStepsRaw.length - 1)) * mDur;
+        var display = v >= 1000
+          ? (v / 1000).toFixed(1) + "k"
+          : v.toString();
+        tl.set("#stat-c", { textContent: display }, t);
+      });
+
+      // === t=4.80s: big counter "celebrates" with a subtle scale pulse ==
+      tl.fromTo("#counter-big",
+        { scale: 1 },
+        { scale: 1.04, duration: 0.35, ease: "back.out(1.7)", transformOrigin: "0% 50%" },
+        4.80);
+      tl.to("#counter-big", { scale: 1, duration: 0.6, ease: "expo.out", transformOrigin: "0% 50%" }, 5.15);
+
+      // ====== CONTINUOUS LIVE MOTION 5.5s → 10s =========================
+
+      // (A) Status dots pulse — each card's green dot blinks softly. Staggered phases.
+      var dots = ["#dot-1", "#dot-2", "#dot-3", "#dot-4"];
+      dots.forEach(function (sel, i) {
+        var phase = 5.50 + i * 0.18;
+        // Pulse 6 times across the remaining beat (~4.5s).
+        // Use yoyo + repeat for compactness; this is deterministic (no Math.random/repeat:-1).
+        tl.fromTo(sel,
+          { scale: 1, boxShadow: "0 0 0 0 rgba(52, 211, 153, 0.5)" },
+          {
+            scale: 1.4,
+            boxShadow: "0 0 0 6px rgba(52, 211, 153, 0)",
+            duration: 0.55,
+            ease: "sine.inOut",
+            yoyo: true,
+            repeat: 7,
+            transformOrigin: "50% 50%",
+          },
+          phase);
+      });
+
+      // (B) Big-counter "micro tick" — 128 → 128.3 → 128.5 → 128.7 → 128.4 → 128.6 → 128.7
+      // (in K). Each tick is a tl.set() at a specific time. Live data feel.
+      var microTicks = [
+        { t: 5.80, v: "128.3" },
+        { t: 6.40, v: "128.5" },
+        { t: 7.10, v: "128.7" },
+        { t: 7.80, v: "128.4" },
+        { t: 8.50, v: "128.6" },
+        { t: 9.20, v: "128.7" }
+      ];
+      microTicks.forEach(function (tick) {
+        tl.set("#counter-big", { textContent: tick.v }, tick.t);
+        // micro pulse on the counter element each tick
+        tl.fromTo("#counter-big",
+          { scale: 1 },
+          { scale: 1.015, duration: 0.18, ease: "power2.out", transformOrigin: "0% 50%", overwrite: "auto" },
+          tick.t);
+        tl.to("#counter-big", { scale: 1, duration: 0.3, ease: "expo.out", transformOrigin: "0% 50%", overwrite: "auto" }, tick.t + 0.18);
+      });
+
+      // (C) Spark number micro-ticks (live data) — 3920 → 3945 → 3962 → 3941 → 3978
+      var sparkTicks = [
+        { t: 5.90, v: "3,945" },
+        { t: 6.80, v: "3,962" },
+        { t: 7.70, v: "3,941" },
+        { t: 8.60, v: "3,978" },
+        { t: 9.40, v: "4,012" }
+      ];
+      sparkTicks.forEach(function (tick) {
+        tl.set("#spark-num", { textContent: tick.v }, tick.t);
+      });
+
+      // (D) Sparkline last dot subtle "heartbeat" pulse — it's the "live" point.
+      tl.to("#sd-12", {
+        scale: 1.4,
+        duration: 0.45,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 9,
+        transformOrigin: "50% 50%",
+      }, 5.60);
+
+      // (E) Donut: subtle "overshoot then settle" demonstration — bump from 87 to 88 then back
+      tl.set("#donut-pct", { textContent: "88%" }, 6.50);
+      tl.set("#donut-pct", { textContent: "87%" }, 7.20);
+      tl.set("#donut-pct", { textContent: "88%" }, 8.10);
+      tl.set("#donut-pct", { textContent: "89%" }, 8.90);
+      tl.to("#donut-fill", {
+        strokeDashoffset: 29.03, // 89%
+        duration: 0.6,
+        ease: "expo.out",
+      }, 8.90);
+
+      // (F) Multi-stat micro-updates (someone joined / left)
+      var statAUpdates = [
+        { t: 5.70, v: "25" },
+        { t: 6.50, v: "26" },
+        { t: 7.40, v: "26" },
+        { t: 8.20, v: "27" },
+        { t: 9.30, v: "28" }
+      ];
+      statAUpdates.forEach(function (u) {
+        tl.set("#stat-a", { textContent: u.v }, u.t);
+        tl.fromTo("#stat-a",
+          { scale: 1, color: "#f5f5f5" },
+          { scale: 1.06, color: "#60a5fa", duration: 0.22, ease: "back.out(1.7)", transformOrigin: "0% 50%", overwrite: "auto" },
+          u.t);
+        tl.to("#stat-a", { scale: 1, color: "#f5f5f5", duration: 0.4, ease: "expo.out", transformOrigin: "0% 50%", overwrite: "auto" }, u.t + 0.22);
+      });
+      var statBUpdates = [
+        { t: 5.90, v: "315" },
+        { t: 6.70, v: "318" },
+        { t: 7.50, v: "321" },
+        { t: 8.30, v: "324" },
+        { t: 9.10, v: "326" }
+      ];
+      statBUpdates.forEach(function (u) {
+        tl.set("#stat-b", { textContent: u.v }, u.t);
+      });
+
+      // (G) Bars subtle "live" growth — the rightmost bar grows a touch more
+      tl.to(".bar:nth-child(10)", {
+        scaleY: 1.05,
+        duration: 1.2,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 3,
+        transformOrigin: "bottom center",
+      }, 5.80);
+      tl.to(".bar:nth-child(9)", {
+        scaleY: 0.92,
+        duration: 1.2,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 3,
+        transformOrigin: "bottom center",
+      }, 6.10);
+
+      // (H) "Live" tag in header heartbeat
+      tl.fromTo("#live-tag",
+        { scale: 1 },
+        { scale: 1.06, duration: 0.55, ease: "sine.inOut", yoyo: true, repeat: 7, transformOrigin: "50% 50%" },
+        5.60);
+
+      // (I) Subtle drift of the whole dash for breath — none ease (ambient)
+      tl.fromTo(".dash",
+        { y: 0 },
+        { y: -6, duration: 4.4, ease: "none" },
+        5.60);
+
+      window.__timelines["scene-05-dashboard-counters"] = tl;
+    })();
+  </script>
+</body>
+</html>

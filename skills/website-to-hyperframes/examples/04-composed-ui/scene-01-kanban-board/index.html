@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-01-kanban-board</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    #scene-01-kanban-board {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(180deg, #0e1116 0%, #0a0c10 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Window chrome — gives the board a "this is a real app" frame. */
+    .window {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1600px;
+      height: 880px;
+      border-radius: 16px;
+      background: #11151b;
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow:
+        0 60px 120px -30px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(255,255,255,0.02) inset;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .window-header {
+      height: 56px;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      background: rgba(255,255,255,0.015);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #28c941; }
+    .crumbs {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-size: 14px;
+      color: #8a93a0;
+      margin-left: 8px;
+    }
+    .crumbs .sep { opacity: 0.4; }
+    .crumbs .current { color: #d6dde6; font-weight: 500; }
+
+    .toolbar {
+      height: 56px;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .toolbar h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+    }
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      color: #8a93a0;
+    }
+    .toolbar .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+    }
+    .toolbar .btn {
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: #5b8dff;
+      color: white;
+      font-weight: 500;
+    }
+
+    /* The kanban grid */
+    .board {
+      flex: 1 1 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 18px;
+      padding: 24px;
+      overflow: hidden;
+    }
+    .column {
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+    }
+    .column-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 6px;
+    }
+    .column-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .column-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+    }
+    .col-todo .column-dot { background: #8a93a0; }
+    .col-prog .column-dot { background: #f59e0b; box-shadow: 0 0 12px rgba(245, 158, 11, 0.5); }
+    .col-done .column-dot { background: #10b981; }
+    .col-todo .column-title-text { color: #8a93a0; }
+    .col-prog .column-title-text { color: #f5d4a0; }
+    .col-done .column-title-text { color: #a5e6cd; }
+    .column-count {
+      font-size: 12px;
+      color: #8a93a0;
+      background: rgba(255,255,255,0.04);
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Cards */
+    .card {
+      background: #181d24;
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 10px;
+      padding: 14px 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      cursor: default;
+      box-shadow: 0 2px 0 rgba(0,0,0,0.2);
+      opacity: 0;  /* locked initial state — GSAP brings them in */
+    }
+    .card .tag {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8a93a0;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.04);
+      align-self: flex-start;
+    }
+    .card.tag-design .tag { color: #a78bfa; background: rgba(167, 139, 250, 0.1); }
+    .card.tag-bug .tag    { color: #f87171; background: rgba(248, 113, 113, 0.1); }
+    .card.tag-feature .tag{ color: #34d399; background: rgba(52, 211, 153, 0.1); }
+    .card.tag-research .tag{ color: #60a5fa; background: rgba(96, 165, 250, 0.1); }
+    .card.tag-ops .tag    { color: #fbbf24; background: rgba(251, 191, 36, 0.1); }
+    .card-title {
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.35;
+      color: #e5e7eb;
+    }
+    .card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .card-meta-left { display: flex; align-items: center; gap: 8px; }
+    .avatar {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+      font-size: 9px;
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600;
+    }
+    .avatar.a { background: linear-gradient(135deg, #6366f1, #a855f7); }
+    .avatar.b { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+    .avatar.c { background: linear-gradient(135deg, #10b981, #06b6d4); }
+    .avatar.d { background: linear-gradient(135deg, #ec4899, #f97316); }
+    .priority {
+      display: flex; gap: 2px;
+    }
+    .priority span {
+      width: 4px; height: 4px; border-radius: 50%; background: #4b5563;
+    }
+    .priority span.on { background: #f59e0b; }
+
+    /* Drag-target card uses absolute positioning so we can fly it
+       between columns without disrupting the grid layout. The column
+       slots reserve space for it via a placeholder div. */
+    .drag-card {
+      position: absolute;
+      width: 480px;
+      z-index: 10;
+      will-change: transform, opacity;
+    }
+    .drag-shadow {
+      box-shadow:
+        0 20px 50px -20px rgba(95, 122, 255, 0.6),
+        0 0 0 1px rgba(91, 141, 255, 0.4),
+        0 2px 0 rgba(0,0,0,0.2);
+    }
+
+    /* Activity indicator badge — "Live" pill that pulses in upper right of board */
+    .live-pill {
+      position: absolute;
+      top: 80px;
+      right: 36px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #34d399;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.15);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0;
+    }
+    .live-pill::before {
+      content: "";
+      width: 6px; height: 6px; border-radius: 50%; background: #34d399;
+      box-shadow: 0 0 8px #34d399;
+    }
+
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 20;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-01-kanban-board"
+       data-composition-id="scene-01-kanban-board"
+       data-start="0"
+       data-duration="9"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="window" id="window">
+      <div class="window-header">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <div class="crumbs">
+          <span>Acme</span><span class="sep">/</span>
+          <span>Launch</span><span class="sep">/</span>
+          <span class="current">Sprint 24 · Board</span>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <h1>Sprint 24 — Launch readiness</h1>
+        <div class="toolbar-actions">
+          <span class="pill">Filter</span>
+          <span class="pill">Group: status</span>
+          <span class="btn">+ New task</span>
+        </div>
+      </div>
+
+      <div class="board">
+        <!-- TODO column -->
+        <div class="column col-todo">
+          <div class="column-header">
+            <div class="column-title">
+              <span class="column-dot"></span>
+              <span class="column-title-text">Todo</span>
+            </div>
+            <span class="column-count" data-col="todo">4</span>
+          </div>
+          <div class="cards-host" data-col-host="todo">
+            <!-- Card slot 1 (will host the drag card after drop) -->
+            <div class="card-placeholder" style="height:0; transition:height 0.3s;"></div>
+            <div class="card tag-design" data-card="t1">
+              <span class="tag">Design</span>
+              <div class="card-title">Redesign onboarding flow for first-run users</div>
+              <div class="card-meta">
+                <div class="card-meta-left"><div class="avatar a">LK</div></div>
+                <div class="priority"><span class="on"></span><span class="on"></span><span></span></div>
+              </div>
+            </div>
+            <div class="card tag-research" data-card="t2">
+              <span class="tag">Research</span>
+              <div class="card-title">Compare retention curves vs. v0.4 baseline</div>
+              <div class="card-meta">
+                <div class="card-meta-left"><div class="avatar c">RM</div></div>
+                <div class="priority"><span class="on"></span><span></span><span></span></div>
+              </div>
+            </div>
+            <div class="card tag-ops" data-card="t3">
+              <span class="tag">Ops</span>
+              <div class="card-title">Provision staging cluster for QA pass</div>
+              <div class="card-meta">
+                <div class="card-meta-left"><div class="avatar b">JA</div></div>
+                <div class="priority"><span class="on"></span><span class="on"></span><span></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- IN PROGRESS column -->
+        <div class="column col-prog">
+          <div class="column-header">
+            <div class="column-title">
+              <span class="column-dot"></span>
+              <span class="column-title-text">In Progress</span>
+            </div>
+            <span class="column-count" data-col="prog">2</span>
+          </div>
+          <div class="cards-host" data-col-host="prog">
+            <!-- Drop target placeholder for the drag card -->
+            <div class="card-placeholder" id="prog-drop" style="height:0;"></div>
+            <div class="card tag-feature" data-card="p1">
+              <span class="tag">Feature</span>
+              <div class="card-title">Wire payment webhook retry logic</div>
+              <div class="card-meta">
+                <div class="card-meta-left"><div class="avatar d">SV</div></div>
+                <div class="priority"><span class="on"></span><span class="on"></span><span class="on"></span></div>
+              </div>
+            </div>
+            <div class="card tag-design" data-card="p2">
+              <span class="tag">Design</span>
+              <div class="card-title">Polish dashboard empty states</div>
+              <div class="card-meta">
+                <div class="card-meta-left"><div class="avatar a">LK</div></div>
+                <div class="priority"><span class="on"></span><span></span><span></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DONE column -->
+        <div class="column col-done">
+          <div class="column-header">
+            <div class="column-title">
+              <span class="column-dot"></span>
+              <span class="column-title-text">Done</span>
+            </div>
+            <span class="column-count" data-col="done">5</span>
+          </div>
+          <div class="cards-host" data-col-host="done">
+            <div class="card tag-bug" data-card="d1">
+              <span class="tag">Bug</span>
+              <div class="card-title">Fix race in shader transition cleanup</div>
+              <div class="card-meta">
+                <div class="card-meta-left"><div class="avatar c">RM</div></div>
+                <div class="priority"><span class="on"></span><span class="on"></span><span></span></div>
+              </div>
+            </div>
+            <div class="card tag-feature" data-card="d2">
+              <span class="tag">Feature</span>
+              <div class="card-title">Add per-word caption mode to renderer</div>
+              <div class="card-meta">
+                <div class="card-meta-left"><div class="avatar b">JA</div></div>
+                <div class="priority"><span class="on"></span><span class="on"></span><span></span></div>
+              </div>
+            </div>
+            <div class="card tag-ops" data-card="d3">
+              <span class="tag">Ops</span>
+              <div class="card-title">Migrate CI runner pool to ARM64</div>
+              <div class="card-meta">
+                <div class="card-meta-left"><div class="avatar d">SV</div></div>
+                <div class="priority"><span class="on"></span><span></span><span></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- The dragged card flies between columns. Pre-rendered at Todo's top
+         slot position; GSAP animates it to In Progress over the beat. -->
+    <div class="card tag-feature drag-card" id="drag-card" style="top: 245px; left: 188px;">
+      <span class="tag">Feature</span>
+      <div class="card-title">Ship Sprint 24 launch announcement</div>
+      <div class="card-meta">
+        <div class="card-meta-left"><div class="avatar a">LK</div></div>
+        <div class="priority"><span class="on"></span><span class="on"></span><span class="on"></span></div>
+      </div>
+    </div>
+
+    <div class="live-pill" id="live-pill">Live</div>
+
+    <div class="label">
+      Scene 01 · <span class="accent">Kanban Board</span> · composed from divs, drag-and-drop animated
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 9;
+      window.__timelines = window.__timelines || {};
+
+      var tl = gsap.timeline({ paused: true });
+
+      // Cards in DOM order, by column. We stagger their entrances early
+      // in the beat so the board "populates" left-to-right, then run the
+      // drag-card animation, then finish with the column-count update.
+
+      var todoCards = document.querySelectorAll('[data-col-host="todo"] .card');
+      var progCards = document.querySelectorAll('[data-col-host="prog"] .card');
+      var doneCards = document.querySelectorAll('[data-col-host="done"] .card');
+
+      // === t=0 initial state — window scaled down + faded, drag card hidden, live pill hidden.
+      tl.set("#window", { scale: 0.96, opacity: 0, transformOrigin: "50% 50%" }, 0);
+      tl.set("#drag-card", { opacity: 0, scale: 0.94 }, 0);
+
+      // === t=0.0s: window scales up + fades in. Sets the stage.
+      tl.fromTo("#window",
+        { scale: 0.96, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.6, ease: "expo.out" },
+        0.10);
+
+      // === t=0.5s: Todo column cards slide in from below, staggered.
+      tl.fromTo(todoCards,
+        { opacity: 0, y: 24, scale: 0.98 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.08, ease: "back.out(1.4)" },
+        0.50);
+
+      // === t=0.85s: Done column cards slide in (showing "this is what we've finished")
+      tl.fromTo(doneCards,
+        { opacity: 0, y: 24, scale: 0.98 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.08, ease: "back.out(1.4)" },
+        0.85);
+
+      // === t=1.2s: In Progress cards last (drama — the action is here)
+      tl.fromTo(progCards,
+        { opacity: 0, y: 24, scale: 0.98 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.08, ease: "back.out(1.4)" },
+        1.20);
+
+      // === t=2.2s: The "Live" pill fades in with a soft pulse, signaling "this is real."
+      tl.fromTo("#live-pill",
+        { opacity: 0, scale: 0.85 },
+        { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.7)" },
+        2.20);
+      // Pulse continuously through hold to keep the frame alive — start after the fromTo settles.
+      tl.to("#live-pill", {
+        scale: 1.05,
+        duration: 0.7,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 7,
+        transformOrigin: "50% 50%",
+      }, 2.75);
+
+      // === t=2.6s: Drag card appears in Todo column slot — fades in at its starting position.
+      tl.fromTo("#drag-card",
+        { opacity: 0, scale: 0.94 },
+        { opacity: 1, scale: 1, duration: 0.4, ease: "expo.out" },
+        2.60);
+
+      // === t=3.4s: Drag pick-up — card lifts (scale up slightly, shadow ramp), rotates 2deg.
+      // The placeholder space in Todo column "collapses" — we don't actually need to do this since
+      // the card was always absolute-positioned, but visual feedback: card scales up + rotates.
+      tl.to("#drag-card", {
+        scale: 1.06,
+        rotation: 3,
+        boxShadow: "0 30px 60px -20px rgba(95, 122, 255, 0.7), 0 0 0 1.5px rgba(91, 141, 255, 0.5), 0 2px 0 rgba(0,0,0,0.2)",
+        duration: 0.35,
+        ease: "back.out(1.6)",
+        transformOrigin: "50% 50%",
+      }, 3.40);
+      tl.to("#drag-card", { className: "card tag-feature drag-card drag-shadow" }, 3.40);
+
+      // === t=3.9s: Drag motion — card flies from Todo (x≈188) to In Progress (x≈718).
+      // Path is slightly curved (y dips down 10px in the middle for "weight").
+      tl.to("#drag-card", {
+        x: 530,    // 188 → 718 horizontal travel
+        y: 10,
+        duration: 1.2,
+        ease: "power2.inOut",
+      }, 3.90);
+
+      // === t=4.5s: While dragging — destination column highlights via a subtle border glow.
+      tl.fromTo(".col-prog",
+        { boxShadow: "0 0 0 0 rgba(245, 158, 11, 0)" },
+        {
+          boxShadow: "0 0 0 1.5px rgba(245, 158, 11, 0.4), 0 0 40px rgba(245, 158, 11, 0.15)",
+          duration: 0.5,
+          ease: "expo.out",
+        }, 4.50);
+
+      // === t=5.1s: Drop — card settles into In Progress. Rotation back to 0, shadow back to normal.
+      tl.to("#drag-card", {
+        rotation: 0,
+        scale: 1,
+        y: 0,
+        duration: 0.4,
+        ease: "elastic.out(1, 0.6)",
+      }, 5.10);
+      // Border glow on the column fades back out.
+      tl.to(".col-prog", {
+        boxShadow: "0 0 0 0 rgba(245, 158, 11, 0)",
+        duration: 0.6,
+        ease: "expo.out",
+      }, 5.50);
+
+      // === t=5.6s: Column counts update — Todo goes 4 → 3, In Progress goes 2 → 3.
+      // Use tl.set() at specific timestamps (the deterministic counter pattern).
+      tl.set('[data-col="todo"]', { textContent: "3" }, 5.60);
+      tl.set('[data-col="prog"]', { textContent: "3" }, 5.60);
+      // Pulse the In Progress count chip — it just got a new task.
+      tl.fromTo('[data-col="prog"]',
+        { scale: 1, color: "#8a93a0", backgroundColor: "rgba(255,255,255,0.04)" },
+        { scale: 1.3, color: "#f5d4a0", backgroundColor: "rgba(245, 158, 11, 0.18)", duration: 0.35, ease: "back.out(1.7)", transformOrigin: "50% 50%" },
+        5.60);
+      tl.to('[data-col="prog"]', {
+        scale: 1,
+        color: "#8a93a0",
+        backgroundColor: "rgba(255,255,255,0.04)",
+        duration: 0.7,
+        ease: "expo.out",
+      }, 6.05);
+
+      // === t=6.4s: Drag card's tag updates ("Feature" stays but the column position has changed —
+      // visually nothing new but we can pulse the priority dots on the dropped card for emphasis).
+      tl.fromTo("#drag-card .priority span",
+        { scale: 1, opacity: 1 },
+        { scale: 1.4, opacity: 1, duration: 0.3, stagger: 0.08, ease: "back.out(1.7)", transformOrigin: "50% 50%" },
+        6.40);
+      tl.to("#drag-card .priority span", { scale: 1, duration: 0.4, ease: "expo.out" }, 6.85);
+
+      // === Continuous motion 6.8s-9.0s: window subtle drift (camera move) + cards breathe.
+      tl.to("#window", {
+        y: -8,
+        duration: 2.2,
+        ease: "sine.inOut",
+      }, 6.80);
+      // Subtle scale-breathing on a couple of cards for "the board is alive" feel.
+      tl.to(progCards, {
+        y: -2,
+        duration: 1.5,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        stagger: 0.05,
+      }, 7.20);
+
+      window.__timelines["scene-01-kanban-board"] = tl;
+    })();
+  </script>
+</body>
+</html>
