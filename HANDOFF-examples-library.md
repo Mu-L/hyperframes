@@ -1,17 +1,17 @@
 # HANDOFF — Examples Library (Sessions May 19, 2026)
 
-> **READ THIS BEFORE PICKING UP THE EXAMPLES LIBRARY WORK.** This is the followup to `HANDOFF.md` (which covers the v2-v9 pipeline-quality work through May 18). This doc covers what was built May 19: the HyperFrames Capability Showcase example library, **62 scenes across 13 sections**, all rendered and uploaded, gallery app live, **skill wiring updated to 3-mode framework** (copy+mutate / recombine / fresh), and a second-pass survey of every production project that turned up 5 high-leverage gap-filler scenes (batch 10).
+> **READ THIS BEFORE PICKING UP THE EXAMPLES LIBRARY WORK.** This is the followup to `HANDOFF.md` (which covers the v2-v9 pipeline-quality work through May 18). This doc covers what was built May 19: the HyperFrames Capability Showcase example library, **65 scenes across 13 sections**, all rendered and uploaded, gallery app live, **skill wiring updated to 3-mode framework** (copy+mutate / recombine / fresh), a second-pass survey of every production project that turned up 5 high-leverage gap-filler scenes (batch 10), and 3 hand-authored scenes filling the thinnest sections (batch 11).
 
 ---
 
 ## TL;DR
 
-**What got built:** **62 production-grade example scenes** at `skills/website-to-hyperframes/examples/`, covering every HyperFrames technique. Each scene is standalone-renderable, lint-clean, snapshot-verified, composed 100% from HTML/CSS/SVG/GSAP/Canvas — zero captured screenshots. Plus a single concatenated "Grand Tour" reel (**7:10 MP4**) that plays all 62 back-to-back.
+**What got built:** **65 production-grade example scenes** at `skills/website-to-hyperframes/examples/`, covering every HyperFrames technique. Each scene is standalone-renderable, lint-clean, snapshot-verified, composed 100% from HTML/CSS/SVG/GSAP/Canvas — zero captured screenshots. Plus a single concatenated "Grand Tour" reel (**7:31 MP4**) that plays all 65 back-to-back.
 
 **Why:** `HANDOFF.md` Recommendation 1 said skill prose was exhausted as a lever (11 eval branches all produced slideshow videos regardless of prose changes). Recommendation 2 said: **show, don't tell** — build production-grade reference examples agents can use. This library is that.
 
 **Gallery is live:** https://www.heygenverse.com/a/1636f2fe-3ddc-4543-9a56-0d0b99538807
-**Grand Tour reel (all 62 scenes, 7:10):** https://www.heygenverse.com/s/67bb4ee5-1c7f-4837-b144-d2527b8ade83/raw
+**Grand Tour reel (all 65 scenes, 7:31):** https://www.heygenverse.com/s/efb24629-1c60-41f9-bd3f-a78d2181d774/raw
 
 **Skill wiring is active AND updated** (May 19 evening): the skill now explicitly names **three legitimate modes** for using examples — `copy+mutate` (1:1 fit), `recombine` (2-3 scenes layered), `fresh` (author from scratch with examples as taste reference). Examples are NEVER finished beats — non-negotiable customization rule applies in every mode. See **[Skill Wiring](#skill-wiring)** below for the patch summary.
 
@@ -20,9 +20,17 @@
 - **step-5-build.md**: mode-aware build process; explicit "fresh ≠ paste, recombine ≠ frankenstein".
 - **beat-builder-guide.md**: 3-mode table is the FIRST mandatory read; "non-negotiable in every mode: customize."
 
-**Branch:** `feat/pipeline-quality-v2` (continued from prior session). **17 commits** total this session.
+**Branch:** `feat/pipeline-quality-v2` (continued from prior session). **18 commits** total this session.
 
-**Library is internally consistent.** Every scene appears in (a) its section README, (b) the master lookup table in `examples/README.md`, (c) the rendered MP4 list, and (d) the Verse asset ID table below. The technique-pick checklist in step-3 has reliable coverage — an agent can find any of the 62 scenes from the lookup table without grepping the directory.
+**Library is internally consistent.** Every scene appears in (a) its section README, (b) the master lookup table in `examples/README.md`, (c) the rendered MP4 list, and (d) the Verse asset ID table below. The technique-pick checklist in step-3 has reliable coverage — an agent can find any of the 65 scenes from the lookup table without grepping the directory.
+
+### What batch 11 added (3 hand-authored scenes filling the thinnest sections)
+
+After batch 10, sections 03 (easing) and 08 (svg) were at 1 scene each. Authored 3 scenes from scratch to bring them up to a reasonable baseline (2 in 03, 3 in 08):
+
+- **03-02 Easing Comparison Race**: 7 balls race the same horizontal track over the same 2-second duration, each driven by a different easing (`power4.out` / `back.out(1.7)` / `expo.out` / `power1.out` / `elastic.out(1, 0.5)` / `expo.inOut` / `none`). Lane labels include intent name + use-case hint. The fact that all balls finish at the same time but spend the journey at radically different positions is the entire pedagogical payload. Visceral teaching scene for easing variety.
+- **08-02 Logo Stroke-Draw**: Brand mark built from SVG paths that draw themselves on — outer ring → M monogram (left stem → left diagonal → right diagonal → right stem) → serif notches → accent dot → arc text labels → italic Fraunces caption. The canonical brand-mark reveal pattern. Each path has `pathLength="1000"` + `stroke-dasharray="1000"` + animated `stroke-dashoffset` (fully seekable, no `onUpdate` callbacks).
+- **08-03 Icon Morph**: Single SVG path morphs through 5 states — SQUARE → CIRCLE → DIAMOND → STAR → WAVE (bezier blob). Each transition uses a scale-pulse (squash + `tl.set(el, { attr: { d: "..." } })` + expand). Phase dots cycle below to mark progress; state-name + caption swap in sync. The reference for icon state-machine UIs without paid plugins.
 
 ### What batch 10 added (May 19 evening — second-pass survey)
 
@@ -82,12 +90,12 @@ skills/website-to-hyperframes/examples/
 │   └── easing-glossary.md                 ← single source of truth for 7 production easings
 ├── 01-typography/              README.md + 11 scene dirs (~100K total)
 ├── 02-markers-and-emphasis/    README.md + 6 scene dirs
-├── 03-easing-variety/          README.md + 1 scene dir
+├── 03-easing-variety/          README.md + 2 scene dirs
 ├── 04-composed-ui/             README.md + 13 scene dirs
 ├── 05-transitions-shader/      README.md + 1 scene dir
 ├── 06-transitions-css/         README.md + 1 scene dir
 ├── 07-html-in-canvas/          README.md + 5 scene dirs
-├── 08-svg-and-path/            README.md + 1 scene dir
+├── 08-svg-and-path/            README.md + 3 scene dirs
 ├── 09-counters-and-data/       README.md + 3 scene dirs
 ├── 10-particles-and-ambient/   README.md + 3 scene dirs
 ├── 11-3d-and-parallax/         README.md + 5 scene dirs
@@ -110,7 +118,7 @@ skills/website-to-hyperframes/examples/
 
 ---
 
-## THE 62 SCENES — FULL INVENTORY
+## THE 65 SCENES — FULL INVENTORY
 
 ### Section 01 — Typography (11 scenes)
 
@@ -141,11 +149,12 @@ skills/website-to-hyperframes/examples/
 | `scene-06-combined-marker-cascade` | 10s | All 5 markers cascading in one phrase |
 | `scene-07-magnetic-caption-webgl` | 5.5s | WebGL GLSL distortion + RGB chromatic aberration follows cursor over text |
 
-### Section 03 — Easing Variety (1 scene)
+### Section 03 — Easing Variety (2 scenes)
 
 | Scene | Duration | Technique |
 |-------|----------|-----------|
 | `scene-01-css-animation-grid` | 3.5s | 6×3 grid of 17 pure-CSS animations |
+| `scene-02-easing-race` | 6s | 7 balls race the same track over same 2s duration — visceral easing-comparison teaching scene |
 
 ### Section 04 — Composed UI (13 scenes)
 
@@ -187,11 +196,13 @@ skills/website-to-hyperframes/examples/
 | `scene-04-iphone-mockup-live` | 8s | CSS iPhone with live "Glow" meditation app — streak counter, breathing badge, bottom-sheet modal slide-in |
 | `scene-05-macbook-mockup-live` | 8s | CSS MacBook with simulated browser session — tab + URL bar type-on + page content reveal |
 
-### Section 08 — SVG and Path (1 scene)
+### Section 08 — SVG and Path (3 scenes)
 
 | Scene | Duration | Technique |
 |-------|----------|-----------|
 | `scene-01-vinyl-record` | 3s | Concentric SVG grooves + tonearm descent + 360° spin |
+| `scene-02-logo-stroke-draw` | 7s | Brand mark drawing itself — ring + M monogram + serifs + accent dot + arc text. 720px of SVG path via stroke-dashoffset |
+| `scene-03-icon-morph` | 8s | Single SVG path morphs SQUARE → CIRCLE → DIAMOND → STAR → WAVE via d-attribute swaps at timeline keyframes |
 
 ### Section 09 — Counters and Data (3 scenes)
 
@@ -317,6 +328,7 @@ All 53 scenes rendered to MP4 at draft quality (24fps) and uploaded. URLs follow
 | Scene | Asset ID |
 |---|---|
 | scene-01-css-animation-grid | 4bc82856-58b9-4291-a4c4-b41eac7a6838 |
+| scene-02-easing-race | 02c80d9a-f194-4831-b105-f1a4a746a367 |
 
 ### Section 04 — Composed UI
 | Scene | Asset ID |
@@ -356,6 +368,8 @@ All 53 scenes rendered to MP4 at draft quality (24fps) and uploaded. URLs follow
 | Scene | Asset ID |
 |---|---|
 | scene-01-vinyl-record | b66aeee8-e50f-46bd-b7d4-91a7a4cb65e8 |
+| scene-02-logo-stroke-draw | d876f121-f7de-4862-9cba-d09124833878 |
+| scene-03-icon-morph | 24e77743-e6c4-446d-b699-f562b67f244a |
 
 ### Section 09 — Counters and Data
 | Scene | Asset ID |
@@ -399,7 +413,8 @@ All 53 scenes rendered to MP4 at draft quality (24fps) and uploaded. URLs follow
 ### Grand Tour Reel
 | Reel | Asset ID | Duration |
 |---|---|---|
-| grand-tour-62-scenes (current) | 67bb4ee5-1c7f-4837-b144-d2527b8ade83 | 7:10 |
+| grand-tour-65-scenes (current) | efb24629-1c60-41f9-bd3f-a78d2181d774 | 7:31 |
+| grand-tour-62-scenes (superseded) | 67bb4ee5-1c7f-4837-b144-d2527b8ade83 | 7:10 |
 | grand-tour-57-scenes (superseded) | b9cdfa1b-6fbd-45a1-b71f-7183edc9bd61 | 6:26 |
 | grand-tour-53-scenes (superseded) | bd3a5ac8-8b80-4dc8-af1b-20606a50456e | 5:58 |
 
@@ -598,10 +613,11 @@ batch_upload_assets supports up to 20 files at once. PUTs can run in parallel vi
 
 ---
 
-## THE 17 COMMITS
+## THE 18 COMMITS
 
 ```
-[pending]  feat(skill): examples library batch 10 — 5 second-pass lifts (62 scenes total)
+[pending]  feat(skill): examples library batch 11 — 3 hand-authored gap-fillers (65 scenes total)
+39069a19  feat(skill): examples library batch 10 — 5 second-pass lifts (62 scenes total)
 2bdba5e9  docs: finalize handoff — batches 7-9 (57 scenes, 3-mode wiring, READMEs synced)
 6bbfafe0  docs(skill): sync remaining section READMEs (01, 02, 04, 10, 11) — 9 missing scenes
 f2d1d11d  docs(skill): sync library READMEs with batch 7 — 3-mode framework + 4 new scenes
@@ -620,7 +636,7 @@ a877da70  feat(skill): examples library section 04 — composed UI, 8 scenes
 04827b98  feat(skill): examples library scaffold + section 01 (typography) — 10 scenes
 ```
 
-All on branch `feat/pipeline-quality-v2`, ahead of `origin/feat/pipeline-quality-v2` by 17 commits.
+All on branch `feat/pipeline-quality-v2`, ahead of `origin/feat/pipeline-quality-v2` by 18 commits.
 
 ### What batches 8 + 9 did (docs sync after batch 7)
 

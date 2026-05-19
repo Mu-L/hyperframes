@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-03-icon-morph</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0b10; }
+
+    [data-composition-id="scene-03-icon-morph"] {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: radial-gradient(ellipse 1200px 800px at 50% 50%, #161821 0%, #0a0b10 75%);
+      font-family: "Inter", -apple-system, sans-serif;
+      color: #f0f0f0;
+    }
+
+    /* Eyebrow */
+    .eyebrow {
+      position: absolute;
+      top: 80px; left: 0; right: 0;
+      text-align: center;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+    }
+
+    /* State label — changes during morph */
+    .state-label {
+      position: absolute;
+      bottom: 130px; left: 0; right: 0;
+      text-align: center;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 32px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #5b8dff;
+      min-height: 40px;
+    }
+
+    .state-caption {
+      position: absolute;
+      bottom: 80px; left: 0; right: 0;
+      text-align: center;
+      font-family: "Inter", sans-serif;
+      font-size: 16px;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 0.02em;
+    }
+
+    /* Icon stage */
+    .icon-stage {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 480px; height: 480px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .icon-stage svg {
+      width: 380px;
+      height: 380px;
+      overflow: visible;
+      filter: drop-shadow(0 0 30px rgba(91, 141, 255, 0.25));
+    }
+
+    .morph-path {
+      fill: #5b8dff;
+      stroke: #5b8dff;
+      stroke-width: 0;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Phase markers under the icon */
+    .phase-dots {
+      position: absolute;
+      bottom: 196px; left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 14px;
+    }
+    .phase-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      transition: none;
+    }
+    .phase-dot.active {
+      background: #5b8dff;
+      box-shadow: 0 0 12px rgba(91, 141, 255, 0.7);
+    }
+
+    /* Corner editorial marks */
+    .corner-mark {
+      position: absolute;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.3);
+    }
+    .corner-mark.tl { top: 40px; left: 56px; }
+    .corner-mark.tr { top: 40px; right: 56px; }
+
+    .scene-label {
+      position: absolute;
+      left: 32px; bottom: 18px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.06em;
+    }
+    .scene-label b { color: rgba(255,255,255,0.65); }
+  </style>
+</head>
+<body>
+  <div
+    id="scene-03-icon-morph"
+    data-composition-id="scene-03-icon-morph"
+    data-start="0"
+    data-duration="8"
+    data-width="1920"
+    data-height="1080"
+  >
+    <div class="corner-mark tl">FIG · 03</div>
+    <div class="corner-mark tr">SVG · ATTR-MORPH</div>
+
+    <div class="eyebrow">Icon Morph · Five States · One Path</div>
+
+    <div class="icon-stage">
+      <!-- We morph attributes (rx, ry, r) on rect and points on polygon-as-path -->
+      <!-- Single path element morphed via `d` attribute swaps at fixed timestamps -->
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Initial state: a square -->
+        <path id="morph-icon" class="morph-path"
+              d="M 40 40 L 160 40 L 160 160 L 40 160 Z" />
+      </svg>
+    </div>
+
+    <div class="phase-dots">
+      <span class="phase-dot" id="pd-1"></span>
+      <span class="phase-dot" id="pd-2"></span>
+      <span class="phase-dot" id="pd-3"></span>
+      <span class="phase-dot" id="pd-4"></span>
+      <span class="phase-dot" id="pd-5"></span>
+    </div>
+
+    <div class="state-label" id="state-label">SQUARE</div>
+    <div class="state-caption" id="state-caption">d = M 40 40 L 160 40 L 160 160 L 40 160 Z</div>
+
+    <div class="scene-label">Section 08 · <b>Icon Morph</b> · single SVG path, d-attribute swaps at timeline keyframes</div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 8;
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      var icon = document.getElementById("morph-icon");
+      var stateLabel = document.getElementById("state-label");
+      var stateCaption = document.getElementById("state-caption");
+
+      // 5 shape states. Each has same number of subdivisions in `d` for clean interpolation
+      // (though we swap discretely here for deterministic seek-safe rendering — GSAP can morph
+      // path data with MorphSVGPlugin, but that's a paid plugin. The discrete-swap pattern
+      // demonstrates that path morphing works fine for state-machine UI without dependencies).
+      //
+      // For continuous morph we'd use MorphSVGPlugin or interpolate `points` on a polygon.
+      // For this demo, each phase shows the icon transitioning between states via scale-out + d-swap + scale-in.
+      var states = [
+        { d: "M 40 40 L 160 40 L 160 160 L 40 160 Z",
+          name: "SQUARE",
+          caption: "rectangle · 120 × 120" },
+        { d: "M 100 30 A 70 70 0 1 1 99.99 30 Z",
+          name: "CIRCLE",
+          caption: "arc · radius 70" },
+        { d: "M 100 25 L 175 100 L 100 175 L 25 100 Z",
+          name: "DIAMOND",
+          caption: "rotated square · 90°" },
+        { d: "M 100 30 L 117 75 L 165 75 L 127 105 L 142 153 L 100 122 L 58 153 L 73 105 L 35 75 L 83 75 Z",
+          name: "STAR",
+          caption: "10 vertices · 5-point" },
+        { d: "M 100 30 C 145 30 175 65 175 100 C 175 135 145 170 100 170 C 75 170 50 158 35 140 C 50 122 75 110 100 110 C 125 110 150 122 165 140 C 150 158 125 170 100 170 Z",
+          name: "WAVE",
+          caption: "bezier blob · organic curve" },
+      ];
+
+      // Phase timing: each state visible for ~1.4s, with a 0.2s transition between them
+      var PHASE_START = 0.4;
+      var PHASE_DUR = 1.4;
+      var TRANSITION = 0.2;
+
+      // Eyebrow + corner marks fade in
+      tl.fromTo([".eyebrow", ".corner-mark"],
+        { opacity: 0, y: -4 },
+        { opacity: 1, y: 0, duration: 0.5, stagger: 0.08, ease: "power2.out" }, 0);
+
+      // Initial icon entrance
+      tl.fromTo("#morph-icon",
+        { scale: 0, transformOrigin: "100px 100px" },
+        { scale: 1, duration: 0.6, ease: "back.out(1.7)" }, 0.2);
+
+      // State 1 (SQUARE) label already in DOM. Phase dot 1 lights up.
+      tl.set("#pd-1", { className: "phase-dot active" }, 0.2);
+
+      // For each phase transition (5 phases means 4 transitions):
+      // - scale-pulse the icon (collapse + expand)
+      // - swap the `d` attribute at the center of the pulse
+      // - swap state-label + caption + phase-dot
+      states.forEach(function (state, i) {
+        if (i === 0) return; // first state is the entrance, no transition needed
+
+        var transitionAt = PHASE_START + i * PHASE_DUR;
+
+        // Squash out (0.2s)
+        tl.to("#morph-icon",
+          { scale: 0.6, rotation: i * 15, transformOrigin: "100px 100px",
+            duration: 0.2, ease: "power2.in" }, transitionAt);
+
+        // Mid-pulse: swap d + labels (instantaneous)
+        tl.set(icon, { attr: { d: state.d } }, transitionAt + 0.2);
+        tl.set(stateLabel, { textContent: state.name }, transitionAt + 0.2);
+        tl.set(stateCaption, { textContent: state.caption }, transitionAt + 0.2);
+
+        // Phase dots: turn off previous, turn on current
+        for (var j = 0; j < states.length; j++) {
+          tl.set("#pd-" + (j + 1),
+            { className: j === i ? "phase-dot active" : "phase-dot" },
+            transitionAt + 0.2);
+        }
+
+        // Pulse back in (0.4s, back.out for satisfying snap)
+        tl.to("#morph-icon",
+          { scale: 1, rotation: 0, duration: 0.4, ease: "back.out(1.8)" },
+          transitionAt + 0.22);
+      });
+
+      // Continuous rotation/breathing in the background (no element static for >1.5s)
+      tl.to(".icon-stage", { rotation: 5, duration: 4, ease: "sine.inOut", yoyo: true, repeat: 1 }, 0);
+
+      // Final hold: pulse the icon gently
+      tl.to("#morph-icon", { scale: 1.06, transformOrigin: "100px 100px", duration: 0.4, ease: "sine.inOut", yoyo: true, repeat: 2 }, 7.2);
+
+      window.__timelines["scene-03-icon-morph"] = tl;
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-02-logo-stroke-draw</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #faf8f3; }
+
+    [data-composition-id="scene-02-logo-stroke-draw"] {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: radial-gradient(ellipse 1400px 900px at 50% 50%, #fff8e9 0%, #f0e8d5 70%);
+      font-family: "Fraunces", "Times New Roman", serif;
+      color: #2a1f10;
+    }
+
+    /* Paper grain */
+    .grain {
+      position: absolute; inset: 0;
+      background-image:
+        radial-gradient(circle at 30% 40%, rgba(0,0,0,0.015) 1px, transparent 1px),
+        radial-gradient(circle at 70% 60%, rgba(0,0,0,0.015) 1px, transparent 1px);
+      background-size: 5px 5px, 7px 7px;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+      opacity: 0.6;
+    }
+
+    /* Stage */
+    .logo-stage {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 900px; height: 900px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-stage svg {
+      width: 720px;
+      height: 720px;
+      overflow: visible;
+    }
+
+    /* Stroke paths: animated via stroke-dashoffset (fully seekable) */
+    .draw-path {
+      fill: none;
+      stroke: #b8320e;
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .fill-path {
+      fill: #b8320e;
+      opacity: 0;
+    }
+
+    /* Eyebrow + caption */
+    .eyebrow {
+      position: absolute;
+      top: 80px; left: 0; right: 0;
+      text-align: center;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: #8a7a5a;
+    }
+
+    .caption {
+      position: absolute;
+      bottom: 110px; left: 0; right: 0;
+      text-align: center;
+      font-family: "Fraunces", serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 36px;
+      color: #6b5a3f;
+      letter-spacing: -0.005em;
+    }
+    .caption b {
+      font-style: normal;
+      font-weight: 600;
+      color: #2a1f10;
+    }
+
+    /* Sub-caption */
+    .sub-caption {
+      position: absolute;
+      bottom: 64px; left: 0; right: 0;
+      text-align: center;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(42,31,16,0.45);
+    }
+
+    /* Corner editorial marks */
+    .corner-mark {
+      position: absolute;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(42,31,16,0.35);
+    }
+    .corner-mark.tl { top: 40px; left: 56px; }
+    .corner-mark.tr { top: 40px; right: 56px; }
+    .corner-mark.bl { bottom: 40px; left: 56px; }
+    .corner-mark.br { bottom: 40px; right: 56px; }
+
+    /* Scene label */
+    .scene-label {
+      position: absolute;
+      left: 32px; bottom: 18px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      color: rgba(42,31,16,0.4);
+      letter-spacing: 0.06em;
+    }
+    .scene-label b { color: rgba(42,31,16,0.7); }
+  </style>
+</head>
+<body>
+  <div
+    id="scene-02-logo-stroke-draw"
+    data-composition-id="scene-02-logo-stroke-draw"
+    data-start="0"
+    data-duration="7"
+    data-width="1920"
+    data-height="1080"
+  >
+    <div class="grain"></div>
+
+    <div class="corner-mark tl">FIG · 02</div>
+    <div class="corner-mark tr">SVG · PATH-DRAW</div>
+    <div class="corner-mark bl">FRAUNCES · 720PX</div>
+    <div class="corner-mark br">STROKE · DASHOFFSET</div>
+
+    <div class="eyebrow">Logo · Stroke Drawing Demonstration</div>
+
+    <div class="logo-stage">
+      <!-- Logo: stylized "M" monogram in a circle (geometric mark with bowl + diagonal counter) -->
+      <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer ring -->
+        <circle id="ring" class="draw-path" cx="200" cy="200" r="170"
+          pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="1000" />
+
+        <!-- M strokes (4 segments — left stem, left diagonal, right diagonal, right stem) -->
+        <path id="m-left-stem" class="draw-path"
+          d="M 130 290 L 130 130"
+          pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="1000" />
+        <path id="m-left-diag" class="draw-path"
+          d="M 130 130 L 200 240"
+          pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="1000" />
+        <path id="m-right-diag" class="draw-path"
+          d="M 200 240 L 270 130"
+          pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="1000" />
+        <path id="m-right-stem" class="draw-path"
+          d="M 270 130 L 270 290"
+          pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="1000" />
+
+        <!-- Accent serif notches at top of each stem (drawn after the stems) -->
+        <path id="serif-left" class="draw-path"
+          d="M 115 130 L 145 130"
+          pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="1000"
+          stroke-width="6" />
+        <path id="serif-right" class="draw-path"
+          d="M 255 130 L 285 130"
+          pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="1000"
+          stroke-width="6" />
+
+        <!-- Accent dot inside the V of the M (drawn last as a fill, not stroke) -->
+        <circle id="accent-dot" class="fill-path" cx="200" cy="210" r="8" />
+
+        <!-- Year / tagline arc inside the ring (drawn after the M) -->
+        <path id="arc-text"
+          d="M 60 200 A 140 140 0 0 1 340 200"
+          fill="none" stroke="none"
+          pathLength="1000" />
+        <text id="arc-label"
+          font-family="JetBrains Mono, monospace" font-size="11" font-weight="500"
+          fill="#8a7a5a" letter-spacing="6" opacity="0">
+          <textPath href="#arc-text" startOffset="50%" text-anchor="middle">
+            MONOGRAM · EST 2026 · HAND-DRAWN
+          </textPath>
+        </text>
+
+        <!-- Bottom-arc tagline -->
+        <path id="bottom-arc"
+          d="M 75 215 A 130 130 0 0 0 325 215"
+          fill="none" stroke="none"
+          pathLength="1000" />
+        <text id="bottom-arc-label"
+          font-family="JetBrains Mono, monospace" font-size="11" font-weight="500"
+          fill="#8a7a5a" letter-spacing="6" opacity="0">
+          <textPath href="#bottom-arc" startOffset="50%" text-anchor="middle">
+            STUDIO · BRAND-MARK · 2026
+          </textPath>
+        </text>
+      </svg>
+    </div>
+
+    <div class="caption">A mark drawn live — <b>720px of SVG path</b> over 4 seconds.</div>
+    <div class="sub-caption">stroke-dasharray + animated stroke-dashoffset · 8 paths · 0 captured assets</div>
+
+    <div class="scene-label">Section 08 · <b>Logo Stroke-Draw</b> · SVG path drawing with stroke-dashoffset</div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 7;
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // Initial state: SVG paths invisible (stroke-dashoffset 1000), accent dot fill 0.
+      // Eyebrow + caption pre-hidden via CSS opacity 0? — set via GSAP for cleanliness.
+
+      // 0.0s: corner marks + eyebrow fade in (the editorial frame establishes first)
+      tl.fromTo([".corner-mark", ".eyebrow"],
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, stagger: 0.08, ease: "power2.out" },
+        0);
+
+      // 0.7s: Ring draws — the perimeter sets the visual container before the mark
+      tl.to("#ring", { strokeDashoffset: 0, duration: 1.2, ease: "expo.out" }, 0.7);
+
+      // 1.4s: M left stem (mechanical pace — these are construction lines)
+      tl.to("#m-left-stem", { strokeDashoffset: 0, duration: 0.45, ease: "power1.out" }, 1.4);
+
+      // 1.7s: left diagonal (the M starts to read)
+      tl.to("#m-left-diag", { strokeDashoffset: 0, duration: 0.4, ease: "power1.out" }, 1.7);
+
+      // 2.0s: right diagonal (V completes)
+      tl.to("#m-right-diag", { strokeDashoffset: 0, duration: 0.4, ease: "power1.out" }, 2.0);
+
+      // 2.3s: right stem
+      tl.to("#m-right-stem", { strokeDashoffset: 0, duration: 0.45, ease: "power1.out" }, 2.3);
+
+      // 2.85s: serif notches (small finishing details — back.out for a satisfying snap)
+      tl.to(["#serif-left", "#serif-right"],
+        { strokeDashoffset: 0, duration: 0.35, ease: "back.out(1.4)", stagger: 0.08 },
+        2.85);
+
+      // 3.4s: accent dot appears (back.out overshoot — the "signature" moment)
+      tl.fromTo("#accent-dot",
+        { opacity: 0, scale: 0, transformOrigin: "200px 210px" },
+        { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2.2)" },
+        3.4);
+
+      // 3.9s: arc labels fade in (top arc first, then bottom)
+      tl.fromTo("#arc-label", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 3.9);
+      tl.fromTo("#bottom-arc-label", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 4.1);
+
+      // 4.4s: caption fades in (italic Fraunces — the "presentation" moment)
+      tl.fromTo(".caption",
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.7, ease: "expo.out" },
+        4.4);
+
+      // 4.7s: sub-caption (mono, smaller)
+      tl.fromTo(".sub-caption",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "power2.out" },
+        4.7);
+
+      // === Hold (5.0-6.4s): continuous gentle motion. Logo breathes, accent dot pulses. ===
+      tl.to(".logo-stage", { scale: 1.015, duration: 1.2, ease: "sine.inOut", yoyo: true, repeat: 1 }, 5.0);
+      tl.to("#accent-dot", { scale: 1.2, transformOrigin: "200px 210px", duration: 0.4, ease: "sine.inOut", yoyo: true, repeat: 2 }, 5.2);
+
+      // 6.4s: subtle drift continues to end
+      tl.to(".caption", { y: -3, duration: 0.6, ease: "sine.out" }, 6.4);
+
+      window.__timelines["scene-02-logo-stroke-draw"] = tl;
+    })();
+  </script>
+</body>
+</html>

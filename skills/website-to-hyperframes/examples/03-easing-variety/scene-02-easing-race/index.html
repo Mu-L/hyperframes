@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-02-easing-race</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #08090c; }
+
+    [data-composition-id="scene-02-easing-race"] {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: radial-gradient(ellipse 1600px 1000px at 50% 50%, #11131a 0%, #08090c 70%);
+      font-family: "Inter", -apple-system, sans-serif;
+      color: #f0f0f0;
+    }
+
+    /* Title */
+    .race-title {
+      position: absolute;
+      top: 64px; left: 0; right: 0;
+      text-align: center;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+    }
+    .race-title b {
+      display: block;
+      font-family: "Inter", sans-serif;
+      font-size: 44px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      text-transform: none;
+      color: #f4f4f7;
+      margin-top: 12px;
+    }
+
+    /* Race container */
+    .race-table {
+      position: absolute;
+      top: 220px;
+      left: 120px;
+      right: 120px;
+      bottom: 200px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .lane {
+      position: relative;
+      height: 84px;
+      display: flex;
+      align-items: center;
+    }
+
+    .lane-label {
+      position: absolute;
+      left: 0; top: 50%;
+      transform: translateY(-50%);
+      width: 240px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 15px;
+      font-weight: 500;
+      color: #c4c8d2;
+      padding-right: 16px;
+      text-align: right;
+    }
+    .lane-label .ease-name {
+      color: #f0f0f0;
+      font-weight: 600;
+    }
+    .lane-label .ease-use {
+      display: block;
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      margin-top: 2px;
+      letter-spacing: 0;
+    }
+
+    /* Track — runs from after label to right edge */
+    .track {
+      position: absolute;
+      left: 256px;
+      right: 120px;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 4px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 2px;
+      overflow: visible;
+    }
+    .track::before,
+    .track::after {
+      content: "";
+      position: absolute;
+      top: -16px;
+      width: 1px; height: 36px;
+      background: rgba(255,255,255,0.12);
+    }
+    .track::before { left: 0; }
+    .track::after { right: 0; }
+
+    /* Finish-line label */
+    .finish-mark {
+      position: absolute;
+      right: -8px; top: -34px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .start-mark {
+      position: absolute;
+      left: -8px; top: -34px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .ball {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      transform: translate(-50%, -50%);
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      box-shadow: 0 0 18px currentColor, 0 2px 6px rgba(0,0,0,0.4);
+    }
+
+    /* Lane colors (mapped to easing intent) */
+    .lane-1 .ball { background: #5b8dff; color: #5b8dff; }    /* power4.out: snap */
+    .lane-2 .ball { background: #a78bfa; color: #a78bfa; }    /* back.out(1.7): whip */
+    .lane-3 .ball { background: #34d399; color: #34d399; }    /* expo.out: soft */
+    .lane-4 .ball { background: #facc15; color: #facc15; }    /* power1.out: mechanical */
+    .lane-5 .ball { background: #f59e0b; color: #f59e0b; }    /* elastic.out: bounce */
+    .lane-6 .ball { background: #f472b6; color: #f472b6; }    /* expo.inOut: dramatic */
+    .lane-7 .ball { background: #94a3b8; color: #94a3b8; }    /* none (linear): drift */
+
+    /* Bottom legend */
+    .legend {
+      position: absolute;
+      bottom: 64px; left: 0; right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 36px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .legend .key {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .legend .swatch {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+
+    /* Scene label */
+    .scene-label {
+      position: absolute;
+      left: 32px; bottom: 24px;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 14px;
+      letter-spacing: 0.06em;
+      color: rgba(255,255,255,0.35);
+    }
+    .scene-label b { color: rgba(255,255,255,0.65); }
+
+    /* Pulse on finish */
+    .ball.finished {
+      animation: none;
+    }
+  </style>
+</head>
+<body>
+  <div
+    id="scene-02-easing-race"
+    data-composition-id="scene-02-easing-race"
+    data-start="0"
+    data-duration="6"
+    data-width="1920"
+    data-height="1080"
+  >
+    <div class="race-title">
+      EASING COMPARISON · SAME DISTANCE · SAME DURATION
+      <b>Seven easings, one race.</b>
+    </div>
+
+    <div class="race-table">
+      <!-- Lane 1: power4.out -->
+      <div class="lane lane-1">
+        <div class="lane-label">
+          <span class="ease-name">power4.out</span>
+          <span class="ease-use">Hero text, UI snap</span>
+        </div>
+        <div class="track">
+          <span class="start-mark">START</span>
+          <span class="finish-mark">FINISH</span>
+          <div class="ball" id="ball-1"></div>
+        </div>
+      </div>
+
+      <!-- Lane 2: back.out(1.7) -->
+      <div class="lane lane-2">
+        <div class="lane-label">
+          <span class="ease-name">back.out(1.7)</span>
+          <span class="ease-use">Whip overshoot, badges</span>
+        </div>
+        <div class="track">
+          <div class="ball" id="ball-2"></div>
+        </div>
+      </div>
+
+      <!-- Lane 3: expo.out -->
+      <div class="lane lane-3">
+        <div class="lane-label">
+          <span class="ease-name">expo.out</span>
+          <span class="ease-use">Soft entrance, per-word</span>
+        </div>
+        <div class="track">
+          <div class="ball" id="ball-3"></div>
+        </div>
+      </div>
+
+      <!-- Lane 4: power1.out -->
+      <div class="lane lane-4">
+        <div class="lane-label">
+          <span class="ease-name">power1.out</span>
+          <span class="ease-use">Mechanical, terminal</span>
+        </div>
+        <div class="track">
+          <div class="ball" id="ball-4"></div>
+        </div>
+      </div>
+
+      <!-- Lane 5: elastic.out(1,0.5) -->
+      <div class="lane lane-5">
+        <div class="lane-label">
+          <span class="ease-name">elastic.out(1,0.5)</span>
+          <span class="ease-use">Counters, CTA buttons</span>
+        </div>
+        <div class="track">
+          <div class="ball" id="ball-5"></div>
+        </div>
+      </div>
+
+      <!-- Lane 6: expo.inOut -->
+      <div class="lane lane-6">
+        <div class="lane-label">
+          <span class="ease-name">expo.inOut</span>
+          <span class="ease-use">Dramatic statements</span>
+        </div>
+        <div class="track">
+          <div class="ball" id="ball-6"></div>
+        </div>
+      </div>
+
+      <!-- Lane 7: none (linear) -->
+      <div class="lane lane-7">
+        <div class="lane-label">
+          <span class="ease-name">none</span>
+          <span class="ease-use">Parallax, Ken Burns drift</span>
+        </div>
+        <div class="track">
+          <div class="ball" id="ball-7"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span class="key"><span class="swatch" style="background:#5b8dff"></span>SNAP</span>
+      <span class="key"><span class="swatch" style="background:#a78bfa"></span>WHIP</span>
+      <span class="key"><span class="swatch" style="background:#34d399"></span>SOFT</span>
+      <span class="key"><span class="swatch" style="background:#facc15"></span>MECHANICAL</span>
+      <span class="key"><span class="swatch" style="background:#f59e0b"></span>BOUNCE</span>
+      <span class="key"><span class="swatch" style="background:#f472b6"></span>DRAMATIC</span>
+      <span class="key"><span class="swatch" style="background:#94a3b8"></span>DRIFT</span>
+    </div>
+
+    <div class="scene-label">Section 03 · <b>Easing Comparison Race</b> · 7 easings racing across the same track</div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 6;
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // Title fade in
+      tl.fromTo(".race-title", { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.6, ease: "expo.out" }, 0);
+
+      // Lane labels stagger in (gives the eye time to read before the race starts)
+      tl.fromTo(".lane-label",
+        { opacity: 0, x: -12 },
+        { opacity: 1, x: 0, duration: 0.4, stagger: 0.05, ease: "power3.out" },
+        0.2);
+
+      // Tracks fade in
+      tl.fromTo(".track",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.4, stagger: 0.04, ease: "power2.out" },
+        0.4);
+
+      // Legend fade in
+      tl.fromTo(".legend", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power2.out" }, 0.8);
+
+      // === The race ===
+      // All balls travel from left to right on their track. left:0 -> left:100%.
+      // Same duration (2.0s) for all so the easing difference is the entire story.
+      // Race starts at t=1.5s, lasts until t=3.5s. Some easings (elastic) overshoot.
+      var RACE_START = 1.5;
+      var RACE_DUR = 2.0;
+
+      var lanes = [
+        { id: "ball-1", ease: "power4.out" },
+        { id: "ball-2", ease: "back.out(1.7)" },
+        { id: "ball-3", ease: "expo.out" },
+        { id: "ball-4", ease: "power1.out" },
+        { id: "ball-5", ease: "elastic.out(1, 0.5)" },
+        { id: "ball-6", ease: "expo.inOut" },
+        { id: "ball-7", ease: "none" },
+      ];
+
+      lanes.forEach(function (lane) {
+        tl.fromTo(
+          "#" + lane.id,
+          { left: "0%" },
+          { left: "100%", duration: RACE_DUR, ease: lane.ease },
+          RACE_START
+        );
+      });
+
+      // Pulse glow on each ball as it crosses the finish (different times because of easings)
+      // All easings reach exactly 100% at t=RACE_START+RACE_DUR=3.5s (that's how GSAP eases work)
+      // — so the "finish pulse" lands together at 3.5s. But the *path to get there* is what varies.
+      lanes.forEach(function (lane) {
+        tl.to("#" + lane.id, { scale: 1.5, duration: 0.18, ease: "back.out(2.2)" }, RACE_START + RACE_DUR);
+        tl.to("#" + lane.id, { scale: 1, duration: 0.4, ease: "power2.out" }, RACE_START + RACE_DUR + 0.18);
+      });
+
+      // === Settle hold (3.8s onward): continuous gentle breathing on the balls + title drift ===
+      tl.to(".ball", { y: -3, duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: 1, stagger: 0.05 }, 3.9);
+      tl.to(".race-title b", { letterSpacing: "-0.005em", duration: 1.2, ease: "sine.inOut", yoyo: true, repeat: 1 }, 4.0);
+
+      // === Exit fade (last 0.4s) ===
+      tl.to([".race-title", ".race-table", ".legend"], { opacity: 0.8, duration: 0.4, ease: "power1.in" }, 5.6);
+
+      window.__timelines["scene-02-easing-race"] = tl;
+    })();
+  </script>
+</body>
+</html>

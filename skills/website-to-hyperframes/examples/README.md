@@ -81,6 +81,7 @@ Need a specific technique? Use this table to find the canonical scene.
 | All 5 markers in cascade | [`02-markers-and-emphasis/scene-06-combined-marker-cascade/`](02-markers-and-emphasis/scene-06-combined-marker-cascade/) |
 | Magnetic WebGL caption (GLSL distortion + chromatic aberration follows cursor) | [`02-markers-and-emphasis/scene-07-magnetic-caption-webgl/`](02-markers-and-emphasis/scene-07-magnetic-caption-webgl/) |
 | 6x3 grid of pure-CSS animations | [`03-easing-variety/scene-01-css-animation-grid/`](03-easing-variety/scene-01-css-animation-grid/) |
+| **7-easing race** (power4.out / back.out / expo.out / power1.out / elastic.out / expo.inOut / none, side-by-side) | [`03-easing-variety/scene-02-easing-race/`](03-easing-variety/scene-02-easing-race/) |
 | Animated kanban board with drag | [`04-composed-ui/scene-01-kanban-board/`](04-composed-ui/scene-01-kanban-board/) |
 | Chat with typing dots + reactions (narration-sync gold standard) | [`04-composed-ui/scene-02-chat-with-typing/`](04-composed-ui/scene-02-chat-with-typing/) |
 | Terminal with multi-line command + output | [`04-composed-ui/scene-03-terminal-typeon/`](04-composed-ui/scene-03-terminal-typeon/) |
@@ -100,6 +101,8 @@ Need a specific technique? Use this table to find the canonical scene.
 | iPhone frame with live composed app UI inside (no screenshots) | [`07-html-in-canvas/scene-04-iphone-mockup-live/`](07-html-in-canvas/scene-04-iphone-mockup-live/) |
 | MacBook frame with simulated browser session inside | [`07-html-in-canvas/scene-05-macbook-mockup-live/`](07-html-in-canvas/scene-05-macbook-mockup-live/) |
 | SVG vinyl record + tonearm | [`08-svg-and-path/scene-01-vinyl-record/`](08-svg-and-path/scene-01-vinyl-record/) |
+| **SVG logo stroke-draw** (M monogram + ring + serifs + accent dot + arc text — paths draw themselves on) | [`08-svg-and-path/scene-02-logo-stroke-draw/`](08-svg-and-path/scene-02-logo-stroke-draw/) |
+| **SVG icon morph** (SQUARE → CIRCLE → DIAMOND → STAR → WAVE via d-attribute swaps at timeline keyframes) | [`08-svg-and-path/scene-03-icon-morph/`](08-svg-and-path/scene-03-icon-morph/) |
 | Editorial timeline diagram + SVG easing curve | [`09-counters-and-data/scene-01-timeline-diagram/`](09-counters-and-data/scene-01-timeline-diagram/) |
 | Vertical scroll-pan pipeline diagram | [`09-counters-and-data/scene-02-pipeline-diagram/`](09-counters-and-data/scene-02-pipeline-diagram/) |
 | Canonical 0 → 1,000,000 counter (33 deterministic `tl.set` steps) | [`09-counters-and-data/scene-03-counter-million-showcase/`](09-counters-and-data/scene-03-counter-million-showcase/) |
@@ -132,10 +135,10 @@ Need a specific technique? Use this table to find the canonical scene.
 
 ## Stitched Grand Tour reel
 
-All 62 scenes concatenated back-to-back as a single 7:10 MP4. Useful for visual-gestalt review or for sharing the library at a glance:
+All 65 scenes concatenated back-to-back as a single 7:31 MP4. Useful for visual-gestalt review or for sharing the library at a glance:
 
-- **Grand Tour reel:** https://www.heygenverse.com/s/67bb4ee5-1c7f-4837-b144-d2527b8ade83/raw
-- **Browsable gallery (per-section grid, all 62 scenes as embedded videos):** https://www.heygenverse.com/a/1636f2fe-3ddc-4543-9a56-0d0b99538807
+- **Grand Tour reel:** https://www.heygenverse.com/s/efb24629-1c60-41f9-bd3f-a78d2181d774/raw
+- **Browsable gallery (per-section grid, all 65 scenes as embedded videos):** https://www.heygenverse.com/a/1636f2fe-3ddc-4543-9a56-0d0b99538807
 
 Rebuild the reel after adding scenes: `ffmpeg -f concat -safe 0 -i /tmp/concat-list.txt -c copy out.mp4` where the concat list orders all scene MP4s in section sequence.
 
