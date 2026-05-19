@@ -68,7 +68,7 @@ async function main() {
     copyDir(join(CLI_ROOT, "src", "templates", tmpl), join(DIST, "templates", tmpl));
   }
 
-  for (const skill of ["hyperframes", "hyperframes-cli", "gsap"]) {
+  for (const skill of ["hyperframes-animation", "hyperframes-cli", "hyperframes-gsap"]) {
     copyDir(join(REPO_ROOT, "skills", skill), join(DIST, "skills", skill));
   }
 
