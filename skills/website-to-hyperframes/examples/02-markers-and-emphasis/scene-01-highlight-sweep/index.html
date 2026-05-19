@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-01-highlight-sweep</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/CustomEase.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #fafaf6; }
+
+    #scene-01-highlight-sweep {
+      position: relative;
+      overflow: hidden;
+      /* Warm off-white editorial paper — same palette family as scene-10
+         per-word-emphasis. Soft warmth in corners, lit from the top. */
+      background:
+        radial-gradient(ellipse at 50% 40%, #fdfcf6 0%, #f5f2e9 70%, #ede9dc 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1a1a1a;
+    }
+
+    /* Paper grain — soft off-white speckle. Drifts during the beat for
+       continuous motion, matching the editorial paper-grain pattern used
+       in scene-10. */
+    .paper-grain {
+      position: absolute;
+      inset: -40px;
+      background:
+        radial-gradient(circle at 15% 22%, rgba(180, 160, 110, 0.06) 0%, transparent 38%),
+        radial-gradient(circle at 82% 70%, rgba(200, 175, 120, 0.05) 0%, transparent 42%),
+        radial-gradient(circle at 50% 92%, rgba(150, 130, 90, 0.04) 0%, transparent 30%);
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    /* Stage: centered host for both phrases. The two phrase rows live
+       stacked on top of each other (position:absolute), and we crossfade
+       between them mid-beat. Pre-built DOM upfront — no tl.call() needed. */
+    .stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .eyebrow {
+      position: absolute;
+      top: calc(50% - 200px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: #8a7a55;
+      opacity: 0;
+    }
+
+    /* Phrase wrapper — both phrases share this. Stacked via position:absolute
+       so they occupy the same screen area; we crossfade opacity between them. */
+    .phrase {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 132px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.05;
+      color: #1a1a1a;
+      white-space: nowrap;
+      display: inline-block;
+    }
+
+    /* Per-word unit — pre-split so we can stagger the entrance and lock
+       the initial state. opacity:0 in CSS locks frame 0 before timeline
+       applies its t=0 set tweens. */
+    .word {
+      display: inline-block;
+      white-space: pre;
+      will-change: transform, opacity;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    /* Highlight host — the key word that gets the marker sweep. Relative
+       so the highlight bar (absolute) anchors directly beneath it. The
+       bar is layered behind via z-index. Padding gives breathing room so
+       the highlight extends slightly past the word edges (like a real
+       marker hits the paper). */
+    .highlight-host {
+      position: relative;
+      display: inline-block;
+      padding: 0 8px;
+    }
+
+    /* The yellow marker bar. transform:scaleX(0) locks the initial empty
+       state in CSS so frame 0 shows no highlight even before the GSAP
+       timeline applies its t=0 set tweens. transform-origin:left center
+       gives the left-to-right sweep direction. The bar sits BEHIND the
+       text via z-index. Slight skew gives a hand-held, "marker-on-paper"
+       imperfection rather than a robotic rectangle. */
+    .highlight-bar {
+      position: absolute;
+      left: -8px;
+      right: -8px;
+      top: 18%;
+      bottom: 8%;
+      transform: scaleX(0) skewX(-3deg);
+      transform-origin: left center;
+      border-radius: 4px;
+      z-index: 0;
+      pointer-events: none;
+      /* opacity here is the "marker density" — slightly translucent so
+         the dark text reads cleanly through it, like real highlighter. */
+      opacity: 0.55;
+    }
+    /* Color variants — each key word gets its own marker color so the
+       second highlight reads as a deliberate second beat, not just a
+       repeat. Phrase 1 = warm yellow, Phrase 2 = soft coral. */
+    .highlight-bar.color-yellow { background: #ffd84d; }
+    .highlight-bar.color-coral  { background: #ff8a5b; }
+
+    /* Highlighted word text — sits on top of the bar via z-index. */
+    .highlight-text {
+      position: relative;
+      z-index: 1;
+    }
+
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #8a7a55;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 10;
+    }
+    .label .accent { color: #1a1a1a; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-01-highlight-sweep"
+       data-composition-id="scene-01-highlight-sweep"
+       data-start="0"
+       data-duration="6"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="paper-grain"></div>
+
+    <div class="stage">
+      <div class="eyebrow" id="eyebrow">Section 02 · Markers</div>
+
+      <!-- Phrase 1: "Made for builders who care."
+           Pre-split into per-word spans. "builders" lives inside .highlight-host
+           with a yellow bar behind it. All words have opacity:0 in CSS,
+           highlight bar has scaleX(0) — frame 0 is locked deterministically. -->
+      <div class="phrase" id="phrase-1">
+        <span class="word">Made</span><span class="word"> for </span><span class="highlight-host"><span class="highlight-bar color-yellow" id="bar-1"></span><span class="word highlight-text" id="word-builders">builders</span></span><span class="word"> who care.</span>
+      </div>
+
+      <!-- Phrase 2: "Move with intention."
+           Stacked over phrase 1 via position:absolute. "intention" gets the
+           coral marker. opacity:0 locks it off-screen until the crossfade
+           hands focus over to it mid-beat. -->
+      <div class="phrase" id="phrase-2" style="opacity:0;">
+        <span class="word">Move with </span><span class="highlight-host"><span class="highlight-bar color-coral" id="bar-2"></span><span class="word highlight-text" id="word-intention">intention</span></span><span class="word">.</span>
+      </div>
+    </div>
+
+    <div class="label">
+      Scene 01 · <span class="accent">Highlight Sweep</span> · yellow marker bar swipes behind key word
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 6;
+      window.__timelines = window.__timelines || {};
+
+      gsap.registerPlugin(CustomEase);
+
+      // Signature crossfade easing — cubic-bezier(0.16, 1, 0.3, 1) — same
+      // curve scene-10 uses for per-word entrances. Smooth-tail soft land.
+      var crossfadeEase = CustomEase.create("crossfade", "0.16, 1, 0.3, 1");
+
+      var phrase1Words = document.querySelectorAll("#phrase-1 .word");
+      var phrase2Words = document.querySelectorAll("#phrase-2 .word");
+
+      var tl = gsap.timeline({ paused: true });
+
+      // === t=0: lock every animated element to its pre-entrance state.
+      // Mirrors the CSS locked state so seek-to-0 is deterministic.
+      tl.set("#eyebrow", { opacity: 0, y: -8 }, 0);
+      tl.set(phrase1Words, { opacity: 0, y: 8 }, 0);
+      tl.set(phrase2Words, { opacity: 0, y: 8 }, 0);
+      tl.set("#phrase-1", { opacity: 1 }, 0);
+      tl.set("#phrase-2", { opacity: 0 }, 0);
+      tl.set("#bar-1", { scaleX: 0, skewX: -3, transformOrigin: "left center" }, 0);
+      tl.set("#bar-2", { scaleX: 0, skewX: -3, transformOrigin: "left center" }, 0);
+
+      // === t=0.20s: eyebrow fades in. Supporting context, layered before
+      // the headline so the viewer's eye has somewhere to land first.
+      tl.fromTo("#eyebrow",
+        { opacity: 0, y: -8 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" },
+        0.20);
+
+      // === t=0.40s: paper grain starts a slow drift — continuous-motion
+      // ambient layer running through the calm hold sections. "none" linear
+      // ease for drift moves; no curve needed.
+      tl.fromTo(".paper-grain",
+        { x: 0, y: 0, opacity: 1 },
+        { x: -18, y: -6, opacity: 0.92, duration: 4.2, ease: "sine.inOut" },
+        0.40);
+
+      // === t=0.40s–1.05s: phrase 1 per-word entrance.
+      // 5 spans (Made / " for " / "builders" / " who care."). Stagger 0.05s
+      // gives left-to-right reveal. crossfade easing = soft-tail premium land.
+      tl.fromTo(phrase1Words,
+        { opacity: 0, y: 8 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.50,
+          stagger: 0.05,
+          ease: crossfadeEase,
+        },
+        0.40);
+
+      // === t=1.25s: yellow marker bar sweeps behind "builders".
+      // power4.out gives a confident, decisive snap — like a marker
+      // stroke from a designer. 0.40s duration matches the spec window.
+      // transform-origin:left center → bar grows from left edge rightward.
+      tl.fromTo("#bar-1",
+        { scaleX: 0 },
+        { scaleX: 1, duration: 0.40, ease: "power4.out" },
+        1.25);
+
+      // === t=1.7s–2.6s: hold with "builders" highlighted.
+      // Tiny y-drift on the phrase keeps the frame alive — viewer reads
+      // the line, sees the emphasis, then we transition. The drift is
+      // small (4px) and slow (sine.inOut yoyo) — ambient, not distracting.
+      tl.to("#phrase-1", {
+        y: -4,
+        duration: 0.9,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 1.70);
+
+      // === t=2.85s–3.10s: phrase 1 exits.
+      // The yellow bar slides off to the right (its left transform-origin
+      // makes scaleX(0) collapse back to the left, but we want it to feel
+      // like the highlight is sliding OUT of frame to the right — so we
+      // instead transform-origin:right and scaleX back to 0. Using a
+      // sub-tween on transform-origin would be brittle; cleaner: change
+      // origin and scale down. We do it in two tweens: first set the new
+      // origin, then animate. */
+      tl.set("#bar-1", { transformOrigin: "right center" }, 2.85);
+      tl.to("#bar-1",
+        { scaleX: 0, duration: 0.40, ease: "power3.in" },
+        2.85);
+
+      // === t=2.90s: phrase 1 words fade out together (no stagger — quick
+      // clear so phrase 2 can take focus). expo.inOut feels dramatic, like
+      // a clean cut between two editorial cards.
+      tl.to(phrase1Words, {
+        opacity: 0,
+        y: -6,
+        duration: 0.35,
+        ease: "expo.inOut",
+      }, 2.90);
+      tl.to("#phrase-1", { opacity: 0, duration: 0.35, ease: "expo.inOut" }, 2.90);
+
+      // === t=3.30s: phrase 2 wrapper fades on (still empty — its words
+      // are still locked at opacity:0). This just enables the container
+      // so per-word reveals can play on top.
+      tl.to("#phrase-2", { opacity: 1, duration: 0.05, ease: "none" }, 3.30);
+
+      // === t=3.30s–3.85s: phrase 2 per-word entrance.
+      // 3 spans (Move with / "intention" / "."). Same crossfade ease as
+      // phrase 1 — establishes a consistent feel between the two beats.
+      tl.fromTo(phrase2Words,
+        { opacity: 0, y: 8 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.50,
+          stagger: 0.05,
+          ease: crossfadeEase,
+        },
+        3.30);
+
+      // === t=4.10s: coral marker bar sweeps behind "intention".
+      // Different color (#ff8a5b) than phrase 1's yellow — second highlight
+      // reads as deliberate second beat, not a repeat. Same power4.out
+      // snap for the marker-stroke feel.
+      tl.fromTo("#bar-2",
+        { scaleX: 0 },
+        { scaleX: 1, duration: 0.40, ease: "power4.out" },
+        4.10);
+
+      // === t=4.6s–5.6s: hold with "intention" highlighted.
+      // Same micro y-drift as phrase 1 — continuous-motion layer through
+      // the calm closing hold so the frame doesn't sit perfectly still.
+      tl.to("#phrase-2", {
+        y: -4,
+        duration: 1.0,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 4.60);
+
+      // === t=5.0s: eyebrow shifts to a slow upward drift — preparing for
+      // the close. expo.out for soft tail.
+      tl.to("#eyebrow", {
+        y: -4,
+        duration: 1.0,
+        ease: "expo.out",
+      }, 5.00);
+
+      window.__timelines["scene-01-highlight-sweep"] = tl;
+    })();
+  </script>
+</body>
+</html>

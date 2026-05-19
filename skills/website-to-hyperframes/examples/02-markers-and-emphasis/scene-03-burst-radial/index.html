@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-03-burst-radial</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    #scene-03-burst-radial {
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(ellipse at center, #14141a 0%, #0a0a0a 70%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* The stage holds both sentences stacked. Only one is visible at a time. */
+    .stage {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 1600px;
+      text-align: center;
+      font-size: 128px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.0;
+    }
+
+    .sentence {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      white-space: nowrap;
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 0.32em;
+    }
+
+    .word {
+      display: inline-block;
+      position: relative;
+    }
+
+    /* The "key" word is the burst target — relatively-positioned so its
+       child .burst-container can pin to its center. */
+    .word.key {
+      position: relative;
+      display: inline-block;
+    }
+    .word.key .text {
+      position: relative;
+      z-index: 2;
+      display: inline-block;
+    }
+
+    /* Burst-1 (yellow) "changes" tint */
+    .sentence-1 .word.key .text {
+      color: #fde047;
+      text-shadow: 0 0 28px rgba(253, 224, 71, 0.30);
+    }
+    /* Burst-2 (cyan) "just" tint */
+    .sentence-2 .word.key .text {
+      color: #06b6d4;
+      text-shadow: 0 0 28px rgba(6, 182, 212, 0.30);
+    }
+
+    /* Burst container — anchored to the word's center, spikes radiate outward */
+    .burst-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .spike {
+      position: absolute;
+      display: block;
+      top: -2px;        /* center the 4px height on y=0 */
+      left: 0;          /* origin pin */
+      width: 80px;
+      height: 4px;
+      border-radius: 2px;
+      transform-origin: 0% 50%;
+      /* CSS-locked initial state — scaleX:0 keeps spike invisible until GSAP runs */
+      transform: rotate(var(--angle)) translateX(var(--offset)) scaleX(0);
+      will-change: transform, opacity;
+      opacity: 0;
+    }
+    /* Burst-1 yellow */
+    .burst-1 .spike {
+      background: linear-gradient(90deg, #fde047 0%, #fef08a 60%, rgba(253, 224, 71, 0) 100%);
+      box-shadow: 0 0 12px rgba(253, 224, 71, 0.7);
+    }
+    /* Burst-2 cyan */
+    .burst-2 .spike {
+      background: linear-gradient(90deg, #06b6d4 0%, #67e8f9 60%, rgba(6, 182, 212, 0) 100%);
+      box-shadow: 0 0 12px rgba(6, 182, 212, 0.7);
+    }
+
+    /* Period punctuation */
+    .period {
+      display: inline-block;
+      color: #f5f5f5;
+    }
+
+    /* Soft vignette ring that pulses with each burst for extra heft */
+    .pulse-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      pointer-events: none;
+      opacity: 0;
+      z-index: 0;
+    }
+    .pulse-1 {
+      background: radial-gradient(circle, rgba(253, 224, 71, 0.18) 0%, rgba(253, 224, 71, 0) 60%);
+    }
+    .pulse-2 {
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.18) 0%, rgba(6, 182, 212, 0) 60%);
+    }
+
+    /* Scene label */
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 20;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-03-burst-radial"
+       data-composition-id="scene-03-burst-radial"
+       data-start="0"
+       data-duration="5"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="stage" id="stage">
+
+      <!-- Pulse rings — one per burst, centered on the key word's position.
+           Positions get set in JS once the key-word bounding boxes are known. -->
+      <div class="pulse-ring pulse-1" id="pulse-1"></div>
+      <div class="pulse-ring pulse-2" id="pulse-2"></div>
+
+      <!-- Sentence 1: "This changes everything." with burst on "changes" -->
+      <div class="sentence sentence-1" id="sentence-1">
+        <span class="word"><span class="text">This</span></span>
+        <span class="word key" id="key-1">
+          <span class="text">changes</span>
+          <span class="burst-container burst-1" id="burst-1">
+            <!-- 12 spikes pre-built; angles in 30deg increments, lengths via --offset push from center. -->
+            <span class="spike" style="--angle:   0deg; --offset: 78px;"></span>
+            <span class="spike" style="--angle:  30deg; --offset: 82px;"></span>
+            <span class="spike" style="--angle:  60deg; --offset: 76px;"></span>
+            <span class="spike" style="--angle:  90deg; --offset: 84px;"></span>
+            <span class="spike" style="--angle: 120deg; --offset: 78px;"></span>
+            <span class="spike" style="--angle: 150deg; --offset: 80px;"></span>
+            <span class="spike" style="--angle: 180deg; --offset: 84px;"></span>
+            <span class="spike" style="--angle: 210deg; --offset: 78px;"></span>
+            <span class="spike" style="--angle: 240deg; --offset: 82px;"></span>
+            <span class="spike" style="--angle: 270deg; --offset: 76px;"></span>
+            <span class="spike" style="--angle: 300deg; --offset: 80px;"></span>
+            <span class="spike" style="--angle: 330deg; --offset: 82px;"></span>
+          </span>
+        </span>
+        <span class="word"><span class="text">everything</span><span class="period">.</span></span>
+      </div>
+
+      <!-- Sentence 2: "It just works." with burst on "just" -->
+      <div class="sentence sentence-2" id="sentence-2" style="opacity: 0;">
+        <span class="word"><span class="text">It</span></span>
+        <span class="word key" id="key-2">
+          <span class="text">just</span>
+          <span class="burst-container burst-2" id="burst-2">
+            <span class="spike" style="--angle:   0deg; --offset: 76px;"></span>
+            <span class="spike" style="--angle:  30deg; --offset: 80px;"></span>
+            <span class="spike" style="--angle:  60deg; --offset: 84px;"></span>
+            <span class="spike" style="--angle:  90deg; --offset: 78px;"></span>
+            <span class="spike" style="--angle: 120deg; --offset: 82px;"></span>
+            <span class="spike" style="--angle: 150deg; --offset: 76px;"></span>
+            <span class="spike" style="--angle: 180deg; --offset: 80px;"></span>
+            <span class="spike" style="--angle: 210deg; --offset: 84px;"></span>
+            <span class="spike" style="--angle: 240deg; --offset: 78px;"></span>
+            <span class="spike" style="--angle: 270deg; --offset: 82px;"></span>
+            <span class="spike" style="--angle: 300deg; --offset: 76px;"></span>
+            <span class="spike" style="--angle: 330deg; --offset: 80px;"></span>
+          </span>
+        </span>
+        <span class="word"><span class="text">works</span><span class="period">.</span></span>
+      </div>
+
+    </div>
+
+    <div class="label">
+      Scene 03 · <span class="accent">Burst Radial</span> · 12 radial spike-lines burst from key word
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 5;
+      window.__timelines = window.__timelines || {};
+
+      var tl = gsap.timeline({ paused: true });
+
+      // Pre-queried element collections — read once, reuse across tweens.
+      var s1 = document.getElementById("sentence-1");
+      var s2 = document.getElementById("sentence-2");
+      var s1Words = s1 ? s1.querySelectorAll(".word") : [];
+      var s2Words = s2 ? s2.querySelectorAll(".word") : [];
+      var burst1Spikes = document.querySelectorAll("#burst-1 .spike");
+      var burst2Spikes = document.querySelectorAll("#burst-2 .spike");
+      var keyText1 = document.querySelector("#key-1 .text");
+      var keyText2 = document.querySelector("#key-2 .text");
+
+      // === t=0 initial state — sentence 1 words sit below their resting pos and faded.
+      // Spikes are CSS-locked at scaleX:0 + opacity:0, so they're invisible until GSAP runs.
+      tl.set(s1Words, { opacity: 0, y: 24 }, 0);
+      tl.set(s2, { opacity: 0 }, 0);
+      tl.set(s2Words, { opacity: 0, y: 24 }, 0);
+      tl.set(keyText1, { scale: 1 }, 0);
+      tl.set(keyText2, { scale: 1 }, 0);
+      tl.set("#pulse-1", { scale: 0, opacity: 0 }, 0);
+      tl.set("#pulse-2", { scale: 0, opacity: 0 }, 0);
+
+      // ---------------------------------------------------------
+      // BEAT 1 — "This changes everything." (t=0.0 → t=2.4)
+      // ---------------------------------------------------------
+
+      // === t=0.10s: sentence-1 words fade up, staggered.
+      tl.fromTo(s1Words,
+        { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.55, stagger: 0.10, ease: "expo.out" },
+        0.10);
+
+      // === t=0.95s: key word "changes" pops slightly — anticipation before burst.
+      tl.fromTo(keyText1,
+        { scale: 1 },
+        { scale: 1.08, duration: 0.18, ease: "back.out(2)", transformOrigin: "50% 50%" },
+        0.95);
+
+      // === t=1.10s: BURST! All 12 spikes expand outward simultaneously w/ slight stagger.
+      // back.out(2) gives the spikes a snappy overshoot at peak length.
+      tl.fromTo(burst1Spikes,
+        { scaleX: 0, opacity: 0 },
+        {
+          scaleX: 1,
+          opacity: 1,
+          duration: 0.35,
+          stagger: 0.015,
+          ease: "back.out(2)",
+          transformOrigin: "0% 50%",
+        },
+        1.10);
+
+      // Pulse ring expands behind the word at the same moment for added impact.
+      tl.fromTo("#pulse-1",
+        { scale: 0, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.30, ease: "expo.out", transformOrigin: "50% 50%" },
+        1.10);
+      tl.to("#pulse-1",
+        { scale: 1.6, opacity: 0, duration: 0.55, ease: "power2.out", overwrite: "auto" },
+        1.42);
+
+      // Key word eases back to 1.0 after the pop (continuous secondary motion).
+      tl.to(keyText1,
+        { scale: 1, duration: 0.45, ease: "elastic.out(1, 0.5)", transformOrigin: "50% 50%" },
+        1.13);
+
+      // === t=1.50s: spikes fade out — leave the word emphasized, not cluttered.
+      tl.to(burst1Spikes,
+        { opacity: 0, duration: 0.45, stagger: 0.012, ease: "power1.out" },
+        1.50);
+
+      // === t=1.85s: sentence-1 holds for ~0.4s, then drifts upward and fades out.
+      tl.to(s1Words,
+        { y: -16, opacity: 0, duration: 0.45, stagger: 0.04, ease: "expo.in" },
+        2.00);
+
+      // ---------------------------------------------------------
+      // BEAT 2 — "It just works." (t=2.5 → t=5.0)
+      // ---------------------------------------------------------
+
+      // === t=2.50s: sentence-2 becomes the active layer.
+      tl.set(s2, { opacity: 1 }, 2.50);
+
+      // === t=2.55s: sentence-2 words fade up, staggered.
+      tl.fromTo(s2Words,
+        { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.55, stagger: 0.10, ease: "expo.out" },
+        2.55);
+
+      // === t=3.25s: key word "just" pops — anticipation before cyan burst.
+      tl.fromTo(keyText2,
+        { scale: 1 },
+        { scale: 1.08, duration: 0.18, ease: "back.out(2)", transformOrigin: "50% 50%" },
+        3.25);
+
+      // === t=3.40s: BURST 2 — cyan spikes radiate.
+      tl.fromTo(burst2Spikes,
+        { scaleX: 0, opacity: 0 },
+        {
+          scaleX: 1,
+          opacity: 1,
+          duration: 0.35,
+          stagger: 0.015,
+          ease: "back.out(2)",
+          transformOrigin: "0% 50%",
+        },
+        3.40);
+
+      // Cyan pulse ring.
+      tl.fromTo("#pulse-2",
+        { scale: 0, opacity: 0 },
+        { scale: 1, opacity: 1, duration: 0.30, ease: "expo.out", transformOrigin: "50% 50%" },
+        3.40);
+      tl.to("#pulse-2",
+        { scale: 1.6, opacity: 0, duration: 0.55, ease: "power2.out", overwrite: "auto" },
+        3.72);
+
+      // Key word elastic settle.
+      tl.to(keyText2,
+        { scale: 1, duration: 0.45, ease: "elastic.out(1, 0.5)", transformOrigin: "50% 50%" },
+        3.43);
+
+      // === t=3.80s: cyan spikes fade out.
+      tl.to(burst2Spikes,
+        { opacity: 0, duration: 0.50, stagger: 0.012, ease: "power1.out" },
+        3.80);
+
+      // === t=4.30s: continuous hold motion — sentence breathes (subtle y drift)
+      // so the frame is not static during the tail of the beat.
+      tl.to(s2Words,
+        { y: -4, duration: 0.7, ease: "sine.inOut", yoyo: true, repeat: 1, stagger: 0.03 },
+        4.30);
+
+      window.__timelines["scene-03-burst-radial"] = tl;
+    })();
+  </script>
+</body>
+</html>

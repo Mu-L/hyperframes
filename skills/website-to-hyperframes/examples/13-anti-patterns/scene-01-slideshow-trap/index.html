@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-01-slideshow-trap (ANTI-PATTERN)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+
+  <!--
+    ════════════════════════════════════════════════════════════════════════════
+    ❌ ANTI-PATTERN: THE SLIDESHOW TRAP
+    ════════════════════════════════════════════════════════════════════════════
+
+    This composition is INTENTIONALLY BAD. It is the failure mode every prior
+    eval run defaulted to: "static screenshot + Ken Burns slow zoom + crossfade
+    between three panels." It looks like a tired PowerPoint reel.
+
+    DO NOT COPY THIS SCENE'S TIMELINE INTO REAL BEATS. It exists only to be
+    pointed at and avoided. Read scene-01-kanban-board and scene-02-chat-with-
+    typing in /04-composed-ui/ for what to do instead.
+
+    WHAT IS WRONG WITH IT (the four authoring sins, all visible in the source
+    below):
+
+      1. SCREENSHOT-AS-UI. Each "panel" is a single rectangle pretending to
+         be a screenshot. There is no actual UI composed from divs — no
+         columns, cards, buttons, message bubbles. The viewer has nothing
+         to focus on inside the frame.
+
+      2. KEN BURNS AS THE ONLY MOTION. Each panel only does scale 1.0 → 1.05
+         over 4 seconds with ease:"none". That is camera drift, not scene
+         motion. Nothing reveals, transforms, counts, or reacts. After the
+         first 200ms the viewer has already seen everything they're going
+         to see for the next 4 seconds.
+
+      3. CROSSFADE AS THE ONLY TRANSITION. Panel A fades out, Panel B fades
+         in. Twice. The 12-second duration is filled with three slow zooms
+         and two fades and literally nothing else. There are no narration-
+         anchored events because there is no narration to anchor.
+
+      4. NO CONTINUOUS MOTION. The beat-builder-guide rule "if an element is
+         on screen, it should be doing something" is violated everywhere.
+         Every hold sits unchanged for ~3.5 seconds.
+
+    THE FIX (cross-reference):
+      → See /04-composed-ui/scene-01-kanban-board/index.html for a composed
+        UI (window chrome + columns + cards + drag animation + count updates).
+      → See /04-composed-ui/scene-02-chat-with-typing/index.html for the
+        narration-synced event pattern (one visual event per spoken phrase).
+    ════════════════════════════════════════════════════════════════════════════
+  -->
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    #scene-01-slideshow-trap {
+      position: relative;
+      overflow: hidden;
+      /* Dark gray with a heavy vignette to mimic "ominous tutorial" framing. */
+      background:
+        radial-gradient(ellipse at center,
+          #1a1d22 0%,
+          #0e1014 60%,
+          #050608 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Vignette overlay — purely cosmetic, sells the "doom" feel. */
+    .vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse at center,
+          transparent 40%,
+          rgba(0,0,0,0.45) 80%,
+          rgba(0,0,0,0.75) 100%);
+      z-index: 5;
+    }
+
+    /*
+      THE PROBLEM (panels):
+      A "panel" here is a single colored rectangle labeled "Screenshot 1/2/3"
+      with a fake URL bar. There is NO real UI composed inside it. This is
+      the exact thing every prior eval video did and exactly what the
+      beat-builder-guide tells you not to do.
+    */
+    .panel {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 1400px;
+      height: 800px;
+      margin: -400px 0 0 -700px;        /* center via margin, NOT translate(-50%,-50%), to play nice with GSAP scale */
+      border-radius: 14px;
+      box-shadow:
+        0 60px 120px -30px rgba(0,0,0,0.8),
+        0 0 0 1px rgba(255,255,255,0.05) inset;
+      opacity: 0;                       /* hidden until GSAP fades it in */
+      transform-origin: 50% 50%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Fake browser chrome — three dots + a fake URL bar. The only "detail"
+       in each panel. Even this is more than most slideshow-trap videos do. */
+    .chrome {
+      flex: 0 0 auto;
+      height: 56px;
+      background: rgba(0,0,0,0.25);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red { background: #ff5f57; }
+    .dot.yellow { background: #ffbd2e; }
+    .dot.green { background: #28c941; }
+    .url-bar {
+      flex: 1 1 auto;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 6px 14px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      background: rgba(0,0,0,0.35);
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+      text-align: center;
+    }
+
+    /* The "screenshot" body — just a flat-colored block with a giant label.
+       Pretending to be content. Is not content. */
+    .panel-body {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+    .panel-body .num {
+      font-size: 220px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      opacity: 0.18;
+      color: white;
+    }
+    .panel-body .lbl {
+      font-size: 36px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      color: rgba(255,255,255,0.7);
+    }
+    .panel-body .sub {
+      font-size: 16px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+      font-weight: 500;
+    }
+
+    /* Three distinct flat colors so the viewer can SEE the crossfade happen. */
+    #panel-1 { background: linear-gradient(135deg, #2b3a52, #1d2638); }
+    #panel-2 { background: linear-gradient(135deg, #4a2b3a, #2e1b27); }
+    #panel-3 { background: linear-gradient(135deg, #2b4a3a, #1b2e27); }
+
+    /* ─────────────────────────────────────────────────────────────────
+       ❌ ANTI-PATTERN banner — top-left
+       This banner exists so the viewer can immediately recognize the
+       scene as "this is what NOT to do."
+       ───────────────────────────────────────────────────────────────── */
+    .anti-banner {
+      position: absolute;
+      top: 36px;
+      left: 36px;
+      padding: 14px 22px;
+      background: #c0152f;
+      color: white;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-radius: 8px;
+      box-shadow:
+        0 0 0 3px rgba(192, 21, 47, 0.25),
+        0 12px 30px -8px rgba(192, 21, 47, 0.6);
+      z-index: 50;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .anti-banner .x { font-size: 28px; line-height: 1; }
+
+    .anti-banner-sub {
+      position: absolute;
+      top: 92px;
+      left: 36px;
+      padding: 8px 14px;
+      background: rgba(192, 21, 47, 0.15);
+      color: #ff8b9c;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      border: 1px solid rgba(192, 21, 47, 0.4);
+      border-radius: 4px;
+      z-index: 50;
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       "Don't do this" — bottom-right corner
+       ───────────────────────────────────────────────────────────────── */
+    .dont {
+      position: absolute;
+      bottom: 110px;
+      right: 36px;
+      max-width: 540px;
+      text-align: right;
+      z-index: 50;
+    }
+    .dont .headline {
+      font-size: 32px;
+      font-weight: 700;
+      color: #ff6b7c;
+      letter-spacing: -0.005em;
+      text-transform: uppercase;
+      line-height: 1;
+    }
+    .dont .reason {
+      margin-top: 14px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(255,255,255,0.65);
+      font-weight: 400;
+    }
+    .dont .reason b { color: #ff8b9c; font-weight: 600; }
+
+    /* Big diagonal "BAD EXAMPLE" watermark spanning the frame so even at a
+       glance the viewer cannot mistake this for a real composition.        */
+    .watermark {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 40;
+    }
+    .watermark span {
+      font-size: 360px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: rgba(192, 21, 47, 0.08);
+      transform: rotate(-18deg);
+      white-space: nowrap;
+      text-transform: uppercase;
+    }
+
+    /* Scene label — bottom-left, dim. */
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 14px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 50;
+      max-width: 1100px;
+      line-height: 1.5;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+    .label .warn   { color: #ff6b7c; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-01-slideshow-trap"
+       data-composition-id="scene-01-slideshow-trap"
+       data-start="0"
+       data-duration="12"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <!-- Three near-identical "screenshot" panels stacked. The only difference
+         between them is the gradient hue and the number. That is the WHOLE
+         scene — and that is the whole point of this anti-pattern. -->
+
+    <div class="panel" id="panel-1">
+      <div class="chrome">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <div class="url-bar">acme.com/feature-1</div>
+      </div>
+      <div class="panel-body">
+        <div class="num">01</div>
+        <div class="lbl">Screenshot 1</div>
+        <div class="sub">Fake content · No real UI · No events</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-2">
+      <div class="chrome">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <div class="url-bar">acme.com/feature-2</div>
+      </div>
+      <div class="panel-body">
+        <div class="num">02</div>
+        <div class="lbl">Screenshot 2</div>
+        <div class="sub">Identical structure · Different color · Same nothing</div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-3">
+      <div class="chrome">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+        <div class="url-bar">acme.com/feature-3</div>
+      </div>
+      <div class="panel-body">
+        <div class="num">03</div>
+        <div class="lbl">Screenshot 3</div>
+        <div class="sub">Third slow zoom · Viewer is asleep · The end</div>
+      </div>
+    </div>
+
+    <!-- Diagonal "BAD EXAMPLE" watermark behind everything -->
+    <div class="watermark"><span>BAD EXAMPLE</span></div>
+
+    <!-- Vignette on top of panels, below banners -->
+    <div class="vignette"></div>
+
+    <!-- ❌ Banner at top-left -->
+    <div class="anti-banner">
+      <span class="x">❌</span>
+      <span>Anti-Pattern: Slideshow Trap</span>
+    </div>
+    <div class="anti-banner-sub">DO NOT COPY THIS TIMELINE</div>
+
+    <!-- "Don't do this" callout — bottom-right -->
+    <div class="dont">
+      <div class="headline">Don't do this</div>
+      <div class="reason">
+        → See section <b>04-composed-ui</b> instead.<br />
+        <b>Build the UI from divs.</b> Add <b>events tied to narration.</b><br />
+        <b>Continuous motion mandatory.</b>
+      </div>
+    </div>
+
+    <!-- Scene label at bottom-left -->
+    <div class="label">
+      Scene 01 · <span class="accent">Anti-Pattern</span> · <span class="warn">Slideshow Trap</span><br />
+      Screenshot + Ken Burns is what every prior eval run defaulted to.
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 12;  // intentionally too long — 12 seconds of slow zoom is the point
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // ════════════════════════════════════════════════════════════════════
+      // THE PROBLEM (timeline shape):
+      //
+      // What follows is the canonical "slideshow" timeline. Three panels.
+      // Each one fades in, slowly Ken-Burns-zooms from scale 1.0 to 1.05
+      // over its entire 4-second visible window using ease:"none", and
+      // crossfades into the next. That's it. That is the entire scene.
+      //
+      // Compare against scene-01-kanban-board's timeline (window + columns
+      // + drag card + glow + count chip + breath) or scene-02-chat-with-
+      // typing's timeline (panel + 3 messages + reactions + typing dots
+      // + self-reply + members count + composer pulse). Those scenes have
+      // 12+ timeline events spread across 8-9 seconds. This scene has 9
+      // events spread across 12 seconds and 6 of them are duplicates of
+      // each other.
+      // ════════════════════════════════════════════════════════════════════
+
+      // === t=0.0s initial state — all three panels hidden, at scale 1.0.
+      tl.set("#panel-1", { opacity: 0, scale: 1.0, transformOrigin: "50% 50%" }, 0);
+      tl.set("#panel-2", { opacity: 0, scale: 1.0, transformOrigin: "50% 50%" }, 0);
+      tl.set("#panel-3", { opacity: 0, scale: 1.0, transformOrigin: "50% 50%" }, 0);
+
+      // ─────────────────────────────────────────────────────────────────
+      // THE PROBLEM (panel 1, t=0–4):
+      // Fades in over 0.5s, then sits there slowly zooming for 3.5 more
+      // seconds. The viewer has perceived everything by t=0.6 and there
+      // is no further information to discover. Ken Burns is "camera
+      // drift" — it is supposed to sit BEHIND scene events, not BE the
+      // scene event.
+      // ─────────────────────────────────────────────────────────────────
+      tl.fromTo("#panel-1",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "power1.out" },
+        0.0);
+      // Ken Burns: scale 1.0 → 1.05 over 4s with ease:"none". The cardinal
+      // sin — this is the ENTIRE motion budget for the first third of the
+      // scene.
+      tl.fromTo("#panel-1",
+        { scale: 1.0 },
+        { scale: 1.05, duration: 4.0, ease: "none" },
+        0.0);
+
+      // ─────────────────────────────────────────────────────────────────
+      // THE PROBLEM (crossfade 1→2, t=3.75–4.25):
+      // 0.5s opacity overlap. No content motivates the cut. No narration
+      // anchor (there is no narration). The viewer is being switched
+      // between near-identical rectangles for no editorial reason.
+      // ─────────────────────────────────────────────────────────────────
+      tl.to("#panel-1", { opacity: 0, duration: 0.5, ease: "power1.inOut" }, 3.75);
+      tl.fromTo("#panel-2",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "power1.inOut" },
+        3.75);
+
+      // Panel 2 Ken Burns — copy/paste of panel 1. Same easing, same
+      // amount, same nothing.
+      tl.fromTo("#panel-2",
+        { scale: 1.0 },
+        { scale: 1.05, duration: 4.0, ease: "none" },
+        4.0);
+
+      // ─────────────────────────────────────────────────────────────────
+      // THE PROBLEM (crossfade 2→3, t=7.75–8.25):
+      // Same crossfade again. Now we have a pattern. The viewer's
+      // attention has already left the screen.
+      // ─────────────────────────────────────────────────────────────────
+      tl.to("#panel-2", { opacity: 0, duration: 0.5, ease: "power1.inOut" }, 7.75);
+      tl.fromTo("#panel-3",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "power1.inOut" },
+        7.75);
+
+      // Panel 3 Ken Burns — third copy of the same tween. The final
+      // 3.5 seconds of the scene are a slow zoom on a colored rectangle.
+      // No events, no narration anchors, no continuous secondary motion,
+      // no counter updates, no UI activity. Compare to the kanban scene
+      // where seconds 6.8–9.0 contain a window drift + card breath
+      // + count chip pulse + priority dot stagger. Here: nothing.
+      tl.fromTo("#panel-3",
+        { scale: 1.0 },
+        { scale: 1.05, duration: 4.0, ease: "none" },
+        8.0);
+
+      // ════════════════════════════════════════════════════════════════════
+      // THE PROBLEM (what this timeline DOES NOT have, by design):
+      //   - No staggered child entrances (no cards, no columns, nothing
+      //     to stagger into)
+      //   - No narration-anchored events (one phrase = one visual event)
+      //   - No continuous motion during holds (no breath, no parallax,
+      //     no drift on layered elements)
+      //   - No easing variety (only "none" and "power1.inOut")
+      //   - No counter updates / data-driven moments
+      //   - No transform variety (only opacity + uniform scale)
+      //   - No layered foreground/midground/background
+      //   - No purpose — the viewer cannot answer "what is this scene
+      //     trying to tell me?"
+      // ════════════════════════════════════════════════════════════════════
+
+      window.__timelines["scene-01-slideshow-trap"] = tl;
+    })();
+  </script>
+</body>
+</html>

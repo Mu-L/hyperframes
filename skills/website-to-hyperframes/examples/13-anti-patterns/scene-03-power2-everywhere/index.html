@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-03-power2-everywhere</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    [data-composition-id="scene-03-power2-everywhere"] {
+      width: 1920px; height: 1080px;
+      position: relative; overflow: hidden;
+      background: linear-gradient(180deg, #0b0d12 0%, #07080c 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ============================================================
+       Top banner — the teaching headline.
+       ============================================================ */
+    .banner {
+      position: absolute;
+      top: 40px; left: 60px; right: 60px;
+      height: 92px;
+      border-radius: 14px;
+      background: linear-gradient(90deg, rgba(248,113,113,0.10) 0%, rgba(248,113,113,0.04) 50%, rgba(52,211,153,0.08) 100%);
+      border: 1px solid rgba(248,113,113,0.25);
+      display: flex; align-items: center;
+      padding: 0 28px;
+      z-index: 30;
+      box-shadow: 0 12px 40px -16px rgba(248,113,113,0.25);
+    }
+    .banner-x {
+      font-size: 36px;
+      margin-right: 16px;
+      filter: drop-shadow(0 0 12px rgba(248,113,113,0.6));
+    }
+    .banner-title {
+      font-weight: 800; font-size: 22px;
+      letter-spacing: 0.04em;
+      color: #fca5a5;
+      text-transform: uppercase;
+    }
+    .banner-sep {
+      width: 1px; height: 38px;
+      background: rgba(255,255,255,0.12);
+      margin: 0 22px;
+    }
+    .banner-msg {
+      font-size: 19px; color: #d5d8df;
+      letter-spacing: 0.005em;
+      font-weight: 500;
+    }
+    .banner-msg b { color: #f5f5f5; font-weight: 700; }
+    .banner-arrow {
+      margin-left: auto;
+      display: flex; align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      color: #6ee7b7;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .banner-arrow svg { display: block; }
+
+    /* ============================================================
+       Side-by-side stage. Two columns split down the middle.
+       ============================================================ */
+    .stage {
+      position: absolute;
+      top: 160px; left: 60px; right: 60px; bottom: 110px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+    .side {
+      position: relative;
+      padding: 30px 40px;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .side.left {
+      background: linear-gradient(180deg, rgba(248,113,113,0.05) 0%, rgba(248,113,113,0.02) 100%);
+      border-right: 1px dashed rgba(255,255,255,0.10);
+      border-radius: 14px 0 0 14px;
+    }
+    .side.right {
+      background: linear-gradient(180deg, rgba(52,211,153,0.05) 0%, rgba(52,211,153,0.02) 100%);
+      border-radius: 0 14px 14px 0;
+    }
+    .side-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 22px;
+    }
+    .side-tag {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-family: "JetBrains Mono", monospace;
+    }
+    .side.left .side-tag {
+      color: #fca5a5;
+      background: rgba(248,113,113,0.12);
+      border: 1px solid rgba(248,113,113,0.30);
+    }
+    .side.right .side-tag {
+      color: #6ee7b7;
+      background: rgba(52,211,153,0.12);
+      border: 1px solid rgba(52,211,153,0.30);
+    }
+    .side-headline {
+      font-size: 18px;
+      font-weight: 600;
+      color: #e5e7eb;
+      letter-spacing: -0.005em;
+    }
+    .side.left .side-headline { color: #f3c4c4; }
+    .side.right .side-headline { color: #c4f3df; }
+
+    /* Each "row" holds: tiny easing label above + the animated element. */
+    .row {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 18px;
+      align-items: center;
+      padding: 10px 0;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    .ease-label {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: #8a93a0;
+      letter-spacing: 0.02em;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      text-align: center;
+      opacity: 0; /* GSAP fades each label in as its element animates */
+    }
+    .side.left .ease-label {
+      color: #fca5a5;
+      background: rgba(248,113,113,0.08);
+      border-color: rgba(248,113,113,0.20);
+    }
+    .side.right .ease-label {
+      color: #6ee7b7;
+      background: rgba(52,211,153,0.08);
+      border-color: rgba(52,211,153,0.20);
+    }
+    .anim-host {
+      position: relative;
+      height: 70px;
+      display: flex; align-items: center;
+    }
+
+    /* ============================================================
+       Animated atoms — six elements per side.
+       Locked at opacity:0 initially; GSAP fromTo brings them in.
+       ============================================================ */
+
+    /* Headline */
+    .a-headline {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      color: #f5f5f5;
+      line-height: 1;
+      opacity: 0;
+    }
+    .side.left .a-headline { color: #fce7e7; }
+    .side.right .a-headline { color: #e7fcf3; }
+
+    /* Subtitle */
+    .a-subtitle {
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 0.005em;
+      color: #c8ced8;
+      opacity: 0;
+    }
+
+    /* Badge */
+    .a-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      color: #1a1a1a;
+      box-shadow: 0 8px 20px -8px rgba(245,158,11,0.5);
+      opacity: 0;
+      transform-origin: 50% 50%;
+    }
+    .a-badge::before {
+      content: "★"; font-size: 14px;
+    }
+
+    /* Button */
+    .a-button {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 14px 22px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #5b8dff 0%, #7c5bff 100%);
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      box-shadow: 0 14px 30px -10px rgba(91,141,255,0.55);
+      opacity: 0;
+      transform-origin: 50% 50%;
+    }
+    .a-button .arrow {
+      width: 18px; height: 18px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700;
+    }
+
+    /* Icon row — three icons */
+    .a-icons {
+      display: flex; align-items: center; gap: 14px;
+    }
+    .a-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      opacity: 0;
+      transform-origin: 50% 50%;
+    }
+    .side.left .a-icon { background: rgba(248,113,113,0.10); border-color: rgba(248,113,113,0.18); }
+    .side.right .a-icon { background: rgba(52,211,153,0.10); border-color: rgba(52,211,153,0.18); }
+
+    /* Glow orb */
+    .a-glow {
+      position: relative;
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #ffffff 0%, #5b8dff 35%, transparent 70%);
+      filter: blur(0.5px);
+      box-shadow: 0 0 40px rgba(91,141,255,0.6), 0 0 80px rgba(91,141,255,0.3);
+      opacity: 0;
+      transform-origin: 50% 50%;
+    }
+
+    /* Counter */
+    .a-counter {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 38px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #f5f5f5;
+      font-variant-numeric: tabular-nums;
+      opacity: 0;
+    }
+    .a-counter .unit {
+      font-size: 18px;
+      color: #8a93a0;
+      margin-left: 4px;
+      font-weight: 500;
+    }
+
+    /* ============================================================
+       Center arrow + verdict marker (overlays the divider).
+       ============================================================ */
+    .verdict {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 25;
+      width: 110px; height: 110px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(15,17,22,0.95) 0%, rgba(15,17,22,0.85) 100%);
+      border: 1px solid rgba(255,255,255,0.10);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 20px 60px -20px rgba(0,0,0,0.6);
+      opacity: 0;
+    }
+    .verdict svg { display: block; }
+
+    /* ============================================================
+       Scene label
+       ============================================================ */
+    .scene-label {
+      position: absolute;
+      left: 60px; bottom: 38px;
+      font-size: 14px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 100;
+    }
+    .scene-label .accent { color: #f5f5f5; font-weight: 600; }
+    .scene-label .anti { color: #fca5a5; font-weight: 700; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-03-power2-everywhere"
+       data-composition-id="scene-03-power2-everywhere"
+       data-start="0"
+       data-duration="7"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <!-- =================================================================
+         BANNER — teaching headline at the top.
+         Pulses subtly to draw the eye, but the meat is the side-by-side.
+         ================================================================= -->
+    <div class="banner" id="banner">
+      <span class="banner-x">❌</span>
+      <span class="banner-title">Anti-Pattern: power2.out Everywhere</span>
+      <span class="banner-sep"></span>
+      <span class="banner-msg">Use <b>easing variety</b> to create <b>motion contrast</b></span>
+      <span class="banner-arrow" id="banner-arrow">
+        <span>boring</span>
+        <svg width="80" height="22" viewBox="0 0 80 22" fill="none">
+          <path d="M2 11 L72 11" stroke="#6ee7b7" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M62 4 L72 11 L62 18" stroke="#6ee7b7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <span>varied</span>
+      </span>
+    </div>
+
+    <!-- =================================================================
+         STAGE — left (anti-pattern) vs right (corrected).
+         ================================================================= -->
+    <div class="stage">
+
+      <!-- ============= LEFT: all power2.out ============= -->
+      <div class="side left" id="left-side">
+        <div class="side-header">
+          <span class="side-tag">// BEFORE</span>
+          <span class="side-headline">ease: "power2.out" on every tween</span>
+        </div>
+
+        <div class="row">
+          <span class="ease-label" data-l="lab-l-1">power2.out</span>
+          <div class="anim-host"><h3 class="a-headline" id="L-headline">Everything App</h3></div>
+        </div>
+        <div class="row">
+          <span class="ease-label" data-l="lab-l-2">power2.out</span>
+          <div class="anim-host"><p class="a-subtitle" id="L-subtitle">One tool. Every workflow.</p></div>
+        </div>
+        <div class="row">
+          <span class="ease-label" data-l="lab-l-3">power2.out</span>
+          <div class="anim-host"><span class="a-badge" id="L-badge">New release</span></div>
+        </div>
+        <div class="row">
+          <span class="ease-label" data-l="lab-l-4">power2.out</span>
+          <div class="anim-host">
+            <span class="a-button" id="L-button">Get started <span class="arrow">→</span></span>
+          </div>
+        </div>
+        <div class="row">
+          <span class="ease-label" data-l="lab-l-5">power2.out</span>
+          <div class="anim-host">
+            <div class="a-icons" id="L-icons">
+              <div class="a-icon">◆</div>
+              <div class="a-icon">●</div>
+              <div class="a-icon">▲</div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <span class="ease-label" data-l="lab-l-6">power2.out</span>
+          <div class="anim-host" style="gap:18px;">
+            <div class="a-glow" id="L-glow"></div>
+            <span class="a-counter" id="L-counter">0<span class="unit">k</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============= RIGHT: varied easings ============= -->
+      <div class="side right" id="right-side">
+        <div class="side-header">
+          <span class="side-tag">// AFTER</span>
+          <span class="side-headline">7 distinct easings — variety = contrast</span>
+        </div>
+
+        <div class="row">
+          <span class="ease-label" data-l="lab-r-1">power4.out</span>
+          <div class="anim-host"><h3 class="a-headline" id="R-headline">Everything App</h3></div>
+        </div>
+        <div class="row">
+          <span class="ease-label" data-l="lab-r-2">expo.out</span>
+          <div class="anim-host"><p class="a-subtitle" id="R-subtitle">One tool. Every workflow.</p></div>
+        </div>
+        <div class="row">
+          <span class="ease-label" data-l="lab-r-3">back.out(1.7)</span>
+          <div class="anim-host"><span class="a-badge" id="R-badge">New release</span></div>
+        </div>
+        <div class="row">
+          <span class="ease-label" data-l="lab-r-4">elastic.out(1, 0.5)</span>
+          <div class="anim-host">
+            <span class="a-button" id="R-button">Get started <span class="arrow">→</span></span>
+          </div>
+        </div>
+        <div class="row">
+          <span class="ease-label" data-l="lab-r-5">power4.out · stagger</span>
+          <div class="anim-host">
+            <div class="a-icons" id="R-icons">
+              <div class="a-icon">◆</div>
+              <div class="a-icon">●</div>
+              <div class="a-icon">▲</div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <span class="ease-label" data-l="lab-r-6">expo.inOut + none</span>
+          <div class="anim-host" style="gap:18px;">
+            <div class="a-glow" id="R-glow"></div>
+            <span class="a-counter" id="R-counter">0<span class="unit">k</span></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center verdict marker -->
+      <div class="verdict" id="verdict">
+        <svg width="70" height="22" viewBox="0 0 70 22" fill="none">
+          <path d="M4 11 L60 11" stroke="#f5f5f5" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M50 4 L60 11 L50 18" stroke="#f5f5f5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="scene-label">
+      Scene 03 · <span class="anti">Anti-Pattern</span> · <span class="accent">power2.out Everywhere</span> · easing variety is contrast, not aesthetic
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 7;
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // =================================================================
+      // Banner — fades in early, gentle pulse holds attention across beat.
+      // =================================================================
+      tl.fromTo("#banner",
+        { opacity: 0, y: -18 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "expo.out" },
+        0.05);
+      // Subtle continuous pulse on the banner arrow so the eye keeps tracking it.
+      tl.to("#banner-arrow svg", {
+        x: 6,
+        duration: 0.9,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 5,
+      }, 0.8);
+
+      // Verdict marker (center arrow) — drops in after both sides have started.
+      tl.fromTo("#verdict",
+        { opacity: 0, scale: 0.7 },
+        { opacity: 1, scale: 1, duration: 0.55, ease: "back.out(1.7)" },
+        1.2);
+
+      // =================================================================
+      // The two sides run IN PARALLEL on the same timeline so the viewer
+      // can see, side-by-side, the same element animating with different
+      // easings at the same moment.
+      //
+      // Element pairing (top to bottom):
+      //   1. headline   — left: power2.out          right: power4.out          (snap)
+      //   2. subtitle   — left: power2.out          right: expo.out            (soft)
+      //   3. badge      — left: power2.out          right: back.out(1.7)       (whip)
+      //   4. button     — left: power2.out          right: elastic.out(1,0.5)  (settle)
+      //   5. icons      — left: power2.out          right: power4.out + stagger
+      //   6. glow+ctr   — left: power2.out          right: expo.inOut + "none"
+      //
+      // Each element on the right gets an easing chosen for INTENT, not look.
+      // =================================================================
+
+      // ---------- Stagger settings: each pair lands 0.45s after previous ----------
+      var BASE = 0.9;       // first pair starts after banner settles
+      var ROW_GAP = 0.55;   // time between consecutive row entrances
+
+      function tRow(i) { return BASE + i * ROW_GAP; }
+
+      // ============ ROW 1 — HEADLINE ============
+      // LEFT: power2.out — boring default
+      tl.fromTo("#L-headline",
+        { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power2.out" },  // power2.out — boring default
+        tRow(0));
+      tl.fromTo('[data-l="lab-l-1"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "power2.out" },  // power2.out — boring default
+        tRow(0));
+
+      // RIGHT: power4.out — snap (iOS feel)
+      tl.fromTo("#R-headline",
+        { opacity: 0, y: 28 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "power4.out" },  // power4.out — snap
+        tRow(0));
+      tl.fromTo('[data-l="lab-r-1"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "power4.out" },  // power4.out — snap
+        tRow(0));
+
+      // ============ ROW 2 — SUBTITLE ============
+      // LEFT: power2.out — boring default
+      tl.fromTo("#L-subtitle",
+        { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.50, ease: "power2.out" },  // power2.out — boring default
+        tRow(1));
+      tl.fromTo('[data-l="lab-l-2"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "power2.out" },  // power2.out — boring default
+        tRow(1));
+
+      // RIGHT: expo.out — soft land, premium feel
+      tl.fromTo("#R-subtitle",
+        { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.60, ease: "expo.out" },  // expo.out — soft land
+        tRow(1));
+      tl.fromTo('[data-l="lab-r-2"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "expo.out" },  // expo.out — soft land
+        tRow(1));
+
+      // ============ ROW 3 — BADGE ============
+      // LEFT: power2.out — boring default (NO overshoot — feels flat for a badge!)
+      tl.fromTo("#L-badge",
+        { opacity: 0, scale: 0.85 },
+        { opacity: 1, scale: 1, duration: 0.50, ease: "power2.out" },  // power2.out — boring default
+        tRow(2));
+      tl.fromTo('[data-l="lab-l-3"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "power2.out" },  // power2.out — boring default
+        tRow(2));
+
+      // RIGHT: back.out(1.7) — whip overshoot, eye catches the badge
+      tl.fromTo("#R-badge",
+        { opacity: 0, scale: 0.7 },
+        { opacity: 1, scale: 1, duration: 0.55, ease: "back.out(1.7)" },  // back.out — whip
+        tRow(2));
+      tl.fromTo('[data-l="lab-r-3"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "back.out(1.7)" },  // back.out — whip
+        tRow(2));
+
+      // ============ ROW 4 — BUTTON ============
+      // LEFT: power2.out — boring default
+      tl.fromTo("#L-button",
+        { opacity: 0, scale: 0.92, y: 12 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.50, ease: "power2.out" },  // power2.out — boring default
+        tRow(3));
+      tl.fromTo('[data-l="lab-l-4"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "power2.out" },  // power2.out — boring default
+        tRow(3));
+
+      // RIGHT: elastic.out(1, 0.5) — spring settle, "ta-da" beat for CTA
+      tl.fromTo("#R-button",
+        { opacity: 0, scale: 0.85, y: 12 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.85, ease: "elastic.out(1, 0.5)" },  // elastic.out — bounce settle
+        tRow(3));
+      tl.fromTo('[data-l="lab-r-4"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "expo.out" },  // expo.out — soft land (for the label only)
+        tRow(3));
+
+      // ============ ROW 5 — ICONS ============
+      // LEFT: power2.out — boring default, NO stagger feel
+      tl.fromTo("#L-icons .a-icon",
+        { opacity: 0, scale: 0.85, y: 10 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.45, ease: "power2.out", stagger: 0.08 },  // power2.out — boring default
+        tRow(4));
+      tl.fromTo('[data-l="lab-l-5"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "power2.out" },  // power2.out — boring default
+        tRow(4));
+
+      // RIGHT: power4.out — snap, with same stagger but the harder ease reads as confidence
+      tl.fromTo("#R-icons .a-icon",
+        { opacity: 0, scale: 0.7, y: 14 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.45, ease: "power4.out", stagger: 0.10 },  // power4.out — snap (staggered)
+        tRow(4));
+      tl.fromTo('[data-l="lab-r-5"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "power4.out" },  // power4.out — snap
+        tRow(4));
+
+      // ============ ROW 6 — GLOW + COUNTER ============
+      // LEFT: power2.out — boring default
+      tl.fromTo("#L-glow",
+        { opacity: 0, scale: 0.6 },
+        { opacity: 1, scale: 1, duration: 0.55, ease: "power2.out" },  // power2.out — boring default
+        tRow(5));
+      tl.fromTo("#L-counter",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.45, ease: "power2.out", overwrite: "auto" },  // power2.out — boring default
+        tRow(5));
+      tl.fromTo('[data-l="lab-l-6"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "power2.out" },  // power2.out — boring default
+        tRow(5));
+      // LEFT counter: power2.out — boring default (no character — just a fade)
+      tl.set("#L-counter", { textContent: "0" }, tRow(5));
+      tl.set("#L-counter", { textContent: "10" }, tRow(5) + 0.10);
+      tl.set("#L-counter", { textContent: "32" }, tRow(5) + 0.22);
+      tl.set("#L-counter", { textContent: "78" }, tRow(5) + 0.34);
+      tl.set("#L-counter", { textContent: "128" }, tRow(5) + 0.46);
+      // (no kick at the end — just stops. Boring.)
+
+      // RIGHT: expo.inOut for glow scale + "none" for orbit drift = dramatic + ambient
+      tl.fromTo("#R-glow",
+        { opacity: 0, scale: 0.5 },
+        { opacity: 1, scale: 1, duration: 0.85, ease: "expo.inOut" },  // expo.inOut — dramatic
+        tRow(5));
+      // Continuous ambient drift on the glow — "none" ease, pure linear ambient motion
+      tl.to("#R-glow", {
+        x: 8, y: -4,
+        duration: 1.8,
+        ease: "none",  // none — pure linear drift, ambient
+        yoyo: true,
+        repeat: 1,
+      }, tRow(5) + 0.85);
+      tl.fromTo("#R-counter",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.40, ease: "power4.out", overwrite: "auto" },  // power4.out — snap
+        tRow(5));
+      tl.fromTo('[data-l="lab-r-6"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.30, ease: "expo.inOut" },  // expo.inOut — dramatic
+        tRow(5));
+      // RIGHT counter: 5 set() steps then a final elastic kick on the wrapper — "ta-da"
+      tl.set("#R-counter", { textContent: "0" }, tRow(5));
+      tl.set("#R-counter", { textContent: "14" }, tRow(5) + 0.10);
+      tl.set("#R-counter", { textContent: "41" }, tRow(5) + 0.22);
+      tl.set("#R-counter", { textContent: "89" }, tRow(5) + 0.34);
+      tl.set("#R-counter", { textContent: "128" }, tRow(5) + 0.46);
+      // elastic.out kick on counter when it settles — bounce settle, attention-getting
+      tl.fromTo("#R-counter",
+        { scale: 1 },
+        { scale: 1.18, duration: 0.50, ease: "elastic.out(1, 0.5)", transformOrigin: "50% 50%", overwrite: "auto" },  // elastic.out — bounce settle
+        tRow(5) + 0.46);
+      tl.to("#R-counter", { scale: 1, duration: 0.40, ease: "expo.out", overwrite: "auto" }, tRow(5) + 1.00);
+
+      // =================================================================
+      // CONTINUOUS MOTION DURING HOLD (final ~1.7s).
+      // The whole point of the scene is contrast, so we keep the left
+      // side static (it has nothing more to offer — power2.out is done)
+      // and let the right side breathe.
+      // =================================================================
+
+      // RIGHT badge continues to "pulse" — back.out feel, attention magnet.
+      tl.to("#R-badge", {
+        scale: 1.08,
+        duration: 0.55,
+        ease: "back.out(1.7)",  // back.out — whip
+        yoyo: true,
+        repeat: 1,
+        transformOrigin: "50% 50%",
+      }, 5.2);
+
+      // RIGHT button hovers gently with expo.inOut breath.
+      tl.to("#R-button", {
+        y: -3,
+        duration: 0.9,
+        ease: "expo.inOut",  // expo.inOut — dramatic
+        yoyo: true,
+        repeat: 1,
+      }, 5.4);
+
+      // RIGHT icons subtle wave with power4.out staggered nudge
+      tl.to("#R-icons .a-icon", {
+        y: -4,
+        duration: 0.40,
+        ease: "power4.out",  // power4.out — snap
+        stagger: 0.08,
+        yoyo: true,
+        repeat: 1,
+      }, 5.6);
+
+      // LEFT side: a single sad continuous tween with — guess what — power2.out.
+      // Everything together, identical feel. Drives the lesson home.
+      tl.to(["#L-headline", "#L-subtitle", "#L-badge", "#L-button", "#L-icons", "#L-glow", "#L-counter"], {
+        y: -3,
+        duration: 0.8,
+        ease: "power2.out",  // power2.out — boring default (yes, here too)
+        yoyo: true,
+        repeat: 1,
+      }, 5.4);
+
+      // Verdict marker: subtle continuous nudge toward the right side, reinforcing direction.
+      tl.to("#verdict", {
+        x: 4,
+        duration: 0.9,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 2,
+      }, 4.5);
+
+      window.__timelines["scene-03-power2-everywhere"] = tl;
+    })();
+  </script>
+</body>
+</html>

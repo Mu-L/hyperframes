@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-04-scribble-underline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #fafaf6; }
+
+    #scene-04-scribble-underline {
+      position: relative;
+      overflow: hidden;
+      /* Warm off-white paper — soft warmth in the corners, like printed
+         editorial paper lit from above. Same family as scene-10 but a
+         touch warmer to read as a notebook page. */
+      background:
+        radial-gradient(ellipse at 50% 40%, #fdfcf6 0%, #f5f1e6 70%, #ebe5d4 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1a1a1a;
+    }
+
+    /* Paper grain — subtle warm speckle layered with very faint ruled
+       paper texture (horizontal lines). Drifts during the beat for
+       continuous motion. */
+    .paper-grain {
+      position: absolute;
+      inset: -40px;
+      background:
+        radial-gradient(circle at 18% 26%, rgba(180, 160, 110, 0.07) 0%, transparent 38%),
+        radial-gradient(circle at 78% 72%, rgba(200, 175, 120, 0.06) 0%, transparent 42%),
+        radial-gradient(circle at 50% 92%, rgba(150, 130, 90, 0.04) 0%, transparent 30%),
+        repeating-linear-gradient(
+          0deg,
+          transparent 0px,
+          transparent 47px,
+          rgba(120, 100, 70, 0.025) 47px,
+          rgba(120, 100, 70, 0.025) 48px
+        );
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    /* Stage host — centers both phrases, which are absolute-positioned
+       and stacked. Only one visible at a time via opacity toggling. */
+    .stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Phrase wrappers — both pre-built in DOM, stacked at the same
+       position so the second can replace the first without layout shift.
+       opacity:0 in CSS locks both off for snapshot frame 0. */
+    .phrase {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 132px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.05;
+      color: #1a1a1a;
+      white-space: nowrap;
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+
+    /* Per-word unit — pre-split. opacity:0 lets us reveal them on the
+       timeline rather than via tl.from (avoiding the from-trap). */
+    .word {
+      display: inline-block;
+      white-space: pre;
+      backface-visibility: hidden;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    /* Emphasis host: relative so the SVG scribble underline anchors
+       to its inline box. padding-bottom gives the wave room to live
+       under the descenders without crowding. */
+    .emphasis-host {
+      position: relative;
+      display: inline-block;
+      padding: 0 6px 28px;
+    }
+
+    /* The scribble underline SVG — pre-positioned under the emphasis word.
+       Width is 100% of the host so the wave matches the word's measured
+       width. preserveAspectRatio="none" stretches the viewBox to fit. */
+    .scribble {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -2px;
+      width: 100%;
+      height: 36px;
+      pointer-events: none;
+      overflow: visible;
+      opacity: 0; /* locked off — fades on the frame the stroke draws */
+    }
+    .scribble path {
+      fill: none;
+      stroke: #dc2626; /* dark coral / red-orange — the spec color */
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      /* Initial dash state set on element attrs (see HTML) so the
+         snapshot tool's first frame is empty even before the timeline
+         applies its t=0 set tweens. */
+    }
+
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #8a7a55;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 10;
+    }
+    .label .accent { color: #1a1a1a; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-04-scribble-underline"
+       data-composition-id="scene-04-scribble-underline"
+       data-start="0"
+       data-duration="6"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="paper-grain"></div>
+
+    <div class="stage">
+
+      <!-- Phrase 1: "Truly handcrafted work." — emphasis on "handcrafted".
+           Both phrases live in the DOM at all times; opacity toggles handle
+           visibility. This keeps snapshot/seek deterministic (no DOM mutation
+           in the timeline). -->
+      <div class="phrase" id="phrase-1">
+        <span class="word" data-w="0">Truly</span><span class="word" data-w="1">&nbsp;</span><span class="emphasis-host"><span class="word" data-w="2" id="emph-1">handcrafted</span><!--
+          Scribble underline — wavy sine SVG path. Eight half-waves across
+          the 240-unit viewBox. The Q control point at y=0 then T-reflections
+          alternate above/below y=10, creating the sine wobble. pathLength=2000
+          normalizes the dash math regardless of computed path length.
+        --><svg class="scribble" id="scribble-1" viewBox="0 0 240 20" preserveAspectRatio="none">
+          <path id="scribble-path-1"
+                stroke-dasharray="2000 2000"
+                stroke-dashoffset="2000"
+                pathLength="2000"
+                d="M 0 10 Q 15 0 30 10 T 60 10 T 90 10 T 120 10 T 150 10 T 180 10 T 210 10 T 240 10"/>
+        </svg></span><span class="word" data-w="3">&nbsp;</span><span class="word" data-w="4">work.</span>
+      </div>
+
+      <!-- Phrase 2: "Made with care." — emphasis on "care". Same scribble
+           pattern, different word. Stacked at same position as phrase-1. -->
+      <div class="phrase" id="phrase-2">
+        <span class="word" data-w="0">Made</span><span class="word" data-w="1">&nbsp;</span><span class="word" data-w="2">with</span><span class="word" data-w="3">&nbsp;</span><span class="emphasis-host"><span class="word" data-w="4" id="emph-2">care</span><svg class="scribble" id="scribble-2" viewBox="0 0 240 20" preserveAspectRatio="none">
+          <path id="scribble-path-2"
+                stroke-dasharray="2000 2000"
+                stroke-dashoffset="2000"
+                pathLength="2000"
+                d="M 0 10 Q 15 0 30 10 T 60 10 T 90 10 T 120 10 T 150 10 T 180 10 T 210 10 T 240 10"/>
+        </svg></span><span class="word" data-w="5">.</span>
+      </div>
+
+    </div>
+
+    <div class="label">
+      Scene 04 · <span class="accent">Scribble Underline</span> · wavy SVG path stroke-dasharray draw
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 6;
+      window.__timelines = window.__timelines || {};
+
+      var PATH_LEN = 2000;
+      var scribble1 = document.getElementById("scribble-path-1");
+      var scribble2 = document.getElementById("scribble-path-2");
+
+      var phrase1Words = document.querySelectorAll("#phrase-1 .word");
+      var phrase2Words = document.querySelectorAll("#phrase-2 .word");
+
+      var tl = gsap.timeline({ paused: true });
+
+      // === t=0: lock every animated element to its pre-entrance state.
+      // Mirrors CSS initial state so seek-to-0 is deterministic.
+      tl.set("#phrase-1", { opacity: 1 }, 0); // host visible; word spans drive entrance
+      tl.set("#phrase-2", { opacity: 0 }, 0);
+      tl.set(phrase1Words, { opacity: 0, y: 8 }, 0);
+      tl.set(phrase2Words, { opacity: 0, y: 8 }, 0);
+      tl.set("#scribble-1", { opacity: 0 }, 0);
+      tl.set("#scribble-2", { opacity: 0 }, 0);
+      tl.set(scribble1, { attr: { "stroke-dasharray": PATH_LEN + " " + PATH_LEN, "stroke-dashoffset": PATH_LEN } }, 0);
+      tl.set(scribble2, { attr: { "stroke-dasharray": PATH_LEN + " " + PATH_LEN, "stroke-dashoffset": PATH_LEN } }, 0);
+
+      // ============================================================
+      // ACT 1: "Truly handcrafted work." (0.0s - 2.9s)
+      // ============================================================
+
+      // === t=0.25s: phrase-1 words fade in with soft stagger.
+      // expo.out for a gentle, editorial entrance — the words "land"
+      // rather than snap. Stagger 0.07s for a readable cadence.
+      tl.fromTo(phrase1Words,
+        { opacity: 0, y: 8 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.55,
+          stagger: 0.07,
+          ease: "expo.out",
+        },
+        0.25);
+
+      // === t=1.05s: scribble SVG fades in one frame before the stroke
+      // draws — hides any round-linecap artifact during the locked-off
+      // pre-draw state.
+      tl.to("#scribble-1", { opacity: 1, duration: 0.04, ease: "none" }, 1.05);
+
+      // === t=1.10s - 1.60s: scribble underline draws beneath "handcrafted".
+      // power2.inOut per spec — slightly mechanical for the hand-drawn
+      // feel (starts gently, ends gently — like a deliberate pen stroke).
+      tl.fromTo(scribble1,
+        { attr: { "stroke-dashoffset": PATH_LEN } },
+        { attr: { "stroke-dashoffset": 0 }, duration: 0.5, ease: "power2.inOut" },
+        1.10);
+
+      // === t=1.65s - 2.40s: hold with continuous breath on the phrase.
+      // Subtle y-drift — the words feel like they're sitting on the page,
+      // not pinned. sine.inOut yoyo keeps the frame alive.
+      tl.to("#phrase-1", {
+        y: "-=4",
+        duration: 0.75,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 1.65);
+
+      // === t=2.55s - 2.85s: phrase-1 exits up + fades.
+      // Faster than the entrance — outgoing content shouldn't linger.
+      tl.to(phrase1Words, {
+        opacity: 0,
+        y: -8,
+        duration: 0.35,
+        stagger: 0.03,
+        ease: "power3.in",
+      }, 2.55);
+      tl.to("#scribble-1", {
+        opacity: 0,
+        duration: 0.3,
+        ease: "power3.in",
+      }, 2.55);
+
+      // ============================================================
+      // ACT 2: "Made with care." (3.05s - 6.0s)
+      // ============================================================
+
+      // === t=3.00s: phrase-2 host becomes visible (the spans are still
+      // opacity:0 from the t=0 set — they enter via the next fromTo).
+      tl.set("#phrase-2", { opacity: 1 }, 3.00);
+
+      // === t=3.05s: phrase-2 words fade in. Same expo.out feel.
+      tl.fromTo(phrase2Words,
+        { opacity: 0, y: 8 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.55,
+          stagger: 0.07,
+          ease: "expo.out",
+        },
+        3.05);
+
+      // === t=3.85s: scribble-2 SVG fades in.
+      tl.to("#scribble-2", { opacity: 1, duration: 0.04, ease: "none" }, 3.85);
+
+      // === t=3.90s - 4.40s: scribble underline draws beneath "care".
+      // Same power2.inOut for visual rhyme with the first underline.
+      tl.fromTo(scribble2,
+        { attr: { "stroke-dashoffset": PATH_LEN } },
+        { attr: { "stroke-dashoffset": 0 }, duration: 0.5, ease: "power2.inOut" },
+        3.90);
+
+      // === t=4.45s - 5.85s: extended hold. The "care" underline gets a
+      // longer beat to land — it's the closing emotional note.
+      // Phrase breathes; underline subtly thickens then settles.
+      tl.to("#phrase-2", {
+        y: "-=4",
+        duration: 0.85,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 4.45);
+
+      // Scribble breath: subtle scale/opacity pulse so the ink looks
+      // "alive" — like the pen mark is still settling onto the paper.
+      tl.to("#scribble-2 path", {
+        strokeWidth: 5.6,
+        duration: 0.9,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 4.55);
+
+      // ============================================================
+      // Continuous motion layer: paper grain drift through the entire beat
+      // ============================================================
+
+      // === t=0.0s - 6.0s: paper grain drifts diagonally. "none" linear
+      // easing keeps the camera-style motion uniform — no curve needed.
+      tl.fromTo(".paper-grain",
+        { x: 0, y: 0 },
+        { x: -28, y: -12, duration: 6, ease: "none" },
+        0);
+
+      window.__timelines["scene-04-scribble-underline"] = tl;
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-05-sketchout-x</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/CustomEase.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #fafaf6; }
+
+    #scene-05-sketchout-x {
+      position: relative;
+      overflow: hidden;
+      /* Warm off-white editorial paper — soft warmth in the corners,
+         like a printed page lit from the top. Same palette family as
+         scene-10 so the marker series feels cohesive. */
+      background:
+        radial-gradient(ellipse at 50% 40%, #fdfcf6 0%, #f5f2e9 70%, #ede9dc 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1a1a1a;
+    }
+
+    /* Paper grain — subtle off-white speckle, drifts during the beat
+       for continuous ambient motion. */
+    .paper-grain {
+      position: absolute;
+      inset: -40px;
+      background:
+        radial-gradient(circle at 18% 26%, rgba(180, 160, 110, 0.06) 0%, transparent 38%),
+        radial-gradient(circle at 80% 72%, rgba(200, 175, 120, 0.05) 0%, transparent 42%),
+        radial-gradient(circle at 50% 92%, rgba(150, 130, 90, 0.04) 0%, transparent 30%);
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    /* Stage: stacked rows. The two phrases live on top of each other
+       so the "replacement" can slide up into the old row position. */
+    .stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .eyebrow {
+      position: absolute;
+      top: calc(50% - 220px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: #8a7a55;
+      opacity: 0;
+      white-space: nowrap;
+    }
+
+    /* Phrase row — pre-built. Both rows are stacked using position:absolute
+       so they occupy the same space; the replacement is shifted down 90px
+       initially and slides up into position when the X marker completes. */
+    .phrase-row {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 132px;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.05;
+      color: #1a1a1a;
+      white-space: nowrap;
+      display: inline-block;
+    }
+
+    /* Replacement row sits 90px below the original, masked off until
+       the X completes. Locked initial state via opacity:0 + y offset. */
+    .phrase-row.replacement {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 90px));
+    }
+
+    /* Per-word unit — pre-split DOM. opacity:0 locks initial state for
+       the snapshot tool. */
+    .word {
+      display: inline-block;
+      white-space: pre;
+      backface-visibility: hidden;
+      will-change: transform, opacity, color;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    /* Emphasis word host — relative so the SVG X marker anchors here. */
+    .emphasis-host {
+      position: relative;
+      display: inline-block;
+      padding: 0 14px; /* breathing room so the X has visual margin */
+    }
+
+    /* The "rejected" word gets a class that fades it to gray after the
+       X completes — separate from the entrance opacity tween. */
+    .reject-target {
+      will-change: color, opacity;
+    }
+
+    /* Replacement emphasis — highlight color (warm orange) for "action". */
+    .accent-word {
+      color: #ea580c;
+    }
+
+    /* SVG X marker — two diagonal lines drawn one after the other via
+       stroke-dasharray animation. Pre-positioned over the emphasis word.
+       Locked off (opacity:0) until just before the first stroke draws. */
+    .x-marker {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 130%;
+      height: 145%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      overflow: visible;
+      opacity: 0; /* locked off — fades on just before first stroke */
+    }
+    .x-marker line {
+      fill: none;
+      stroke: #dc2626;
+      stroke-width: 6;
+      stroke-linecap: round;
+      /* Initial dash state set as SVG attributes on the element itself
+         (see HTML below) so the snapshot tool's first-frame render shows
+         empty strokes even before the GSAP timeline applies its t=0 sets. */
+    }
+    /* Slight per-line rotation for hand-drawn feel — applied via CSS so
+       it persists through the GSAP transform tweens on the parent. */
+    .x-marker .x-fwd {
+      transform-origin: 200px 100px;
+      transform: rotate(-3deg);
+    }
+    .x-marker .x-bwd {
+      transform-origin: 200px 100px;
+      transform: rotate(2deg);
+    }
+
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #8a7a55;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 10;
+    }
+    .label .accent { color: #1a1a1a; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-05-sketchout-x"
+       data-composition-id="scene-05-sketchout-x"
+       data-start="0"
+       data-duration="6"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="paper-grain"></div>
+
+    <div class="stage">
+      <div class="eyebrow" id="eyebrow">Scene 05 · Sketchout</div>
+
+      <!-- ROW A: the "wrong" phrase. Stays in place; "excuses" gets X'd
+           out, then the whole row fades down as the replacement enters. -->
+      <div class="phrase-row" id="phrase-a">
+        <span class="word" data-word="0">Stop with </span><span class="emphasis-host"><span class="word reject-target" data-word="1" id="reject-word">excuses</span><!--
+          Two diagonal lines forming an X. stroke-dasharray locks each
+          line to an "empty" initial state. ViewBox is generous so the
+          stroke can sit slightly outside the word without clipping.
+          Lines are drawn corner-to-corner of a 400x200 box, with slight
+          rotation applied via the CSS .x-fwd / .x-bwd classes for that
+          hand-drawn "not perfectly straight" feel.
+        --><svg class="x-marker" id="x-marker" viewBox="0 0 400 200" preserveAspectRatio="none">
+          <line class="x-fwd" id="x-fwd"
+                x1="40" y1="30" x2="360" y2="170"
+                stroke-dasharray="400 400"
+                stroke-dashoffset="400"
+                pathLength="400"/>
+          <line class="x-bwd" id="x-bwd"
+                x1="360" y1="30" x2="40" y2="170"
+                stroke-dasharray="400 400"
+                stroke-dashoffset="400"
+                pathLength="400"/>
+        </svg></span><span class="word" data-word="2">.</span>
+      </div>
+
+      <!-- ROW B: the "right" phrase. Starts hidden, slides up into
+           the same row position as ROW A after it exits. -->
+      <div class="phrase-row replacement" id="phrase-b">
+        <span class="word" data-word="0">Start with </span><span class="word accent-word" data-word="1" id="accent-word">action</span><span class="word" data-word="2">.</span>
+      </div>
+    </div>
+
+    <div class="label">
+      Scene 05 · <span class="accent">Sketchout X</span> · two diagonal SVG strokes cross a word
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 6;
+      window.__timelines = window.__timelines || {};
+
+      gsap.registerPlugin(CustomEase);
+
+      // Signature easing for the per-word entrance — same curve as
+      // scene-10 so the marker series feels cohesive.
+      var crossfadeEase = CustomEase.create("crossfade", "0.16, 1, 0.3, 1");
+      var crossfadeExit = CustomEase.create("crossfadeExit", "0.7, 0, 0.84, 0");
+
+      // Both X-marker lines declare pathLength="400" as an SVG attribute,
+      // so the browser normalizes dash math to a 400-unit scale regardless
+      // of the actual computed line length. Initial state (empty stroke)
+      // is locked on the elements themselves in HTML — that way the
+      // snapshot tool's first-frame capture is correct even before
+      // the GSAP timeline applies its t=0 set tweens.
+      var xFwd = document.getElementById("x-fwd");
+      var xBwd = document.getElementById("x-bwd");
+      var PATH_LEN = 400;
+
+      var wordsA = document.querySelectorAll("#phrase-a .word");
+      var wordsB = document.querySelectorAll("#phrase-b .word");
+
+      var tl = gsap.timeline({ paused: true });
+
+      // === t=0: lock every animated element to its pre-entrance state.
+      // Mirrors CSS initial state so seek-to-0 is deterministic.
+      tl.set(wordsA, { opacity: 0, y: 8 }, 0);
+      tl.set(wordsB, { opacity: 0, y: 8 }, 0);
+      tl.set("#phrase-b", { opacity: 0, y: 90 }, 0);
+      tl.set("#eyebrow", { opacity: 0, y: -8 }, 0);
+      tl.set(xFwd, { attr: { "stroke-dashoffset": PATH_LEN } }, 0);
+      tl.set(xBwd, { attr: { "stroke-dashoffset": PATH_LEN } }, 0);
+      tl.set("#x-marker", { opacity: 0 }, 0);
+      tl.set("#reject-word", { color: "#1a1a1a" }, 0);
+
+      // === t=0.25s: eyebrow fades in. Supporting move, layered before
+      // the main row entrance.
+      tl.fromTo("#eyebrow",
+        { opacity: 0, y: -8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "expo.out" },
+        0.25);
+
+      // === t=0.45s-1.05s: ROW A per-word entrance.
+      // 3 word spans; total ~0.5 + 2*0.06 = 0.62s ending ~1.07s.
+      tl.fromTo(wordsA,
+        { opacity: 0, y: 8 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.50,
+          stagger: 0.06,
+          ease: crossfadeEase,
+        },
+        0.45);
+
+      // === t=1.0s: paper grain settles into a slow drift.
+      // Continuous-motion layer running through the hold sections.
+      tl.fromTo(".paper-grain",
+        { x: 0, y: 0, opacity: 1 },
+        { x: -22, y: -8, opacity: 0.92, duration: 3.5, ease: "sine.inOut" },
+        1.00);
+
+      // === t=1.45s: X-marker SVG fades in just before the first stroke
+      // starts drawing. Hides the round-linecap dot artifact that would
+      // otherwise show during the locked-off pre-draw state.
+      tl.to("#x-marker", { opacity: 1, duration: 0.04, ease: "none" }, 1.45);
+
+      // === t=1.5s-1.8s: FIRST diagonal — top-left to bottom-right.
+      // power2.in gives the stroke a confident "pen-down, accelerate
+      // across" feel. 300ms matches the spec.
+      tl.fromTo(xFwd,
+        { attr: { "stroke-dashoffset": PATH_LEN } },
+        { attr: { "stroke-dashoffset": 0 }, duration: 0.30, ease: "power2.in" },
+        1.50);
+
+      // === t=1.75s-2.05s: SECOND diagonal — bottom-left to top-right.
+      // Slight overlap with the first (starts at 1.75s while first ends
+      // at 1.80s) so the X feels like a single fluid gesture, not two
+      // disconnected lines.
+      tl.fromTo(xBwd,
+        { attr: { "stroke-dashoffset": PATH_LEN } },
+        { attr: { "stroke-dashoffset": 0 }, duration: 0.30, ease: "power2.in" },
+        1.75);
+
+      // === t=2.1s-2.5s: "excuses" fades to a muted gray — the word
+      // is now visually rejected, the X is the verdict.
+      tl.to("#reject-word",
+        { color: "#9a9a9a", duration: 0.4, ease: "power2.out" },
+        2.10);
+
+      // === t=2.1s-3.6s: X marker breathes — subtle scale + rotation
+      // yoyo so the verdict doesn't sit perfectly static during the
+      // hold. Feels like the ink is still drying.
+      tl.to("#x-marker", {
+        scale: 1.03,
+        rotation: 1.5,
+        duration: 0.75,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        transformOrigin: "50% 50%",
+      }, 2.10);
+
+      // === t=3.2s-3.7s: ROW A exits — phrase + X marker drift up and
+      // fade. expo.in accelerates the exit so it clears fast and the
+      // replacement entrance feels punchy.
+      tl.to("#phrase-a", {
+        opacity: 0,
+        y: -40,
+        duration: 0.50,
+        ease: "expo.in",
+      }, 3.20);
+
+      // === t=3.5s-4.3s: ROW B slides up into the now-empty row
+      // position. expo.out gives it a snappy "this is the answer" feel.
+      tl.to("#phrase-b", {
+        opacity: 1,
+        y: 0,
+        duration: 0.80,
+        ease: "expo.out",
+      }, 3.50);
+
+      // === t=3.6s-4.3s: per-word stagger inside ROW B — words pop up
+      // sequentially after the row itself starts moving, layering the
+      // motion for a richer "build" rather than a flat block reveal.
+      tl.fromTo(wordsB,
+        { opacity: 0, y: 8 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.50,
+          stagger: 0.06,
+          ease: crossfadeEase,
+        },
+        3.60);
+
+      // === t=4.2s-4.55s: "action" gets a brief whip-overshoot scale
+      // pulse — back.out, then settle. Emphasizes the accent word as
+      // the answer to the rejected one. Pulls focus.
+      tl.fromTo("#accent-word",
+        { scale: 1 },
+        {
+          scale: 1.06,
+          duration: 0.35,
+          ease: "back.out(2.4)",
+          transformOrigin: "50% 50%",
+          yoyo: true,
+          repeat: 1,
+        },
+        4.20);
+
+      // === t=4.6s-5.6s: hold with continuous breathing motion on
+      // ROW B so the replacement doesn't sit completely still through
+      // the closing seconds.
+      tl.to("#phrase-b", {
+        y: -4,
+        duration: 1.0,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 4.60);
+
+      // === t=5.0s-6.0s: paper grain returns to neutral — closing
+      // ambient breath. "none" linear easing for ambient drift.
+      tl.to(".paper-grain", {
+        x: 0,
+        y: 0,
+        opacity: 1,
+        duration: 1.0,
+        ease: "none",
+      }, 5.00);
+
+      // === t=5.5s-6.0s: eyebrow exits with a soft fade.
+      tl.to("#eyebrow", {
+        opacity: 0,
+        y: -8,
+        duration: 0.45,
+        ease: "expo.inOut",
+      }, 5.50);
+
+      window.__timelines["scene-05-sketchout-x"] = tl;
+    })();
+  </script>
+</body>
+</html>

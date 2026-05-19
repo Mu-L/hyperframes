@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-02-static-after-entrance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0a; }
+
+    #scene-02-static-after-entrance {
+      position: relative;
+      overflow: hidden;
+      background: radial-gradient(ellipse at 50% 45%, #161616 0%, #0a0a0a 70%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #f5f5f5;
+    }
+
+    /* ==========================================================
+       ANTI-PATTERN BANNER — top-left corner.
+       Renders the red "❌ ANTI-PATTERN" badge and a subtitle
+       pointing the viewer toward the fix.
+       ========================================================== */
+    .anti-banner {
+      position: absolute;
+      top: 48px;
+      left: 48px;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .anti-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: #b91c1c;
+      color: #fff5f5;
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      box-shadow: 0 6px 24px -8px rgba(185, 28, 28, 0.5);
+      border: 1px solid rgba(255, 200, 200, 0.18);
+    }
+    .anti-badge .x { font-size: 20px; line-height: 1; }
+    .anti-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #f87171;
+    }
+    .anti-subtitle {
+      font-size: 15px;
+      font-weight: 500;
+      color: #a1a1aa;
+      letter-spacing: 0.02em;
+      max-width: 520px;
+    }
+    .anti-subtitle .pointer {
+      color: #fbbf24;
+      font-weight: 600;
+    }
+
+    /* ==========================================================
+       COUNTDOWN OVERLAY — top-right corner.
+       Live readout of how long the scene has been static.
+       ========================================================== */
+    .countdown {
+      position: absolute;
+      top: 48px;
+      right: 48px;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      font-family: "JetBrains Mono", "SF Mono", monospace;
+    }
+    .countdown-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #71717a;
+    }
+    .countdown-value {
+      font-size: 48px;
+      font-weight: 700;
+      color: #fbbf24;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .countdown-hint {
+      font-size: 13px;
+      font-weight: 500;
+      color: #a1a1aa;
+      letter-spacing: 0.04em;
+    }
+
+    /* ==========================================================
+       THE DEMO CONTENT — headline + subtitle + cards.
+       These elements enter in the first 1.5s and then NEVER move.
+       This is the failure mode being demonstrated.
+       ========================================================== */
+    .demo-stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 96px;
+    }
+
+    .eyebrow {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: #6b7280;
+      margin-bottom: 24px;
+      /* CSS-locked initial state: GSAP fromTo brings it in */
+      opacity: 0;
+    }
+
+    .headline {
+      font-size: 120px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.02;
+      color: #fafafa;
+      text-align: center;
+      margin-bottom: 28px;
+      opacity: 0;
+    }
+
+    .subtitle {
+      font-size: 26px;
+      font-weight: 400;
+      color: #a1a1aa;
+      text-align: center;
+      max-width: 900px;
+      line-height: 1.4;
+      margin-bottom: 64px;
+      opacity: 0;
+    }
+
+    .card-row {
+      display: flex;
+      gap: 24px;
+      align-items: stretch;
+    }
+    .card {
+      width: 260px;
+      padding: 24px 22px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      opacity: 0;
+    }
+    .card-tag {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #60a5fa;
+    }
+    .card-title {
+      font-size: 19px;
+      font-weight: 600;
+      color: #e5e7eb;
+      line-height: 1.3;
+    }
+    .card-body {
+      font-size: 14px;
+      color: #71717a;
+      line-height: 1.5;
+    }
+
+    /* ==========================================================
+       SCENE LABEL — bottom-left.
+       ========================================================== */
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 10;
+      max-width: 1100px;
+    }
+    .label .accent { color: #f5f5f5; font-weight: 600; }
+    .label .anti { color: #f87171; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-02-static-after-entrance"
+       data-composition-id="scene-02-static-after-entrance"
+       data-start="0"
+       data-duration="9"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <!-- ========================================================
+         ANTI-PATTERN BANNER (annotation, not part of the demo)
+         ======================================================== -->
+    <div class="anti-banner">
+      <div class="anti-badge"><span class="x">&#10060;</span><span>Anti-Pattern</span></div>
+      <div class="anti-title">Static After Entrance</div>
+      <div class="anti-subtitle">
+        Everything moves in the first 1.5s, then NOTHING for 7.5s.
+        <br />
+        <span class="pointer">&rarr; See scene-01-soft-blur-in for continuous motion done right.</span>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         COUNTDOWN OVERLAY — the only thing that updates after t=1.5s.
+         Its job is to make the staticness obvious to the viewer.
+         ======================================================== -->
+    <div class="countdown">
+      <div class="countdown-label">Time Static</div>
+      <div class="countdown-value" id="countdown-value">0.0s</div>
+      <div class="countdown-hint" id="countdown-hint">waiting for entrance&hellip;</div>
+    </div>
+
+    <!-- ========================================================
+         DEMO CONTENT — enters t=0..1.5s, then frozen.
+         ======================================================== -->
+    <div class="demo-stage">
+      <div class="eyebrow" id="eyebrow">Section 02 &middot; Product</div>
+      <div class="headline" id="headline">Built for speed.</div>
+      <div class="subtitle" id="subtitle">
+        A modern platform that scales with your team and never gets in the way.
+      </div>
+
+      <div class="card-row">
+        <div class="card" data-card="0">
+          <div class="card-tag">Fast</div>
+          <div class="card-title">Instant deploys</div>
+          <div class="card-body">Ship in seconds with global edge caching.</div>
+        </div>
+        <div class="card" data-card="1">
+          <div class="card-tag">Simple</div>
+          <div class="card-title">Zero config</div>
+          <div class="card-body">Pick a framework and we handle the rest.</div>
+        </div>
+        <div class="card" data-card="2">
+          <div class="card-tag">Scalable</div>
+          <div class="card-title">Built to grow</div>
+          <div class="card-body">From a prototype to a billion requests per day.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="label">
+      Scene 02 &middot; <span class="anti">Anti-Pattern</span> &middot;
+      <span class="accent">Static After Entrance</span> &middot;
+      the most common failure mode in every prior eval
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 9;
+      window.__timelines = window.__timelines || {};
+
+      var tl = gsap.timeline({ paused: true });
+
+      // ============================================================
+      // t=0 INITIAL STATE — everything in the demo is hidden and
+      // pre-positioned. CSS already locks opacity:0 for snapshot.
+      // ============================================================
+      tl.set("#eyebrow",  { opacity: 0, y: -12 }, 0);
+      tl.set("#headline", { opacity: 0, y: 40, scale: 0.96 }, 0);
+      tl.set("#subtitle", { opacity: 0, y: 24 }, 0);
+      tl.set(".card",     { opacity: 0, y: 32, scale: 0.97 }, 0);
+
+      // Countdown overlay starts at "0.0s — waiting".
+      tl.set("#countdown-value", { textContent: "0.0s" }, 0);
+      tl.set("#countdown-hint",  { textContent: "waiting for entrance…" }, 0);
+
+      // ============================================================
+      // ENTRANCE PHASE (t=0.0s -> t=1.5s)
+      // All four content tiers enter on top of each other.
+      // After 1.5s — nothing else animates on the demo content.
+      // ============================================================
+
+      // t=0.10s: eyebrow slides in.
+      tl.fromTo("#eyebrow",
+        { opacity: 0, y: -12 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" },
+        0.10);
+      // FAILS HERE: no follow-up tween. The eyebrow sits frozen from
+      // t=0.6s until t=9.0s — that's 8.4 seconds of nothing.
+
+      // t=0.30s: headline rises and fades in.
+      tl.fromTo("#headline",
+        { opacity: 0, y: 40, scale: 0.96 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.8, ease: "power4.out" },
+        0.30);
+      // FAILS HERE: no breathing tween, no Ken-Burns drift, no
+      // letter-level continuous motion after the entrance. Compare to
+      // scene-01-soft-blur-in, which adds a `y: -4` sine.inOut breath
+      // on the final phrase from t=6.7s to t=8.0s.
+
+      // t=0.70s: subtitle fades up.
+      tl.fromTo("#subtitle",
+        { opacity: 0, y: 24 },
+        { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" },
+        0.70);
+      // FAILS HERE: subtitle locks at t=1.3s and never drifts, never
+      // breathes, never highlights a word. Dead text for 7.7s.
+
+      // t=0.90s: three cards stagger in from below.
+      tl.fromTo(".card",
+        { opacity: 0, y: 32, scale: 0.97 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.55, stagger: 0.12, ease: "back.out(1.5)" },
+        0.90);
+      // FAILS HERE: cards finish entering at t=1.45s and then NEVER:
+      //   - shift y by ±2px (no breathing)
+      //   - hover their shadow (no card-is-alive feel)
+      //   - reveal a hover-state on one of them
+      //   - animate a counter or pulse a status dot
+      // Compare to scene-01-kanban-board (THE BAR): live pill pulses
+      // 7 times across the beat, window drifts y:-8 from t=6.8s,
+      // priority dots scale-pulse at t=6.4s. Continuous motion fills
+      // every second of the 9s duration.
+
+      // ============================================================
+      // STATIC PHASE (t=1.5s -> t=9.0s)
+      // 7.5 seconds of nothing.
+      //
+      // The countdown overlay below is the ONLY thing that updates,
+      // and that's an ANNOTATION on the failure — not part of the
+      // demo. Its job is to make the absence of motion impossible to
+      // miss. In a real video, this slot is wasted screen time.
+      // ============================================================
+
+      // Discrete tl.set() countdown — fires every 0.5s, fully seekable.
+      // (Same deterministic counter pattern as scene-05-dashboard-counters.)
+      var ticks = [
+        { t: 1.5, v: "0.0s" }, { t: 2.0, v: "0.5s" }, { t: 2.5, v: "1.0s" },
+        { t: 3.0, v: "1.5s" }, { t: 3.5, v: "2.0s" }, { t: 4.0, v: "2.5s" },
+        { t: 4.5, v: "3.0s" }, { t: 5.0, v: "3.5s" }, { t: 5.5, v: "4.0s" },
+        { t: 6.0, v: "4.5s" }, { t: 6.5, v: "5.0s" }, { t: 7.0, v: "5.5s" },
+        { t: 7.5, v: "6.0s" }, { t: 8.0, v: "6.5s" }, { t: 8.5, v: "7.0s" },
+        { t: 9.0, v: "7.5s" },
+      ];
+      ticks.forEach(function (tick) {
+        tl.set("#countdown-value", { textContent: tick.v }, tick.t);
+      });
+
+      // Hint label updates: "waiting" -> "Static for Ns ->"
+      tl.set("#countdown-hint", { textContent: "Static for 0.0s →" }, 1.5);
+      tl.set("#countdown-hint", { textContent: "Static for 2.0s →" }, 3.5);
+      tl.set("#countdown-hint", { textContent: "Static for 4.0s →" }, 5.5);
+      tl.set("#countdown-hint", { textContent: "Static for 6.0s →" }, 7.5);
+      tl.set("#countdown-hint", { textContent: "Static for 7.5s →" }, 9.0);
+
+      // NOTE: there is NO ambient layer being animated.
+      //   No grain drift (cf. scene-01-soft-blur-in lines 232-238).
+      //   No window-level y bob (cf. scene-01-kanban-board lines 566-571).
+      //   No staggered card breathing (cf. scene-01-kanban-board lines 572-580).
+      //   No secondary element reveal mid-beat.
+      //   No parallax background pan.
+      //   The frame is dead. By design — this is the anti-pattern.
+
+      window.__timelines["scene-02-static-after-entrance"] = tl;
+    })();
+  </script>
+</body>
+</html>

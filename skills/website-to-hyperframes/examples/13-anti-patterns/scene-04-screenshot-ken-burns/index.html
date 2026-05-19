@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-04-screenshot-ken-burns</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <style>
+    /* THE PROBLEM: every prior eval video defaulted to this pattern.
+       0/11 used HTML-in-canvas, SVG draw, counters, kinetic typography.
+       This scene is intentionally bad — it exists to be recognized and rejected. */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; }
+
+    #scene-04-screenshot-ken-burns {
+      position: relative;
+      overflow: hidden;
+      /* Dark vignette background — frames the "screenshot" so the anti-pattern reads cleanly. */
+      background:
+        radial-gradient(ellipse at center, rgba(20, 22, 28, 1) 0%, #050608 70%, #000 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f5f5f5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ============================================================
+       THE FAKE "SCREENSHOT" — single big rectangle, 80% of frame.
+       This is the WHOLE composition. One layer, one slow drift.
+       ============================================================ */
+    .fake-screenshot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      /* GSAP will replace these via xPercent/yPercent; we set transform-origin
+         here so the Ken Burns drift scales from center. No CSS translate(-50%) — that
+         would conflict with GSAP transforms (per RULES). We position via top/left
+         relative to the parent + use marginLeft/marginTop to center the rectangle. */
+      margin-left: -768px;   /* half of 1536 (80% of 1920) */
+      margin-top: -432px;    /* half of 864 (80% of 1080) */
+      width: 1536px;
+      height: 864px;
+      border-radius: 12px;
+      /* Dark-blue gradient interior — generic SaaS dashboard backdrop */
+      background:
+        linear-gradient(180deg, #0e1730 0%, #0b1228 60%, #08101f 100%);
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow:
+        0 60px 120px -30px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(255,255,255,0.02) inset;
+      overflow: hidden;
+      transform-origin: 50% 50%;
+      will-change: transform;
+    }
+
+    /* Fake browser chrome at top */
+    .chrome {
+      height: 44px;
+      background: rgba(255,255,255,0.025);
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 16px;
+    }
+    .chrome .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .chrome .dot.r { background: #ff5f57; }
+    .chrome .dot.y { background: #ffbd2e; }
+    .chrome .dot.g { background: #28c941; }
+    .chrome .url {
+      flex: 1;
+      margin: 0 14px 0 14px;
+      height: 24px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      font-size: 12px;
+      color: #6f7a89;
+      letter-spacing: 0.02em;
+    }
+
+    /* Fake app UI inside — colored blocks suggesting a dashboard.
+       Intentionally inert. No counters, no SVG draw, no timeline events
+       on these elements. They exist to be photographed. */
+    .app {
+      padding: 32px;
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 28px;
+      height: calc(100% - 44px);
+    }
+    .sidebar {
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 10px;
+      padding: 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .nav-item {
+      height: 26px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 6px;
+    }
+    .nav-item.active { background: rgba(91, 141, 255, 0.22); }
+    .nav-item.w70 { width: 70%; }
+    .nav-item.w55 { width: 55%; }
+    .nav-item.w85 { width: 85%; }
+    .nav-item.w60 { width: 60%; }
+
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 110px 1fr 1fr;
+      gap: 18px;
+    }
+    .kpi {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 10px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+    }
+    .kpi .label {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #6f7a89;
+      font-weight: 600;
+    }
+    .kpi .num {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #d7dee9;
+      font-variant-numeric: tabular-nums;
+    }
+    .kpi.b { border-left: 3px solid #5b8dff; }
+    .kpi.p { border-left: 3px solid #a78bfa; }
+    .kpi.t { border-left: 3px solid #34d399; }
+
+    .chart {
+      grid-column: span 2;
+      grid-row: span 2;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 10px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .chart-h {
+      font-size: 13px;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: #6f7a89;
+      font-weight: 600;
+    }
+    .chart-area {
+      flex: 1;
+      background:
+        linear-gradient(180deg, rgba(91, 141, 255, 0.18) 0%, rgba(91, 141, 255, 0) 100%);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Fake static "chart line" via clip-path on a div */
+    .chart-line {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, transparent 0%, transparent calc(100% - 2px), #5b8dff calc(100% - 2px));
+      clip-path: polygon(
+        0% 70%, 6% 64%, 12% 68%, 18% 56%, 24% 60%, 30% 48%,
+        36% 52%, 42% 38%, 48% 44%, 54% 30%, 60% 36%, 66% 22%,
+        72% 28%, 78% 18%, 84% 22%, 90% 12%, 96% 16%, 100% 8%,
+        100% 100%, 0% 100%
+      );
+    }
+
+    .side-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 10px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .side-card .row {
+      height: 14px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px;
+    }
+    .side-card .row.w80 { width: 80%; }
+    .side-card .row.w65 { width: 65%; }
+    .side-card .row.w90 { width: 90%; }
+    .side-card .row.w50 { width: 50%; }
+
+    /* Overlay note on the fake screenshot — so the viewer knows this stands in
+       for a real captured screenshot. Without this caption the metaphor breaks. */
+    .fake-stamp {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 14px 28px;
+      background: rgba(0, 0, 0, 0.72);
+      border: 1.5px dashed rgba(255, 200, 100, 0.55);
+      border-radius: 10px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+      color: #ffcf6b;
+      backdrop-filter: blur(4px);
+      white-space: nowrap;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+    }
+
+    /* ============================================================
+       ANTI-PATTERN BANNER — top bar, red, declarative.
+       ============================================================ */
+    .banner {
+      position: absolute;
+      top: 32px;
+      left: 50%;
+      margin-left: -640px;
+      width: 1280px;
+      padding: 18px 28px;
+      background: linear-gradient(90deg, #b91c1c 0%, #dc2626 50%, #b91c1c 100%);
+      border: 1.5px solid rgba(255, 200, 200, 0.4);
+      border-radius: 10px;
+      box-shadow:
+        0 20px 50px -10px rgba(220, 38, 38, 0.5),
+        0 0 0 1px rgba(255,255,255,0.05) inset;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: #ffffff;
+      text-transform: uppercase;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      z-index: 30;
+    }
+    .banner .x {
+      font-size: 34px;
+      line-height: 1;
+    }
+
+    /* Sub-banner below the main one — reinforces failure stats */
+    .sub-banner {
+      position: absolute;
+      top: 102px;
+      left: 50%;
+      margin-left: -540px;
+      width: 1080px;
+      padding: 10px 22px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(220, 38, 38, 0.45);
+      border-radius: 8px;
+      text-align: center;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: #fca5a5;
+      text-transform: uppercase;
+      opacity: 0;
+      z-index: 30;
+    }
+    .sub-banner b { color: #ffffff; font-weight: 800; }
+
+    /* ============================================================
+       ARROW + SIDE CAPTION — points from the screenshot to the fix.
+       ============================================================ */
+    .arrow-wrap {
+      position: absolute;
+      right: 56px;
+      top: 50%;
+      margin-top: -120px;
+      width: 360px;
+      z-index: 25;
+      opacity: 0;
+    }
+    .arrow-svg {
+      width: 100%;
+      height: 70px;
+      display: block;
+      margin-bottom: 14px;
+    }
+    .arrow-path {
+      fill: none;
+      stroke: #fbbf24;
+      stroke-width: 4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.5));
+    }
+    .arrow-head {
+      fill: #fbbf24;
+      filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.5));
+    }
+    .side-caption {
+      background: rgba(0, 0, 0, 0.78);
+      border: 1.5px solid rgba(251, 191, 36, 0.6);
+      border-radius: 10px;
+      padding: 18px 20px;
+      box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.7);
+    }
+    .side-caption .arrow-glyph {
+      font-size: 26px;
+      font-weight: 800;
+      color: #fbbf24;
+      margin-bottom: 8px;
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+    .side-caption .fix-title {
+      font-size: 19px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.005em;
+      line-height: 1.3;
+      margin-bottom: 10px;
+    }
+    .side-caption .fix-path {
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #fbbf24;
+      letter-spacing: 0.01em;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+
+    /* ============================================================
+       FAILURE-MODE COUNTER PILL (bottom-right) — drives the message home.
+       "0 / 11 runs used real composition" reads as evidence.
+       ============================================================ */
+    .stat-pill {
+      position: absolute;
+      right: 56px;
+      bottom: 120px;
+      padding: 14px 22px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1.5px solid rgba(248, 113, 113, 0.55);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 10px 30px -10px rgba(248, 113, 113, 0.4);
+      opacity: 0;
+      z-index: 25;
+    }
+    .stat-pill .head {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #f87171;
+      font-weight: 700;
+    }
+    .stat-pill .big {
+      font-size: 36px;
+      font-weight: 800;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .stat-pill .big .of { color: #f87171; font-weight: 700; }
+    .stat-pill .desc {
+      font-size: 12px;
+      color: #8a93a0;
+      letter-spacing: 0.02em;
+      margin-top: 2px;
+    }
+
+    /* Scene label (bottom-left) — matches the convention used in 04-composed-ui scenes */
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 15px;
+      color: #707070;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 30;
+      max-width: 1100px;
+    }
+    .label .accent { color: #f87171; font-weight: 700; }
+    .label .danger { color: #ffffff; font-weight: 700; }
+  </style>
+</head>
+<body>
+
+  <div id="scene-04-screenshot-ken-burns"
+       data-composition-id="scene-04-screenshot-ken-burns"
+       data-start="0"
+       data-duration="8"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <!-- ============================================================
+         The fake "screenshot" — a single big rectangle filling 80%.
+         GSAP applies a slow Ken Burns drift to THIS element only.
+         Nothing else inside it moves. That is the anti-pattern.
+         ============================================================ -->
+    <div class="fake-screenshot" id="shot">
+      <div class="chrome">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <div class="url">https://acme.example.com/dashboard</div>
+      </div>
+      <div class="app">
+        <div class="sidebar">
+          <div class="nav-item active w85"></div>
+          <div class="nav-item w70"></div>
+          <div class="nav-item w60"></div>
+          <div class="nav-item w55"></div>
+          <div class="nav-item w70"></div>
+          <div class="nav-item w60"></div>
+          <div class="nav-item w55"></div>
+        </div>
+        <div class="main">
+          <div class="kpi b">
+            <div class="label">Users</div>
+            <div class="num">128,402</div>
+          </div>
+          <div class="kpi p">
+            <div class="label">Revenue</div>
+            <div class="num">$84,219</div>
+          </div>
+          <div class="kpi t">
+            <div class="label">Conversion</div>
+            <div class="num">3.42%</div>
+          </div>
+          <div class="chart">
+            <div class="chart-h">Weekly Activity</div>
+            <div class="chart-area">
+              <div class="chart-line"></div>
+            </div>
+          </div>
+          <div class="side-card">
+            <div class="chart-h" style="margin-bottom:6px;">Recent</div>
+            <div class="row w90"></div>
+            <div class="row w80"></div>
+            <div class="row w65"></div>
+            <div class="row w50"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stamp inside the rectangle so viewers know this stands in for a real screenshot -->
+      <div class="fake-stamp">Pretend this is a real captured screenshot</div>
+    </div>
+
+    <!-- ============================================================
+         RED BANNER + sub-banner — declares the anti-pattern.
+         ============================================================ -->
+    <div class="banner" id="banner">
+      <span class="x">&#x2715;</span>
+      <span>Anti-Pattern: Screenshot + Ken Burns</span>
+      <span class="x">&#x2715;</span>
+    </div>
+    <div class="sub-banner" id="sub-banner">
+      Across <b>11</b> pipeline-eval runs, <b>11/11</b> defaulted to this. <b>0/11</b> used HTML-in-canvas, SVG draw, counters, or kinetic typography. <b>Stop.</b>
+    </div>
+
+    <!-- ============================================================
+         YELLOW ARROW + SIDE CAPTION — points FROM the screenshot
+         TO the counter-reference scene path.
+         ============================================================ -->
+    <div class="arrow-wrap" id="arrow">
+      <!-- Arrow curves left → right, ending with a head pointing right at the caption. -->
+      <svg class="arrow-svg" viewBox="0 0 360 70" preserveAspectRatio="none">
+        <path class="arrow-path" id="arrow-path"
+              d="M 10 35 C 70 10, 150 60, 240 35 L 330 35"/>
+        <polygon class="arrow-head"
+                 points="330,22 354,35 330,48 336,35"/>
+      </svg>
+      <div class="side-caption">
+        <div class="arrow-glyph">&rarr; Build the kanban from divs.</div>
+        <div class="fix-title">Compose the UI with real DOM. Animate counters, paths, layout.</div>
+        <div class="fix-path">examples/04-composed-ui/scene-01-kanban-board<br/>examples/04-composed-ui/scene-05-dashboard-counters</div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         FAILURE-MODE STAT PILL (bottom-right).
+         ============================================================ -->
+    <div class="stat-pill" id="stat-pill">
+      <div class="head">Eval Failure Mode</div>
+      <div class="big"><span id="stat-num">0</span><span class="of"> / 11</span></div>
+      <div class="desc">runs used real composition</div>
+    </div>
+
+    <!-- Bottom-left scene label -->
+    <div class="label">
+      Scene 04 · <span class="accent">Anti-Pattern</span> · Screenshot + Ken Burns ·
+      <span class="danger">the failure mode from every prior eval run</span>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 8;
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // === t=0 initial state — lock everything via GSAP, not CSS, so seeking works.
+      // The fake-screenshot starts at scale 1.0, translate 0. Ken Burns drifts to
+      // scale 1.08 and a small translate over the full 8s, ease "none" (linear).
+      // Nothing inside the rectangle is animated — that IS the anti-pattern.
+      tl.set("#shot", { scale: 1.0, x: 0, y: 0, transformOrigin: "50% 50%" }, 0);
+
+      // ----------------------------------------------------------------
+      // KEN BURNS DRIFT — the single motion in this scene.
+      // scale 1.0 → 1.08, translate +30px x / -16px y, over the whole 8s,
+      // ease: "none" (linear). This is what marketing B-roll defaults to and
+      // what every prior eval video did instead of composing from divs.
+      // ----------------------------------------------------------------
+      tl.to("#shot", {
+        scale: 1.08,
+        x: 30,
+        y: -16,
+        duration: BEAT,
+        ease: "none",
+      }, 0);
+
+      // ----------------------------------------------------------------
+      // The banner / sub-banner / arrow / stat-pill DO move — those are
+      // the MESSAGING layer (not the anti-pattern itself). They have to
+      // enter and read; the audience needs to absorb the failure mode.
+      // ----------------------------------------------------------------
+
+      // === t=0.20s: red banner drops in from above
+      tl.fromTo("#banner",
+        { opacity: 0, y: -40, scale: 0.96 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "back.out(1.6)" },
+        0.20);
+
+      // Banner micro-pulse to keep the danger reading "hot" — runs across the hold.
+      tl.to("#banner", {
+        scale: 1.02,
+        duration: 0.9,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 6,
+        transformOrigin: "50% 50%",
+      }, 1.20);
+
+      // === t=0.70s: sub-banner fades in below
+      tl.fromTo("#sub-banner",
+        { opacity: 0, y: -10 },
+        { opacity: 1, y: 0, duration: 0.5, ease: "expo.out" },
+        0.70);
+
+      // === t=1.40s: arrow + side caption slide in from the right
+      tl.fromTo("#arrow",
+        { opacity: 0, x: 40 },
+        { opacity: 1, x: 0, duration: 0.6, ease: "expo.out" },
+        1.40);
+
+      // === t=2.20s: stat pill pops in (bottom-right)
+      tl.fromTo("#stat-pill",
+        { opacity: 0, y: 20, scale: 0.9 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.5, ease: "back.out(1.7)" },
+        2.20);
+
+      // === t=2.40s → 4.20s: stat number stays at 0. The pill reads "0 / 11 runs used real composition".
+      // No animation on the digit; the digit IS the punchline (zero out of eleven).
+      // We add micro-pulses on the pill border instead, keeping the message alive.
+      tl.fromTo("#stat-pill",
+        { boxShadow: "0 10px 30px -10px rgba(248, 113, 113, 0.4)" },
+        { boxShadow: "0 10px 40px -8px rgba(248, 113, 113, 0.7)", duration: 0.9, ease: "sine.inOut", yoyo: true, repeat: 5 },
+        2.40);
+
+      // === t=4.50s: arrow head "jabs" toward the side caption — emphasizes the FIX direction.
+      tl.fromTo("#arrow",
+        { x: 0 },
+        { x: -12, duration: 0.35, ease: "power2.inOut", yoyo: true, repeat: 5, transformOrigin: "50% 50%" },
+        4.50);
+
+      // === t=5.50s: red banner intensifies (color punch via filter brightness) — final emphasis
+      tl.fromTo("#banner",
+        { filter: "brightness(1)" },
+        { filter: "brightness(1.18)", duration: 0.4, ease: "sine.inOut", yoyo: true, repeat: 3 },
+        5.50);
+
+      // === t=6.40s: sub-banner "STOP." word emphasis — slight scale pop on the whole sub-banner.
+      tl.fromTo("#sub-banner",
+        { scale: 1 },
+        { scale: 1.025, duration: 0.35, ease: "back.out(1.7)", transformOrigin: "50% 50%" },
+        6.40);
+      tl.to("#sub-banner", { scale: 1, duration: 0.4, ease: "expo.out", transformOrigin: "50% 50%" }, 6.85);
+
+      window.__timelines["scene-04-screenshot-ken-burns"] = tl;
+    })();
+  </script>
+</body>
+</html>

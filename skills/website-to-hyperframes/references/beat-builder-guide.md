@@ -136,7 +136,9 @@ A beat is a SCENE, not a single entrance animation. Your GSAP timeline should ha
 - CSS CENTERING: no `transform: translate(-50%, -50%)` with GSAP transforms. Use flexbox or `xPercent/yPercent`.
 - QUERYSELECTOR: `document.getElementById("id")` with null guards. No method calls without null check.
 - CHARACTER SPANS: `display:inline-block` on spaces collapses them. Use `&nbsp;` or per-word spans.
-- COUNTERS: no `onUpdate` callbacks. Discrete `tl.set(el, {textContent: "42"}, 2.5)` at timestamps.
+- COUNTERS: no `onUpdate` callbacks. Discrete `tl.set(el, {textContent: "42"}, 2.5)` at timestamps. For a 0→128K counter over 2s, that means 20–30 `tl.set()` calls along the duration — easier than it sounds, and fully seekable. See `examples/04-composed-ui/scene-05-dashboard-counters/index.html` for the canonical pattern.
+- CANVAS RENDER LOOPS: do NOT drive canvas rendering via `tl.to(proxy, {onUpdate: render})`. That pattern works during live playback but does NOT fire during `tl.seek()` (which the snapshot/render CLI uses to scrub the timeline). Result: black frames in the rendered video. Instead, use `gsap.ticker.add()` and read `tl.time()` each frame to call your render function. See `examples/07-html-in-canvas/scene-02-canvas-ascii/index.html` for the working pattern.
+- DOM MUTATION IN TIMELINE: do NOT use `tl.call(function() { /* createElement, appendChild, etc */ })` to build DOM during the timeline. Callbacks don't fire during `tl.seek()`. Build ALL DOM upfront (pre-split text spans, pre-rendered phrase wrappers stacked with `position:absolute`), then toggle visibility via opacity/display in the timeline. See `examples/01-typography/scene-01-soft-blur-in/index.html` for the multi-phrase pattern.
 - TIMELINE: `window.__timelines["beat-N-name"] = tl` synchronously. Key = `data-composition-id`.
 - DETERMINISTIC: no `Math.random()`, `Date.now()`, `requestAnimationFrame`, `repeat:-1`.
 - Always `tl.fromTo()` not `tl.from()` for entrances.

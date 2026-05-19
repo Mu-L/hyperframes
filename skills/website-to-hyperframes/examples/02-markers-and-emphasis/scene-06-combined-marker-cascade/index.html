@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>scene-06-combined-marker-cascade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@500;700&display=swap"
+    rel="stylesheet"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/CustomEase.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #fafaf6; }
+
+    #scene-06-combined-marker-cascade {
+      position: relative;
+      overflow: hidden;
+      /* Warm off-white editorial paper — same warm-paper family as scenes 01
+         and 10. Soft warmth in corners, lit from the top like a printed page. */
+      background:
+        radial-gradient(ellipse at 50% 40%, #fdfcf6 0%, #f5f2e9 70%, #ede9dc 100%);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1a1a1a;
+    }
+
+    /* Paper grain — soft off-white speckle that drifts during the beat.
+       Continuous-motion ambient layer matching the editorial-paper family. */
+    .paper-grain {
+      position: absolute;
+      inset: -40px;
+      background:
+        radial-gradient(circle at 15% 22%, rgba(180, 160, 110, 0.06) 0%, transparent 38%),
+        radial-gradient(circle at 82% 70%, rgba(200, 175, 120, 0.05) 0%, transparent 42%),
+        radial-gradient(circle at 50% 92%, rgba(150, 130, 90, 0.04) 0%, transparent 30%);
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    /* Stage: centered host for the phrase. Block layout so we can stack
+       two phrase rows comfortably with line-height room for markers. */
+    .stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+    }
+
+    .eyebrow {
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: #8a7a55;
+      opacity: 0;
+      margin-bottom: 16px;
+    }
+
+    /* Phrase rows — large editorial type, two-line layout so 5 emphasis words
+       have room with their markers stacked above/below without overlap.
+       Each phrase line uses overflow:visible so markers can paint outside
+       the text bounding box (circles, bursts, scribbles).
+       Line 1 is shorter so it can use the full font size; line 2 has more
+       words so it's stepped down ~12% to fit inside the 1920px safe area. */
+    .phrase-row {
+      position: relative;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+      color: #1a1a1a;
+      white-space: nowrap;
+      display: block;
+      overflow: visible;
+    }
+    #line-1 { font-size: 78px; }
+    #line-2 { font-size: 64px; }
+
+    /* Per-word unit — pre-split DOM. opacity:0 locks initial state for the
+       snapshot tool (first frame captured before timeline t=0 applies).
+       display:inline-block + white-space:pre so trailing spaces don't collapse. */
+    .word {
+      display: inline-block;
+      white-space: pre;
+      will-change: transform, opacity;
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    /* === Emphasis hosts: each emphasis word wraps in its own host with the
+       specific marker DOM pre-built inside. position:relative anchors the
+       marker overlay. padding gives breathing room so markers extend a bit
+       past the glyph edges. */
+    .em-host {
+      position: relative;
+      display: inline-block;
+    }
+
+    /* ====================================================================
+       MARKER 1 — HIGHLIGHT SWEEP (word: "builders")
+       Yellow marker bar behind the text. scaleX(0) locks the initial empty
+       state in CSS. transform-origin:left center → left-to-right sweep.
+       Slight skewX(-3deg) gives a hand-held, "marker-on-paper" imperfection.
+       The bar sits BEHIND the text via z-index:0; text is z-index:1. */
+    .em-highlight {
+      padding: 0 10px;
+    }
+    .highlight-bar {
+      position: absolute;
+      left: -6px;
+      right: -6px;
+      top: 18%;
+      bottom: 8%;
+      background: #ffd84d;
+      opacity: 0.65;
+      transform: scaleX(0) skewX(-3deg);
+      transform-origin: left center;
+      border-radius: 4px;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .highlight-text {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ====================================================================
+       MARKER 2 — HAND-DRAWN CIRCLE (word: "clear")
+       Wonky elliptical SVG path with cubic Beziers that have intentional
+       deviations — feels sketched, not mathematically perfect. ViewBox is
+       generous so the stroke can sit outside the word without clipping.
+       stroke-dasharray locks the initial empty state on the SVG element
+       itself so frame 0 is correct before GSAP runs. */
+    .em-circle {
+      padding: 0 14px;
+    }
+    .circle-marker {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 145%;
+      height: 165%;
+      transform: translate(-50%, -50%) rotate(-2.2deg);
+      pointer-events: none;
+      overflow: visible;
+      opacity: 0;
+    }
+    .circle-marker path {
+      fill: none;
+      stroke: #ff8c2a;
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* ====================================================================
+       MARKER 3 — BURST RADIAL (word: "bold")
+       12 radiating cyan spikes around the word. Each line is an absolute
+       positioned div rotated to its angle. transform:scale(0) locks each
+       line's pre-burst state so frame 0 shows no burst. Varied line lengths
+       (40-78px) give an organic, hand-drawn feel. */
+    .em-burst {
+      padding: 0 4px;
+    }
+    .burst-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .burst-line {
+      position: absolute;
+      display: block;
+      width: 4px;
+      height: var(--len);
+      background: #00b8d4;
+      border-radius: 2px;
+      left: -2px;
+      top: calc(-1 * var(--len));
+      transform: rotate(var(--angle)) scaleY(0);
+      transform-origin: bottom center;
+      opacity: 0;
+    }
+    .burst-text {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ====================================================================
+       MARKER 4 — SCRIBBLE UNDERLINE (word: "vibrant")
+       Wavy SVG underline that draws itself via stroke-dashoffset. The path
+       alternates Q-curve control points between y=0 and y=24 for natural
+       wobble. pathLength=2000 normalizes the dash math regardless of
+       computed length. Initial state locked on element attributes. */
+    .em-scribble {
+      padding: 0 6px;
+    }
+    .scribble-svg {
+      position: absolute;
+      left: -4px;
+      right: -4px;
+      bottom: -22px;
+      width: calc(100% + 8px);
+      height: 28px;
+      pointer-events: none;
+      overflow: visible;
+    }
+    .scribble-svg path {
+      fill: none;
+      stroke: #e53935;
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* ====================================================================
+       MARKER 5 — SKETCHOUT X (word: "excuses")
+       Two diagonal red strokes that draw across the word — like crossing
+       it out by hand. Each stroke uses transform:scaleX(0) with rotated
+       transform-origin so the lines paint from one corner to the other.
+       Container overflow:hidden keeps the lines clipped to the word box. */
+    .em-sketchout {
+      padding: 0 6px;
+    }
+    .sketchout-lines {
+      position: absolute;
+      top: -4px;
+      bottom: -4px;
+      left: -6px;
+      right: -6px;
+      pointer-events: none;
+      overflow: visible;
+      z-index: 2;
+    }
+    .sketchout-line {
+      position: absolute;
+      display: block;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: #e53935;
+      border-radius: 2px;
+      transform-origin: left center;
+    }
+    .sketchout-fwd {
+      transform: translateY(-2px) rotate(-14deg) scaleX(0);
+    }
+    .sketchout-bwd {
+      transform: translateY(-2px) rotate(14deg) scaleX(0);
+    }
+
+    /* Scene label at bottom-left — editorial caption style matching the
+       warm-paper family (color #8a7a55 + dark accent). */
+    .label {
+      position: absolute;
+      left: 48px;
+      bottom: 48px;
+      font-size: 16px;
+      color: #8a7a55;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 500;
+      z-index: 10;
+    }
+    .label .accent { color: #1a1a1a; font-weight: 600; }
+
+    /* Tiny "key" of marker colors in the upper-right corner — adds a small
+       continuous-motion element and visually frames the 5-marker thesis. */
+    .marker-key {
+      position: absolute;
+      top: 48px;
+      right: 48px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      z-index: 10;
+      opacity: 0;
+    }
+    .marker-key .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+    }
+    .marker-key .swatch.s1 { background: #ffd84d; }
+    .marker-key .swatch.s2 { background: #ff8c2a; }
+    .marker-key .swatch.s3 { background: #00b8d4; }
+    .marker-key .swatch.s4 { background: #e53935; }
+    .marker-key .swatch.s5 { background: #e53935; border: 2px solid #1a1a1a; box-sizing: border-box; }
+    .marker-key .ck-label {
+      font-family: "Caveat", cursive;
+      font-size: 22px;
+      color: #1a1a1a;
+      margin-left: 6px;
+      transform: rotate(-2deg);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="scene-06-combined-marker-cascade"
+       data-composition-id="scene-06-combined-marker-cascade"
+       data-start="0"
+       data-duration="10"
+       data-width="1920"
+       data-height="1080"
+       style="width:1920px; height:1080px;">
+
+    <div class="paper-grain"></div>
+
+    <div class="marker-key" id="marker-key">
+      <span class="swatch s1"></span>
+      <span class="swatch s2"></span>
+      <span class="swatch s3"></span>
+      <span class="swatch s4"></span>
+      <span class="swatch s5"></span>
+      <span class="ck-label">5 markers</span>
+    </div>
+
+    <div class="stage">
+      <div class="eyebrow" id="eyebrow">Section 02 · Combined · Cascade</div>
+
+      <!-- Phrase split into two lines so 5 emphasis words breathe with
+           their markers (which extend above/below the text bounding box).
+           All words have opacity:0 + y:8 locked in CSS for frame 0. -->
+
+      <!-- LINE 1: "We help [builders] create [clear] ideas" -->
+      <div class="phrase-row" id="line-1">
+        <span class="word">We help </span><span class="em-host em-highlight"><span class="highlight-bar" id="bar-highlight"></span><span class="word highlight-text">builders</span></span><span class="word"> create </span><span class="em-host em-circle"><span class="word">clear</span><svg class="circle-marker" id="circle-marker" viewBox="0 0 400 200" preserveAspectRatio="none">
+          <path id="circle-path"
+                stroke-dasharray="2000 2000"
+                stroke-dashoffset="2000"
+                pathLength="2000"
+                d="
+            M 60 102
+            C 55 70, 110 38, 200 36
+            C 295 34, 348 64, 350 100
+            C 352 138, 290 168, 198 168
+            C 110 168, 56 140, 58 104
+            C 58 92, 70 80, 85 72
+          "/>
+        </svg></span><span class="word"> ideas</span>
+      </div>
+
+      <!-- LINE 2: "with [bold] colors, [vibrant] energy, and zero [excuses]." -->
+      <div class="phrase-row" id="line-2">
+        <span class="word">with </span><span class="em-host em-burst"><span class="burst-container" id="burst-container">
+          <span class="burst-line" style="--angle: 0deg; --len: 62px;"></span>
+          <span class="burst-line" style="--angle: 30deg; --len: 48px;"></span>
+          <span class="burst-line" style="--angle: 60deg; --len: 72px;"></span>
+          <span class="burst-line" style="--angle: 90deg; --len: 40px;"></span>
+          <span class="burst-line" style="--angle: 120deg; --len: 56px;"></span>
+          <span class="burst-line" style="--angle: 150deg; --len: 70px;"></span>
+          <span class="burst-line" style="--angle: 180deg; --len: 50px;"></span>
+          <span class="burst-line" style="--angle: 210deg; --len: 64px;"></span>
+          <span class="burst-line" style="--angle: 240deg; --len: 78px;"></span>
+          <span class="burst-line" style="--angle: 270deg; --len: 42px;"></span>
+          <span class="burst-line" style="--angle: 300deg; --len: 66px;"></span>
+          <span class="burst-line" style="--angle: 330deg; --len: 52px;"></span>
+        </span><span class="word burst-text">bold</span></span><span class="word"> colors, </span><span class="em-host em-scribble"><span class="word">vibrant</span><svg class="scribble-svg" id="scribble-svg" viewBox="0 0 500 24" preserveAspectRatio="none">
+          <path id="scribble-path"
+                stroke-dasharray="2000 2000"
+                stroke-dashoffset="2000"
+                pathLength="2000"
+                d="M0,12 Q31,2 62,12 Q93,22 125,12 Q156,2 187,12 Q218,22 250,12 Q281,2 312,12 Q343,22 375,12 Q406,2 437,12 Q468,22 500,12"/>
+        </svg></span><span class="word"> energy, and zero </span><span class="em-host em-sketchout"><span class="word">excuses</span><span class="sketchout-lines" id="sketchout-lines">
+          <span class="sketchout-line sketchout-fwd" id="sketchout-fwd"></span>
+          <span class="sketchout-line sketchout-bwd" id="sketchout-bwd"></span>
+        </span></span><span class="word">.</span>
+      </div>
+    </div>
+
+    <div class="label">
+      Scene 06 · <span class="accent">Combined Marker Cascade</span> · 5 marker techniques in one phrase
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var BEAT = 10;
+      window.__timelines = window.__timelines || {};
+
+      gsap.registerPlugin(CustomEase);
+
+      // Signature crossfade ease for per-word entrances — same cubic-bezier
+      // as scenes 01 and 10 for consistent feel across the section.
+      var crossfadeEase = CustomEase.create("crossfade", "0.16, 1, 0.3, 1");
+
+      // Pre-grab all DOM references once. No queries during the timeline.
+      var allWords = document.querySelectorAll(".phrase-row .word");
+      var burstLines = document.querySelectorAll("#burst-container .burst-line");
+      var circlePath = document.getElementById("circle-path");
+      var scribblePath = document.getElementById("scribble-path");
+      var PATH_LEN = 2000;
+
+      var tl = gsap.timeline({ paused: true });
+
+      // === t=0: lock every animated element to its pre-entrance state.
+      // Mirrors the CSS locked state so seek-to-0 is deterministic for
+      // snapshot rendering. Each marker is locked invisible/empty.
+      tl.set("#eyebrow", { opacity: 0, y: -8 }, 0);
+      tl.set("#marker-key", { opacity: 0, y: -6 }, 0);
+      tl.set(allWords, { opacity: 0, y: 8 }, 0);
+
+      // Marker 1 — highlight bar: scaleX(0), skew locked
+      tl.set("#bar-highlight", { scaleX: 0, skewX: -3, transformOrigin: "left center" }, 0);
+
+      // Marker 2 — circle path: dashed-empty + container hidden
+      tl.set(circlePath, { attr: { "stroke-dasharray": PATH_LEN + " " + PATH_LEN, "stroke-dashoffset": PATH_LEN } }, 0);
+      tl.set("#circle-marker", { opacity: 0, scale: 1, rotation: -2.2, transformOrigin: "50% 50%" }, 0);
+
+      // Marker 3 — burst lines: all 12 spikes scaled-to-zero, hidden
+      tl.set(burstLines, { scaleY: 0, opacity: 0, transformOrigin: "bottom center" }, 0);
+
+      // Marker 4 — scribble path: dashed-empty
+      tl.set(scribblePath, { attr: { "stroke-dasharray": PATH_LEN + " " + PATH_LEN, "stroke-dashoffset": PATH_LEN } }, 0);
+
+      // Marker 5 — sketchout lines: both diagonals scaled-to-zero
+      tl.set("#sketchout-fwd", { scaleX: 0, transformOrigin: "left center" }, 0);
+      tl.set("#sketchout-bwd", { scaleX: 0, transformOrigin: "left center" }, 0);
+
+      // === t=0.20s: eyebrow + marker key fade in.
+      // Supporting context — gives the viewer's eye somewhere to land
+      // before the main phrase reveal.
+      tl.fromTo("#eyebrow",
+        { opacity: 0, y: -8 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "expo.out" },
+        0.20);
+      tl.fromTo("#marker-key",
+        { opacity: 0, y: -6 },
+        { opacity: 1, y: 0, duration: 0.55, ease: "expo.out" },
+        0.30);
+
+      // === t=0.40s: paper grain starts slow drift.
+      // Continuous-motion ambient layer through the calm hold sections.
+      // sine.inOut for organic breath; covers most of the beat.
+      tl.fromTo(".paper-grain",
+        { x: 0, y: 0, opacity: 1 },
+        { x: -22, y: -10, opacity: 0.9, duration: 8.0, ease: "sine.inOut" },
+        0.40);
+
+      // === t=0.40s–1.35s: per-word entrance across BOTH lines.
+      // ~14 word spans total; stagger 0.045 gives a brisk left-to-right
+      // reveal that finishes well before the first marker fires at 1.5s.
+      // crossfade easing = soft-tail premium land matching the family.
+      tl.fromTo(allWords,
+        { opacity: 0, y: 8 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.50,
+          stagger: 0.045,
+          ease: crossfadeEase,
+        },
+        0.40);
+
+      // ====================================================================
+      // MARKER 1 @ t=1.50s — HIGHLIGHT SWEEP on "builders"
+      // Yellow bar scaleX 0→1 from left edge. power4.out for decisive
+      // marker-stroke snap. 0.40s duration matches spec.
+      // ====================================================================
+      tl.fromTo("#bar-highlight",
+        { scaleX: 0 },
+        { scaleX: 1, duration: 0.40, ease: "power4.out" },
+        1.50);
+
+      // Hold motion 1.9-3.0s: the highlighted word breathes slightly so
+      // the highlight doesn't feel frozen during the gap before marker 2.
+      tl.to("#line-1", {
+        y: -3,
+        duration: 0.55,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 1.90);
+
+      // ====================================================================
+      // MARKER 2 @ t=3.00s — HAND-DRAWN CIRCLE on "clear"
+      // SVG container fades on a hair before the stroke draws (hides the
+      // round-linecap dot that would otherwise show during pre-draw).
+      // Path then scribes around the word via stroke-dashoffset 2000→0.
+      // power4.out gives a confident pen-stroke feel. 0.70s duration.
+      // ====================================================================
+      tl.to("#circle-marker", { opacity: 1, duration: 0.04, ease: "none" }, 2.98);
+      tl.fromTo(circlePath,
+        { attr: { "stroke-dashoffset": PATH_LEN } },
+        { attr: { "stroke-dashoffset": 0 }, duration: 0.70, ease: "power4.out" },
+        3.00);
+
+      // Hold motion 3.7-4.5s: the freshly-drawn circle breathes (tiny
+      // rotation + scale yoyo) — feels like the ink is still drying.
+      tl.to("#circle-marker", {
+        rotation: -3.6,
+        scale: 1.04,
+        duration: 0.45,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+        transformOrigin: "50% 50%",
+      }, 3.70);
+
+      // ====================================================================
+      // MARKER 3 @ t=4.50s — BURST RADIAL on "bold"
+      // All 12 spikes burst outward simultaneously with a slight stagger
+      // (0.025s between each). scaleY 0→1 from bottom origin makes them
+      // grow outward from the word center. power2.out for clean snap.
+      // Total duration with stagger: 0.40 + 11*0.025 = 0.675s.
+      // ====================================================================
+      tl.fromTo(burstLines,
+        { scaleY: 0, opacity: 0 },
+        {
+          scaleY: 1,
+          opacity: 1,
+          duration: 0.40,
+          stagger: 0.025,
+          ease: "power2.out",
+        },
+        4.50);
+
+      // Hold motion 5.3-6.0s: subtle pulse on the burst lines so they
+      // don't sit perfectly still during the wait for marker 4.
+      tl.to(burstLines, {
+        scaleY: 0.92,
+        duration: 0.35,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 5.30);
+
+      // ====================================================================
+      // MARKER 4 @ t=6.00s — SCRIBBLE UNDERLINE on "vibrant"
+      // Wavy SVG underline draws itself via stroke-dashoffset 2000→0.
+      // power1.inOut gives an even, hand-drawn pen-pace (not snappy —
+      // a scribble has consistent stroke speed). 0.50s duration per spec.
+      // ====================================================================
+      tl.fromTo(scribblePath,
+        { attr: { "stroke-dashoffset": PATH_LEN } },
+        { attr: { "stroke-dashoffset": 0 }, duration: 0.50, ease: "power1.inOut" },
+        6.00);
+
+      // Hold motion 6.5-7.4s: second line breathes — keeps frame alive
+      // during the brief pause before the final sketchout fires.
+      tl.to("#line-2", {
+        y: -3,
+        duration: 0.45,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 6.55);
+
+      // ====================================================================
+      // MARKER 5 @ t=7.50s — SKETCHOUT X on "excuses"
+      // Two diagonal red strokes draw across the word. Forward slash
+      // (rotate -14deg) fires first at 7.50, backward slash (rotate 14deg)
+      // follows at 7.80 — sequenced like a hand drawing an X with two
+      // strokes. Each is 0.30s, total 0.60s, ending at 8.10s.
+      // ====================================================================
+      tl.fromTo("#sketchout-fwd",
+        { scaleX: 0 },
+        { scaleX: 1, duration: 0.30, ease: "power2.out" },
+        7.50);
+      tl.fromTo("#sketchout-bwd",
+        { scaleX: 0 },
+        { scaleX: 1, duration: 0.30, ease: "power2.out" },
+        7.80);
+
+      // ====================================================================
+      // FINAL HOLD t=8.50s–10.0s — all 5 markers visible, gentle breathing
+      // ====================================================================
+
+      // Subtle scale-up on the whole stage — a "thesis" moment where all
+      // five markers sit on the phrase together. expo.out for soft land.
+      tl.to(".stage", {
+        scale: 1.015,
+        duration: 1.2,
+        ease: "sine.inOut",
+        transformOrigin: "50% 50%",
+        yoyo: true,
+        repeat: 1,
+      }, 8.50);
+
+      // Marker key in upper-right gets a tiny rotation breath — keeps
+      // the eye corner alive without distracting from the phrase.
+      tl.to("#marker-key", {
+        x: -4,
+        duration: 0.9,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: 1,
+      }, 8.50);
+
+      // Eyebrow drifts gently upward toward the close — soft outro cue.
+      tl.to("#eyebrow", {
+        y: -3,
+        duration: 1.4,
+        ease: "expo.out",
+      }, 8.60);
+
+      window.__timelines["scene-06-combined-marker-cascade"] = tl;
+    })();
+  </script>
+</body>
+</html>
