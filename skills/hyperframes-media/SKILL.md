@@ -1,6 +1,6 @@
 ---
 name: hyperframes-media
-description: Asset preprocessing for HyperFrames compositions. Use for npx hyperframes tts, transcribe, remove-background, voice selection, Whisper model selection, transcript generation, transparent cutouts, and TTS to transcript to captions workflows.
+description: Asset preprocessing for HyperFrames compositions. Use for npx hyperframes tts, transcribe, remove-background, voice selection, Whisper model selection, transcript generation, transparent cutouts, background music generation via Google Lyria, and TTS to transcript to captions workflows.
 ---
 
 # HyperFrames Media
@@ -210,6 +210,22 @@ Both share the same `--quality` and run from a single inference pass — only en
 
 If a user asks for "the room **without** the person, displayed standalone" (no subject anywhere, no compositing on top), `--background-output` is wrong — its plate has a transparent hole, not a filled-in clean plate. They need an **inpainter**: LaMa, ProPainter, or E2FGVI. Tell them this command can't do it.
 
+## Background Music
+
+Generate original background music via Google Lyria RealTime. Unlike `tts` and `transcribe` above, there is no `npx hyperframes` wrapper — run the Python recipe in [references/background-music.md](./references/background-music.md) directly through Bash.
+
+Requires `GOOGLE_API_KEY` and `pip install -q google-genai python-dotenv`. Output lands in `assets/bgm.wav` (HyperFrames serves `assets/`, not `public/`).
+
+**`DURATION_SEC` must equal the total video duration.** Sum scene voice durations first:
+
+```bash
+total=$(for f in assets/voice/scene_*.wav; do
+  ffprobe -v error -show_entries format=duration -of csv=p=0 "$f"
+done | paste -sd+ - | bc)
+```
+
+Place the generated track as a top-level `<audio>` clip in `index.html`; see `hyperframes-core/references/variables-and-media.md` for `<audio>` wiring and volume conventions (typically `data-volume="0.15"`–`"0.25"` under narration).
+
 ## TTS To Captions
 
 When no recorded voiceover exists, generate one and transcribe it back for word-level caption timing:
@@ -228,5 +244,6 @@ Each command downloads its own model on first run and caches it under `~/.cache/
 - **TTS** — Kokoro-82M (~311 MB) + voices (~27 MB) in `tts/`. Requires Python 3.8+ with `kokoro-onnx` and `soundfile` (`pip install kokoro-onnx soundfile`). Non-English text also needs `espeak-ng` system-wide.
 - **Transcribe** — Whisper model size depending on choice (75 MB – 3.1 GB) in `whisper/`. Bundles `whisper.cpp`.
 - **Remove-background** — `u2net_human_seg` (~168 MB ONNX) in `background-removal/models/`. Peak inference RAM ~1.5 GB.
+- **Background Music** — Google Lyria RealTime API (cloud). Requires `GOOGLE_API_KEY` + `google-genai` Python package. No local model download; streamed over WebSocket.
 
 Run `npx hyperframes doctor` if a command fails because of a missing dependency.
