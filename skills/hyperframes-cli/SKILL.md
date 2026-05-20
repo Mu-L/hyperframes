@@ -70,9 +70,39 @@ See `references/lambda.md` for prerequisites, all 6 subcommands (`deploy`, `site
 
 ## Minimum Completion Gate
 
+### Static gates
+
 ```bash
 npx hyperframes lint
 npx hyperframes validate
 ```
 
 Add `inspect` for layout-sensitive work and `render --strict` in CI to fail on lint errors.
+
+### Visual smoke test — required when the project uses sub-compositions
+
+`lint` / `validate` / `inspect` evaluate each composition **in isolation**. They never load `index.html` and mount sub-compositions via `data-composition-src`, so they cannot catch cross-file mount failures (see `hyperframes-core` → `references/sub-compositions.md`, "Common pitfalls"). The only gate that catches them is one that actually loads `index.html` and seeks the timeline.
+
+Use `hyperframes snapshot` — it loads the project the same way `render` does (so it exercises the same mount path) but only captures the timestamps you request, so it's seconds instead of a full render:
+
+```bash
+# Capture one frame at the midpoint of every sub-composition.
+# Midpoints = data-start + data-duration/2 for each host slot in index.html.
+npx hyperframes snapshot --at <t1>,<t2>,<t3>,...
+
+# Or, if you don't need per-scene targeting, an evenly-spaced sample:
+npx hyperframes snapshot --frames 9
+```
+
+Output lands in `snapshots/frame-NN-at-Xs.png`. Eyeball each frame against the scene plan.
+
+Per-frame red flags (each maps to a specific failure mode the static gates miss):
+
+| What you see                                                                       | Root cause                                                                                  |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Text shows up tiny + unstyled in the top-left corner                               | `<style>` block left in `<head>` outside `<template>` (Pitfall 1) — no CSS reached live DOM |
+| SVG/icon elements blown up to canvas-size                                          | Same as above — no width/height constraints applied                                         |
+| Hero element of the scene is missing entirely; only background + watermark visible | Host-id ≠ template id (Pitfall 2) — timeline never ran, frame captured at initial state     |
+| Snapshot command logs `Sub-composition timelines not registered after 45000ms`     | Pitfall 2 — direct confirmation                                                             |
+
+`snapshots/` can be deleted after eyeballing; the user-facing final render is a separate pass with `npx hyperframes render`.

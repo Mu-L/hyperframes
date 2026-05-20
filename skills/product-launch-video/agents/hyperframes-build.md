@@ -53,44 +53,48 @@ Check whether `hyperframes/` already exists:
 - Reference blueprints + rules from `hyperframes-animation` **by name** (don't reinvent the wheel).
 - Copy each asset from `extraction/` to `hyperframes/public/` **before** referencing. Verify file exists. Never invent filenames.
 
-## Hard rules (apply to every composition)
+## Hard rules
 
-- No `Math.random()`, no `Date.now()`, no `performance.now()`, no network fetches at render time.
+Two of these are cross-file mount rules that `lint` / `validate` / `inspect` cannot catch. Full ❌/✅ examples in `hyperframes-core` → `references/sub-compositions.md` ("Common pitfalls").
+
+- **Sub-comp `<style>` + `<script>` go INSIDE `<template>`, not in `<head>`.** `<head>` is discarded at mount time.
+- **Host `data-composition-id` ≡ inner template `data-composition-id` ≡ `window.__timelines` key.** No `-mount`/`-slot` suffixes.
+- No `Math.random()` / `Date.now()` / `performance.now()` / network fetches at render time.
 - No CSS transitions — only the paused GSAP timeline drives motion.
-- No infinite repeats (`repeat: -1` forbidden). Compute finite repeats from `data-duration`.
-- `data-duration` on the root governs render length, NOT the GSAP timeline's intrinsic length.
+- No infinite repeats (`repeat: -1`). Compute finite repeats from `data-duration`.
+- `data-duration` on the root governs render length, not GSAP timeline length.
 
-## After each scene
+## Gates
+
+After each scene — fix every error before the next:
 
 ```bash
 (cd hyperframes && npx hyperframes lint)
 ```
 
-Fix every reported error before moving to the next scene.
-
-## After all scenes
+After all scenes — run the full Minimum Completion Gate from `hyperframes-cli`:
 
 ```bash
 (cd hyperframes && npx hyperframes validate)
 (cd hyperframes && npx hyperframes inspect)
+(cd hyperframes && npx hyperframes snapshot --at <per-scene midpoints>)  # midpoint = data-start + data-duration/2
 ```
 
-Validate catches runtime + contrast issues. Inspect catches text overflow / off-canvas. Fix all reported issues.
+The `snapshot` step is the only gate that catches the two cross-file mount rules above. Eyeball every PNG in `snapshots/` against the scene plan; see `hyperframes-cli` → "Visual smoke test" for the symptom → root-cause table. Fix any failure before reporting done.
 
-## Do NOT run the final render
-
-`npx hyperframes render` is Phase 5 — the orchestrator runs it after your phase completes.
+Do **NOT** run `npx hyperframes render` — that's Phase 5, the orchestrator's job.
 
 ## When done — report
 
 - Scene count built
 - Assets copied (rough count)
-- `lint` / `validate` / `inspect` status
+- Gates status: `lint` / `validate` / `inspect` / `snapshot`
+- One-line per scene from the snapshot eyeball
 
 Then append to `./context.log`:
 
 ```
 ## Phase 4: hyperframes-build [done <ISO timestamp>]
 Scenes: <count>
-Status: lint OK / validate OK / inspect OK
+Status: lint OK / validate OK / inspect OK / snapshot OK
 ```

@@ -84,7 +84,11 @@ Two root forms; they are **not** interchangeable.
 - **Standalone** (the top-level `index.html`) — root `<div data-composition-id="…">` sits directly in `<body>`. **No `<template>` wrapper.** Wrapping a standalone root in `<template>` hides all content from the browser and breaks rendering.
 - **Sub-composition** (a file loaded via `data-composition-src`) — root `<div data-composition-id="…">` **must** be wrapped in `<template>`. Without the wrapper the runtime cannot extract and mount it.
 
-See `references/sub-compositions.md` for the sub-composition file shape and host wiring.
+> ⚠ Sub-composition transport rule: the runtime **only clones `<template>` contents** into the live DOM. Everything outside the template — including `<head>` and any `<style>`/`<script>`/`<link>` that lives in `<head>` — is discarded. Put `<style>` and `<script>` blocks **inside** `<template>`, not in `<head>`. Putting them in `<head>` ships a render where no CSS applies and no scripts run.
+>
+> ⚠ Host-id rule: in the host file, `data-composition-id` on the slot must **exactly equal** the inner template's `data-composition-id` **and** the `window.__timelines["<id>"]` key. Do not add `-mount` / `-slot` / `-host` suffixes; the slot id is itself the timeline lookup key.
+
+See `references/sub-compositions.md` for the sub-composition file shape, host wiring, ❌/✅ pitfall examples, and a pre-render verification checklist.
 
 ## Choosing an Animation Runtime
 
