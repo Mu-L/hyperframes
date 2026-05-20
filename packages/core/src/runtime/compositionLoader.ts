@@ -262,6 +262,8 @@ async function mountCompositionContent(params: {
   headStyles?: HTMLStyleElement[];
   /** Extra <script> elements from the parsed document <head> (non-template sub-compositions). */
   headScripts?: HTMLScriptElement[];
+  /** Extra <link> elements from the parsed document <head> (font stylesheets, preconnects). */
+  headLinks?: HTMLLinkElement[];
   /**
    * Defaults extracted from the sub-composition's own
    * `<html data-composition-variables="...">` attribute. Layered under the
@@ -296,6 +298,15 @@ async function mountCompositionContent(params: {
   const runtimeScopeSelector = runtimeScopeCompositionId
     ? `[data-composition-id="${CSS.escape(runtimeScopeCompositionId)}"]`
     : undefined;
+
+  if (params.headLinks) {
+    for (const link of params.headLinks) {
+      const href = link.getAttribute("href") || "";
+      if (!href) continue;
+      if (document.head.querySelector(`link[href="${CSS.escape(href)}"]`)) continue;
+      document.head.appendChild(link.cloneNode(true));
+    }
+  }
 
   // Inject <head> styles from non-template sub-compositions first (they define
   // element styles like backgrounds and positioning that the composition needs).
@@ -395,6 +406,9 @@ async function mountCompositionContent(params: {
     if (heightRaw) params.host.setAttribute("data-height", heightRaw);
     if (widthPx && params.host instanceof HTMLElement) params.host.style.width = widthPx;
     if (heightPx && params.host instanceof HTMLElement) params.host.style.height = heightPx;
+    if (innerRoot.hasAttribute("data-timeline-locked")) {
+      params.host.setAttribute("data-timeline-locked", "");
+    }
     params.host.appendChild(prepareFlattenedInnerRoot(innerRoot));
   } else if (params.hasTemplate) {
     params.host.appendChild(document.importNode(contentNode, true));
@@ -581,6 +595,13 @@ export async function loadExternalCompositions(
         const headScripts = !template
           ? Array.from(doc.head.querySelectorAll<HTMLScriptElement>("script"))
           : undefined;
+        const headLinks = !template
+          ? Array.from(
+              doc.head.querySelectorAll<HTMLLinkElement>(
+                'link[rel="stylesheet"], link[rel="preconnect"]',
+              ),
+            )
+          : undefined;
         await mountCompositionContent({
           host,
           authoredCompositionId,
@@ -595,6 +616,7 @@ export async function loadExternalCompositions(
           parseDimensionPx: params.parseDimensionPx,
           headStyles,
           headScripts,
+          headLinks,
           declaredVariableDefaults: readDeclaredDefaults(doc.documentElement),
           onDiagnostic: params.onDiagnostic,
         });

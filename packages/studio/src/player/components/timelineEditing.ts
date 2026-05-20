@@ -211,8 +211,9 @@ export function getTimelineEditCapabilities(input: {
   playbackStartAttr?: "media-start" | "playback-start";
   sourceDuration?: number;
   timingSource?: "authored" | "implicit";
+  timelineLocked?: boolean;
 }): TimelineEditCapabilities {
-  if (input.timingSource === "implicit") {
+  if (input.timingSource === "implicit" || input.timelineLocked) {
     return {
       canMove: false,
       canTrimStart: false,

@@ -97,6 +97,7 @@ export interface InlineSubCompositionsResult {
   styles: string[];
   scripts: string[];
   externalScriptSrcs: string[];
+  externalLinks: { href: string; rel: string; crossorigin?: string }[];
   variablesByComp: Record<string, Record<string, unknown>>;
 }
 
@@ -149,6 +150,8 @@ export function inlineSubCompositions(
   const styles: string[] = [];
   const scripts: string[] = [];
   const externalScriptSrcs: string[] = [];
+  const externalLinks: { href: string; rel: string; crossorigin?: string }[] = [];
+  const seenLinkHrefs = new Set<string>();
   const variablesByComp: Record<string, Record<string, unknown>> = {};
 
   for (const hostEl of hosts) {
@@ -221,6 +224,19 @@ export function inlineSubCompositions(
           externalScriptSrcs.push(externalSrc);
         }
       }
+      for (const link of [
+        ...compDoc.head.querySelectorAll('link[rel="stylesheet"], link[rel="preconnect"]'),
+      ]) {
+        const href = (link.getAttribute("href") || "").trim();
+        if (href && !seenLinkHrefs.has(href)) {
+          seenLinkHrefs.add(href);
+          const rel = (link.getAttribute("rel") || "").trim();
+          const crossorigin = link.hasAttribute("crossorigin")
+            ? link.getAttribute("crossorigin") || ""
+            : undefined;
+          externalLinks.push({ href, rel, crossorigin });
+        }
+      }
     }
 
     // Extract styles from content
@@ -286,6 +302,10 @@ export function inlineSubCompositions(
       );
     }
 
+    if (innerRoot?.hasAttribute("data-timeline-locked")) {
+      hostEl.setAttribute("data-timeline-locked", "");
+    }
+
     // Copy dimension attributes from inner root to host if missing
     if (innerRoot) {
       const innerW = innerRoot.getAttribute("data-width");
@@ -325,5 +345,5 @@ export function inlineSubCompositions(
     hostEl.removeAttribute("data-composition-src");
   }
 
-  return { styles, scripts, externalScriptSrcs, variablesByComp };
+  return { styles, scripts, externalScriptSrcs, externalLinks, variablesByComp };
 }

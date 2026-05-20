@@ -10,3 +10,4 @@ packages/studio/src/App.tsx
 packages/studio/src/player/components/Timeline.tsx
 packages/studio/src/player/components/timelineEditing.test.ts
 packages/studio/src/components/editor/domEditing.test.ts
+packages/studio/src/components/editor/domEditingLayers.ts

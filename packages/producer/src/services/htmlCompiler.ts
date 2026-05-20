@@ -612,6 +612,18 @@ function inlineSubCompositions(
     }
   }
 
+  if (result.externalLinks.length && head) {
+    for (const link of result.externalLinks) {
+      const escapedHref = link.href.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+      if (document.querySelector(`link[href="${escapedHref}"]`)) continue;
+      const el = document.createElement("link");
+      el.setAttribute("rel", link.rel);
+      el.setAttribute("href", link.href);
+      if (link.crossorigin != null) el.setAttribute("crossorigin", link.crossorigin);
+      head.appendChild(el);
+    }
+  }
+
   // Append collected styles to <head>
   if (result.styles.length && head) {
     const styleEl = document.createElement("style");

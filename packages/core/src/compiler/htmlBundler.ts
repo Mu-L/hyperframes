@@ -685,6 +685,7 @@ export async function bundleToSingleHtml(
   const compStyleChunks: string[] = [...subCompResult.styles];
   const compScriptChunks: string[] = [...subCompResult.scripts];
   const compExternalScriptSrcs: string[] = [...subCompResult.externalScriptSrcs];
+  const compExternalLinks = [...subCompResult.externalLinks];
   const compVariablesByComp: Record<string, Record<string, unknown>> = {
     ...subCompResult.variablesByComp,
   };
@@ -808,6 +809,17 @@ export async function bundleToSingleHtml(
       const extScript = document.createElement("script");
       extScript.setAttribute("src", extSrc);
       document.body.appendChild(extScript);
+    }
+  }
+
+  for (const link of compExternalLinks) {
+    const escapedHref = link.href.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    if (!document.querySelector(`link[href="${escapedHref}"]`)) {
+      const linkEl = document.createElement("link");
+      linkEl.setAttribute("rel", link.rel);
+      linkEl.setAttribute("href", link.href);
+      if (link.crossorigin != null) linkEl.setAttribute("crossorigin", link.crossorigin);
+      document.head.appendChild(linkEl);
     }
   }
 

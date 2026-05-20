@@ -263,6 +263,22 @@ describe("getTimelineEditCapabilities", () => {
     });
   });
 
+  it("locks all timeline edits for clips with data-timeline-locked", () => {
+    expect(
+      getTimelineEditCapabilities({
+        tag: "div",
+        duration: 8,
+        selector: '[data-composition-id="caption-highlight"]',
+        compositionSrc: "compositions/components/caption-highlight.html",
+        timelineLocked: true,
+      }),
+    ).toEqual({
+      canMove: false,
+      canTrimStart: false,
+      canTrimEnd: false,
+    });
+  });
+
   it("allows full editing of explicitly authored generic elements", () => {
     expect(
       getTimelineEditCapabilities({

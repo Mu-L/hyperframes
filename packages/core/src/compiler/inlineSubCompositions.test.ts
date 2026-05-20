@@ -131,6 +131,91 @@ describe("inlineSubCompositions – #ID selector scoping divergence", () => {
     expect(scopedCss).toContain('[data-hf-authored-id="intro"]');
   });
 
+  it("extracts <link> elements from sub-composition <head> with original rel and crossorigin", () => {
+    const subCompWithLinks = `<!doctype html>
+<html><head>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap">
+</head><body>
+  <div data-composition-id="captions" data-width="1920" data-height="1080">
+    <span>Hello</span>
+  </div>
+</body></html>`;
+
+    const document = makeHostDocument("captions");
+    const host = document.querySelector('[data-composition-src="intro.html"]')!;
+
+    const result = inlineSubCompositions(document, [host], {
+      resolveHtml: () => subCompWithLinks,
+      parseHtml: (html) => parseHTML(html).document,
+    });
+
+    expect(result.externalLinks).toHaveLength(3);
+    expect(result.externalLinks[0]).toEqual({
+      href: "https://fonts.googleapis.com",
+      rel: "preconnect",
+      crossorigin: undefined,
+    });
+    expect(result.externalLinks[1]).toEqual({
+      href: "https://fonts.gstatic.com",
+      rel: "preconnect",
+      crossorigin: "",
+    });
+    expect(result.externalLinks[2]).toEqual({
+      href: "https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap",
+      rel: "stylesheet",
+      crossorigin: undefined,
+    });
+  });
+
+  it("deduplicates link hrefs across multiple sub-compositions", () => {
+    const subComp = `<!doctype html>
+<html><head>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800">
+</head><body>
+  <div data-composition-id="cap1" data-width="1920" data-height="1080"><span>A</span></div>
+</body></html>`;
+
+    const { document } = parseHTML(`<!DOCTYPE html>
+<html><body>
+  <div data-composition-id="main">
+    <div data-composition-id="cap1" data-composition-src="cap1.html" data-start="0" data-duration="4" data-track-index="0"></div>
+    <div data-composition-id="cap2" data-composition-src="cap2.html" data-start="4" data-duration="4" data-track-index="1"></div>
+  </div>
+</body></html>`);
+    const hosts = Array.from(document.querySelectorAll("[data-composition-src]"));
+
+    const result = inlineSubCompositions(document, hosts, {
+      resolveHtml: () => subComp,
+      parseHtml: (html) => parseHTML(html).document,
+    });
+
+    expect(result.externalLinks).toHaveLength(1);
+    expect(result.externalLinks[0]!.href).toBe(
+      "https://fonts.googleapis.com/css2?family=Montserrat:wght@800",
+    );
+  });
+
+  it("propagates data-timeline-locked from inner root to host element", () => {
+    const lockedSubComp = `<!doctype html>
+<html><head></head><body>
+  <div id="captions" data-composition-id="captions" data-timeline-locked data-width="1920" data-height="1080">
+    <span>Hello</span>
+  </div>
+</body></html>`;
+
+    const document = makeHostDocument("captions");
+    const host = document.querySelector('[data-composition-src="intro.html"]')!;
+
+    inlineSubCompositions(document, [host], {
+      resolveHtml: () => lockedSubComp,
+      parseHtml: (html) => parseHTML(html).document,
+    });
+
+    expect(host.hasAttribute("data-timeline-locked")).toBe(true);
+  });
+
   it("producer path propagates data-hf-authored-id to host when inner root has id", () => {
     const document = makeHostDocument("intro");
     const host = document.querySelector('[data-composition-src="intro.html"]')!;
