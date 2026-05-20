@@ -355,7 +355,7 @@ This is the LAST creative pass before file-tree time. It comes here intentionall
 
 ### The brand-inflection floor (REQUIRED minimums)
 
-Two hard rules — `verify-beats` checks them at Step 5, and the deliverable fails the brand-floor check if they're missing:
+Two hard rules — the main agent checks them at Step 5 (reading each beat HTML top-to-bottom for asset references), and the deliverable fails the brand-floor check if they're missing:
 
 1. **The brand mark (logo / wordmark SVG) MUST appear in the opener AND the closer beat.** A brand video that doesn't show the brand mark in the first and last frame is failing its job. The only exception is when STORYBOARD.md explicitly overrides this with a written reason (e.g., "opener is pure kinetic typography to delay brand reveal until beat 3 for narrative tension"). If you override, write the reason in that beat's Composition + Accents section so the verifier sees it.
 

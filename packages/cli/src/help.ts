@@ -34,7 +34,6 @@ const GROUPS: Group[] = [
       ["lint", "Validate a composition for common mistakes"],
       ["inspect", "Inspect rendered visual layout across the timeline"],
       ["snapshot", "Capture key frames as PNG screenshots for visual verification"],
-      ["verify-beats", "Cross-check per-beat verification artifacts against actual files"],
       ["info", "Print project metadata"],
       ["compositions", "List all compositions in a project"],
       ["docs", "View inline documentation in the terminal"],

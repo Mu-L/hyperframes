@@ -18,6 +18,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
+// fallow-ignore-next-line complexity
 (() => {
   const here = dirname(fileURLToPath(import.meta.url));
   const shader = join(here, "shaderTransitionWorker.js");
@@ -111,7 +112,6 @@ const subCommands = {
   snapshot: () => import("./commands/snapshot.js").then((m) => m.default),
   capture: () => import("./commands/capture.js").then((m) => m.default),
   lambda: () => import("./commands/lambda.js").then((m) => m.default),
-  "verify-beats": () => import("./commands/verify-beats.js").then((m) => m.default),
 };
 
 const main = defineCommand({

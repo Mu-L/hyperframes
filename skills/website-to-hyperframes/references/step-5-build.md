@@ -293,25 +293,25 @@ The Studio preview server rewrites base URLs to the project root — `../` paths
 
 In either case, use the template. Do not skip it and build from memory.
 
-Each sub-agent reads [beat-builder-guide.md](beat-builder-guide.md) — it has everything: rules, easing, file references, validation commands, and the **required verification artifact spec**. **Do not try to paste all rules into the prompt yourself.** Instead, tell the sub-agent to read the guide file. You paste only the beat-specific context: the storyboard sections, brand values, and asset paths.
+Each sub-agent reads [beat-builder-guide.md](beat-builder-guide.md) — it has everything: rules, easing, file references, validation commands. **Do not try to paste all rules into the prompt yourself.** Instead, tell the sub-agent to read the guide file. You paste only the beat-specific context: the storyboard sections, brand values, and asset paths.
 
 ```
 Build the composition for Beat N. Save to compositions/beat-N-name.html.
 
 FIRST: Read skills/website-to-hyperframes/references/beat-builder-guide.md end to end.
-It has your full workflow, all rules, easing vocabulary, file references, and the
-VERIFICATION ARTIFACT SPEC. Follow its workflow exactly:
+It has your full workflow, all rules, easing vocabulary, and file references.
+Follow its workflow exactly:
   build → lint (`npx hyperframes lint .`)
         → snapshot (`npx tsx packages/cli/src/cli.ts snapshot . --frames 3`)
         → view contact sheet AND read snapshots/descriptions.md
         → fix issues
-        → write compositions/beat-N-name-verify.json (REQUIRED — see beat-builder-guide.md §5 for exact schema)
 
-The main agent runs `hyperframes verify-beats` after your work. It cross-checks
-your verify.json claims against the actual composition HTML and snapshot files
-on disk. You CANNOT pass verification by claiming things you didn't do — the
-CLI greps the HTML for every hex color, every asset path you listed, and checks
-every snapshot file exists. Do the work; write the truth.
+After you finish, the main agent will READ your composition HTML top-to-bottom
+and cross-check it against DESIGN.md and STORYBOARD.md — does the brand bg/accent
+hex actually appear in your CSS, are the captured assets the storyboard called
+for actually referenced, is the headline ≥80px, does the GSAP timeline cover
+the full beat duration. Do the work honestly. Reports of "looks good" without
+the work being done will be caught when the main agent opens the file.
 
 ═══ PREVIOUS BEAT (Beat N-1) ═══
 [paste the FULL previous beat section from STORYBOARD.md]
@@ -385,33 +385,35 @@ For every `.html` file in `compositions/`, confirm that `index.html` has a `data
 
 **Captions stub rule:** Never create a `compositions/captions.html` with an empty transcript (`const script = [];`). If the VO/transcript step was skipped or failed, do not create the captions composition at all. An empty captions file that returns immediately is worse than no captions file — it silently does nothing and wastes a track slot.
 
-## 5. Run verify-beats — REQUIRED gate before Step 6
+## 5. Read each beat HTML top-to-bottom — REQUIRED gate before Step 6
 
-**Do not declare Step 5 complete on sub-agents' word.** Run the verifier:
+**Do not declare Step 5 complete on sub-agents' word.** Earlier sessions had sub-agents reply "looks good, 0 errors" and the main agent trusted them — that's how videos shipped with mismatched colors, missing logos, headlines too small to read. Close the trust path by opening every file the sub-agent produced.
 
-```bash
-npx hyperframes verify-beats <project-dir>
-```
+For each `compositions/beat-N.html`:
 
-This reads each `compositions/beat-N-verify.json` (which sub-agents wrote per the beat-builder-guide.md verification artifact spec) and **cross-checks every claim against the actual composition HTML and snapshot files on disk.** It catches:
+1. **Open the file and read it top-to-bottom.** Not a glance. Not a grep. Read the `<style>` block, then the markup, then the `<script>` block. Understand what's actually there.
+2. **Cross-check against DESIGN.md:**
+   - Does the `--bg` / primary background hex from DESIGN.md appear in the CSS or inline styles?
+   - Does the accent hex appear (if this beat uses an accent)?
+   - Are fonts the ones DESIGN.md specified? If `@font-face` is declared, does the path match a real file under `capture/assets/fonts/` or a published `@fontsource/*` import?
+   - Is the headline `font-size` ≥80px?
+3. **Cross-check against STORYBOARD.md (this beat's section):**
+   - Are the captured assets the storyboard called for actually referenced in the HTML (`<img src=...>`, inline SVG, `background-image: url(...)`, etc.)? Open the asset paths and confirm the files exist.
+   - Does the GSAP timeline cover the full beat duration, not just the first 1-2 seconds of entrance tweens? Look for events spread across the `BEAT` constant.
+   - Does the shot framing/camera move described in the storyboard show up in the GSAP code (scale/x/y/yPercent transforms with meaningful magnitudes)?
+4. **Check the technical gates inline:**
+   - `data-composition-id` on the root div matches the `window.__timelines["..."]` key in the script
+   - `data-width` and `data-height` match the host div in index.html
+   - The script is INSIDE the `<template>`, not after `</template>`
+   - No bare `gsap.to(...)`, no `Math.random()`, no `repeat: -1`
+5. **Open each frame in `snapshots/beat-N/`** and confirm visually that the entrance, hold, and exit moments look like what the storyboard described. If `snapshots/descriptions.md` exists, read Gemini's per-frame analysis of this beat in particular.
 
-- Missing verify.json files (sub-agent skipped the verification step entirely)
-- `lint.exit !== 0` (lint errors hidden)
-- Fewer than 3 frame observations (sub-agent didn't actually look at the snapshots)
-- Snapshot PNG paths that don't exist on disk (lied about taking snapshots)
-- Brand colors claimed but absent from the composition HTML (lied about using them)
-- Asset paths claimed but absent from the composition HTML (lied about using them)
-- Headlines under 80px (unreadable at video scale)
-- Missing or empty `concept_alignment` (no reason the beat exists in this video)
-- Brand-floor violations: first or last beat doesn't reference the brand logo
+**Anything off — fix it inline (small CSS / GSAP correction) or re-dispatch the sub-agent with the specific problem quoted.** Do not move to Step 6 until every beat has been read top-to-bottom and the cross-checks pass.
 
-**If verify-beats exits non-zero, do NOT proceed to Step 6.** For each failing beat:
+### Brand-floor check (whole-video, after every beat passes its own read)
 
-1. Read the specific failure from the verifier output
-2. Re-dispatch a sub-agent for that beat with the failure quoted in the prompt
-3. The sub-agent must rebuild OR rewrite the verify.json (after actually doing the work it claimed)
-4. Re-run `npx hyperframes verify-beats` until exit code is 0
+- First beat references a brand logo / wordmark SVG from `capture/assets/svgs/`
+- Last beat references the brand logo / wordmark
+- If either is missing without an explicit STORYBOARD.md override (e.g. "opener is pure kinetic type"), fix it — videos that don't open or close on the brand are failing their job.
 
-This is the gate. Earlier sessions had sub-agents reply "looks good" and the main agent trusted them — that's why videos shipped with mismatched colors and missing logos. The verifier removes that trust path. There is no way for a sub-agent to fake the verify.json because the CLI reads the actual files it would have to write.
-
-Once `npx hyperframes verify-beats` exits 0, move to Step 6 (Validate & Deliver) for lint, validate, snapshots, and visual review.
+Once every beat reads clean and the brand-floor check passes, move to Step 6 (Validate & Deliver) for lint, validate, snapshots, and visual review.

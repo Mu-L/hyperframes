@@ -128,9 +128,9 @@ If Step 2 said no narration — ask about background music, then skip to Step 5.
 **Read:** The `hyperframes` skill (load it — every rule matters)
 **Read:** [references/step-5-build.md](references/step-5-build.md)
 
-Build index.html and compositions following the architecture and pacing chosen in the storyboard (Step 3). Each sub-agent writes a `compositions/beat-N-verify.json` artifact (see [beat-builder-guide.md](references/beat-builder-guide.md)) declaring what they built. **The main agent does NOT trust sub-agents' chat reports** — it runs `npx hyperframes verify-beats <project-dir>` which cross-checks every claim against the composition HTML and snapshot files on disk.
+Build index.html and compositions following the architecture and pacing chosen in the storyboard (Step 3). Sub-agents run `hyperframes lint` and `hyperframes snapshot` on each beat before reporting back.
 
-**Gate:** `npx hyperframes verify-beats <project-dir>` exits 0. Every beat passes structural and brand-floor checks. If it fails, re-dispatch the failing beats with the verifier output quoted in the prompt — do not advance to Step 6 until the verifier passes.
+**Gate:** **The main agent does NOT trust sub-agents' chat reports.** After every sub-agent completes, the main agent opens each `compositions/beat-N.html` and reads it top-to-bottom. For each beat: does the GSAP timeline use the data attributes correctly, do the brand colors from DESIGN.md actually appear in the CSS, are the captured assets the storyboard called for actually referenced, is the headline at video-readable size, does the beat serve the storyboard arc? Anything off — fix it inline or re-dispatch the sub-agent with the specific problem quoted.
 
 ---
 

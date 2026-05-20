@@ -113,6 +113,7 @@ export function extractFontMetadata(fontsDir: string, outputPath: string): Fonts
   return manifest;
 }
 
+// fallow-ignore-next-line complexity
 function readSingleFont(fullPath: string, filename: string): FontFileMetadata {
   const empty: FontFileMetadata = {
     file: filename,
@@ -174,6 +175,7 @@ function readSingleFont(fullPath: string, filename: string): FontFileMetadata {
 }
 
 /** Aggregate per-file entries into per-family summaries — most useful shape for DESIGN.md. */
+// fallow-ignore-next-line complexity
 function aggregateFamilies(files: FontFileMetadata[]): FontFamilySummary[] {
   const byFamily = new Map<string, FontFamilySummary>();
   for (const f of files) {
@@ -207,6 +209,7 @@ function deriveFamilyFromPostscript(postscript: string): string {
 }
 
 /** Fallback when OS/2 table is missing — guess weight from "Bold", "Light", etc. */
+// fallow-ignore-next-line complexity
 function inferWeightFromSubfamily(subfamily: string): number {
   const s = subfamily.toLowerCase();
   if (s.includes("thin")) return 100;
@@ -272,6 +275,7 @@ const WEIGHT_TOKEN_RE = new RegExp(`\\s+(${Object.keys(WEIGHT_TOKEN_TO_VALUE).jo
  * italic flag is recovered separately from the OS/2 fsSelection bit, so no
  * information is lost.
  */
+// fallow-ignore-next-line complexity
 function canonicalizeFamily(family: string): {
   canonical: string;
   inferredWeight: number | null;

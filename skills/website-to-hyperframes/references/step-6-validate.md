@@ -9,7 +9,7 @@ This is the quality gate. Before the user sees anything, YOU verify that the vid
 Score each item 1–5. If any item scores below 3, fix it before continuing. **Do not rush these.** Each checkbox is its own pass through the artifacts — slow down, look at every frame, write the actual observation, not a summary impression.
 
 ```
-[ ] verify-beats exits 0                  → paste the summary line ("✓ N/N beats passed")
+[ ] Every beat HTML read top-to-bottom    → see "Per-beat file read" below; paste the per-beat verdict
 [ ] Lint: zero errors                     → paste the lint output (not "lint passed")
 [ ] Snapshot taken, N frames confirmed    → state the exact frame count
 [ ] descriptions.md read in full          → quote the WORST frame Gemini described, verbatim
@@ -20,17 +20,26 @@ Score each item 1–5. If any item scores below 3, fix it before continuing. **D
 [ ] Critic sub-agent run                  → paste its single biggest quality gap finding, verbatim
 ```
 
-`verify-beats` is a **structural backstop**, not the verification itself. It catches the easy lies (missing files, wrong hex codes, headlines too small, observations under 20 characters). It does NOT catch: a beat that's technically present but boring, a captured logo placed off-screen, a kinetic-type beat that's correctly written but unreadable at video scale, a transition that's jarring, audio sync drift, brand voice that's wrong. **Those failures only surface when YOU look at every frame.**
+### Per-beat file read
 
-The pre-fix-era flow took longer specifically because it caught these. Don't trade the careful look for a green checkmark. The order is:
+This is what verification means now: you open each `compositions/beat-N.html` and read it top-to-bottom against DESIGN.md and STORYBOARD.md. Step 5 already required this once before advancing here — repeat it here as the final check, in case fixes during Step 5 introduced new problems.
 
-1. Run `verify-beats` → fix any structural failures, re-run until exit 0.
-2. **Then do the per-frame review yourself** — open `snapshots/contact-sheet.jpg`, read `snapshots/descriptions.md` line-by-line, write the per-beat verdict in the section below.
-3. **Then spawn the critic sub-agent** — fresh eyes, no knowledge of what you intended, only what's on screen.
+For each beat, write a per-beat verdict in this form:
 
-If any of those three stages surfaces a problem, fix it and re-do all three from the top. Iteration is the point. A video that passes `verify-beats` but a careful human review would reject is not done.
+```
+Beat N (Ns–Ns) — <name>
+  CSS bg: <hex> (DESIGN.md says <hex>, matches: yes/no)
+  CSS accent: <hex> (DESIGN.md says <hex>, matches: yes/no)
+  Headline font-size: <px> (≥80: yes/no)
+  Captured assets referenced: <list of paths from <img>, inline SVG, background-image> (storyboard called for: <list>)
+  GSAP timeline coverage: events from <first t> to <last t>, beat duration <N>s (full coverage: yes/no)
+  Storyboard alignment: <one sentence — does this beat deliver what its STORYBOARD.md section described>
+  VERDICT: PASS / NEEDS FIX (<what specifically>)
+```
 
-**Why this matters:** The natural tendency is to look at a contact sheet, see that content is present, and declare it done. That is not verification — that is pattern-matching to a completion signal. Verification means running each check and reporting the raw result. "Frame 7 at 14.2s shows the Raycast logo SVG drawing its final stroke at 0.85 opacity against #07080A, the headline 'Crush your sprint' has settled in 96px Inter SemiBold below" is evidence. "The video looks great" is not.
+The pre-fix-era flow took longer specifically because it caught these problems. Don't trade the careful look for a green checkmark.
+
+**Why this matters:** The natural tendency is to look at a contact sheet, see that content is present, and declare it done. That is not verification — that is pattern-matching to a completion signal. Verification means opening every file the sub-agents produced, reading every line, and reporting the raw result. "Frame 7 at 14.2s shows the Raycast logo SVG drawing its final stroke at 0.85 opacity against #07080A, the headline 'Crush your sprint' has settled in 96px Inter SemiBold below" is evidence. "The video looks great" is not.
 
 ---
 
