@@ -66,18 +66,58 @@ npx hyperframes lambda render ./my-project \
 
 Starts a Step Functions execution. Returns immediately with a `renderId` unless `--wait` is set, in which case the CLI blocks until completion and streams per-chunk progress lines. Add `--json` for machine-parseable output.
 
-| Flag                    | Description                                    |
-| ----------------------- | ---------------------------------------------- |
-| `--width` / `--height`  | Output dimensions in pixels                    |
-| `--fps`                 | `24` / `30` / `60`                             |
-| `--format`              | `mp4` / `mov` / `png-sequence` (default `mp4`) |
-| `--codec`               | `h264` / `h265` (mp4 only)                     |
-| `--quality`             | `draft` / `standard` / `high`                  |
-| `--chunk-size`          | Frames per chunk (default `240`)               |
-| `--max-parallel-chunks` | Max concurrent chunks (default `16`)           |
-| `--site-id`             | Reuse an existing site (skip upload)           |
-| `--wait`                | Block until completion, stream progress        |
-| `--json`                | Machine-parseable progress snapshot            |
+For **personalised single renders**, pair the project's `data-composition-variables` declaration (see `/hyperframes-core` → variables-and-media) with `--variables` / `--variables-file`. To fan out N personalised renders in one call, use `render-batch` below.
+
+| Flag                    | Description                                                                                                             |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `--width` / `--height`  | Output dimensions in pixels                                                                                             |
+| `--fps`                 | `24` / `30` / `60`                                                                                                      |
+| `--format`              | `mp4` / `mov` / `webm` / `png-sequence` (default `mp4`; `webm` uses closed-GOP VP9 + concat-copy)                       |
+| `--codec`               | `h264` / `h265` (mp4 only)                                                                                              |
+| `--quality`             | `draft` / `standard` / `high`                                                                                           |
+| `--chunk-size`          | Frames per chunk (default `240`)                                                                                        |
+| `--max-parallel-chunks` | Max concurrent chunks (default `16`)                                                                                    |
+| `--site-id`             | Reuse an existing site (skip upload)                                                                                    |
+| `--variables`           | Inline JSON object of variable overrides, e.g. `'{"title":"Hi Alice","accentColor":"#ff0000"}'`                         |
+| `--variables-file`      | Path to a JSON file of overrides (mutually exclusive with `--variables`)                                                |
+| `--strict-variables`    | Fail the render on undeclared keys or type mismatches against `data-composition-variables` (default: warn and continue) |
+| `--output-key`          | S3 key for the final artifact (default: `renders/<renderId>.<ext>`)                                                     |
+| `--wait`                | Block until completion, stream progress                                                                                 |
+| `--json`                | Machine-parseable progress snapshot                                                                                     |
+
+Variables travel inside the Step Functions execution input, which AWS caps at **256 KiB for the entire payload** (Standard workflows). The SDK validates client-side and rejects oversize inputs with a clear error before any AWS call. Pass typed primitives only — for media (images, audio, video) put a URL into the variable and let the composition fetch it at render time, not a base64 blob.
+
+### render-batch
+
+```bash
+npx hyperframes lambda render-batch ./my-template \
+  --batch ./users.jsonl \
+  --width 1920 --height 1080 \
+  --max-concurrent 5
+```
+
+Dispatches N personalised renders from a JSONL batch file in one CLI call. Deploys the site once (or reuses `--site-id`), then issues `StartExecution` per row, capped at `--max-concurrent` simultaneous starts. Returns a manifest with one line per input row mapping it to its `executionArn` / `renderId`. **Does not block** for completion — poll each `executionArn` with `progress` to track finishes.
+
+Each JSONL line is one render. `outputKey` is the S3 key for that render's final artifact; `variables` is the per-entry override object merged onto the composition's declared defaults:
+
+```jsonl
+{"outputKey": "renders/alice.mp4", "variables": {"title": "Hi Alice", "accentColor": "#ff0000"}}
+{"outputKey": "renders/bob.mp4",   "variables": {"title": "Hi Bob",   "accentColor": "#00aa00"}}
+```
+
+| Flag                                                                                                               | Description                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--batch`                                                                                                          | Path to JSONL file with one `{outputKey, variables}` entry per render                                                                                     |
+| `--max-concurrent`                                                                                                 | Max simultaneous `StartExecution` calls (default `50`)                                                                                                    |
+| `--site-id`                                                                                                        | Reuse a pre-staged site (skip the up-front upload)                                                                                                        |
+| `--strict-variables`                                                                                               | Apply per-entry strict validation; one failing row does not stop the batch — it's reported as `failed-to-start` in the manifest                           |
+| `--dry-run`                                                                                                        | Validate the batch file (parse, variables shape, payload size against the 256 KiB cap) without invoking — each row becomes `would-invoke` in the manifest |
+| `--json`                                                                                                           | Emit the manifest as JSON instead of the human-readable table (pipe to `jq` for downstream coordination)                                                  |
+| `--width` / `--height` / `--fps` / `--format` / `--codec` / `--quality` / `--chunk-size` / `--max-parallel-chunks` | Same semantics as `render`; applied uniformly to every row                                                                                                |
+
+`render-batch` does **not** accept `--variables` or `--variables-file` — per-entry variable payloads are the whole point of the verb, and live in the JSONL file. To render a single personalised video, use `render --variables` instead.
+
+The batch verb's `--max-concurrent` is orchestrator-side (caps `StartExecution`s in flight) and is distinct from `lambda deploy --concurrency`, which caps how many chunk Lambdas the render function can run in parallel. Useful starting guideline for large batches: `--max-concurrent ≈ floor(reservedConcurrency / maxParallelChunks)` so each running render gets its full chunk fan-out budget.
 
 ### progress
 
