@@ -446,6 +446,33 @@ export function StudioApp() {
     initialState: initialUrlStateRef.current,
   });
 
+  // Memoize nested objects so StudioProvider's useMemo can see stable deps.
+  const editHistoryCtx = useMemo(
+    () => ({
+      canUndo: editHistory.canUndo,
+      canRedo: editHistory.canRedo,
+      undoLabel: editHistory.undoLabel,
+      redoLabel: editHistory.redoLabel,
+    }),
+    [editHistory.canUndo, editHistory.canRedo, editHistory.undoLabel, editHistory.redoLabel],
+  );
+  const renderQueueCtx = useMemo(
+    () => ({
+      jobs: renderQueue.jobs,
+      isRendering: renderQueue.isRendering,
+      deleteRender: renderQueue.deleteRender,
+      clearCompleted: renderQueue.clearCompleted,
+      startRender: renderQueue.startRender as (options: unknown) => Promise<void>,
+    }),
+    [
+      renderQueue.jobs,
+      renderQueue.isRendering,
+      renderQueue.deleteRender,
+      renderQueue.clearCompleted,
+      renderQueue.startRender,
+    ],
+  );
+
   // StudioProvider performs its own useMemo — no need for a second memo here.
   const studioCtxValue: StudioContextValue = {
     projectId: projectId!,
@@ -460,21 +487,10 @@ export function StudioApp() {
     currentTime,
     timelineElements,
     isPlaying,
-    editHistory: {
-      canUndo: editHistory.canUndo,
-      canRedo: editHistory.canRedo,
-      undoLabel: editHistory.undoLabel,
-      redoLabel: editHistory.redoLabel,
-    },
+    editHistory: editHistoryCtx,
     handleUndo: appHotkeys.handleUndo,
     handleRedo: appHotkeys.handleRedo,
-    renderQueue: {
-      jobs: renderQueue.jobs,
-      isRendering: renderQueue.isRendering,
-      deleteRender: renderQueue.deleteRender,
-      clearCompleted: renderQueue.clearCompleted,
-      startRender: renderQueue.startRender as (options: unknown) => Promise<void>,
-    },
+    renderQueue: renderQueueCtx,
     compositionDimensions,
     waitForPendingDomEditSaves: previewPersistence.waitForPendingDomEditSaves,
     handlePreviewIframeRef,

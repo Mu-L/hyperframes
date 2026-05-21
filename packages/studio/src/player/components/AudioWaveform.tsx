@@ -68,9 +68,13 @@ export const AudioWaveform = memo(function AudioWaveform({
   const roRef = useRef<ResizeObserver | null>(null);
   const cacheKey = waveformUrl ?? audioUrl;
   const [peaks, setPeaks] = useState<number[] | null>(peaksCache.get(cacheKey) ?? null);
+  const peaksRef = useRef(peaks);
+  peaksRef.current = peaks;
 
   useEffect(() => {
-    if (peaks || !cacheKey) return;
+    // Guard via ref — avoids including `peaks` in deps which would
+    // cause an unnecessary re-fire when the fetch resolves and state updates.
+    if (peaksRef.current || !cacheKey) return;
 
     let cancelled = false;
 
@@ -108,7 +112,7 @@ export const AudioWaveform = memo(function AudioWaveform({
     return () => {
       cancelled = true;
     };
-  }, [audioUrl, waveformUrl, cacheKey, peaks]);
+  }, [audioUrl, waveformUrl, cacheKey]);
 
   // Draw bars into the container using innerHTML (fast, zoom-resilient)
   const draw = useCallback(() => {

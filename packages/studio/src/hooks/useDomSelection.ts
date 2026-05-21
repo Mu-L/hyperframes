@@ -101,11 +101,13 @@ export function useDomSelection({
   const domEditSelectionRef = useRef<DomEditSelection | null>(domEditSelection);
   const domEditGroupSelectionsRef = useRef<DomEditSelection[]>(domEditGroupSelections);
   const domEditHoverSelectionRef = useRef<DomEditSelection | null>(domEditHoverSelection);
+  const rightPanelTabRef = useRef<RightPanelTab>(rightPanelTab);
 
   // Keep refs in sync with state
   domEditSelectionRef.current = domEditSelection;
   domEditGroupSelectionsRef.current = domEditGroupSelections;
   domEditHoverSelectionRef.current = domEditHoverSelection;
+  rightPanelTabRef.current = rightPanelTab;
 
   // ── Callbacks ──
 
@@ -165,7 +167,7 @@ export function useDomSelection({
       if (nextSelection) {
         if (options?.revealPanel !== false) {
           setRightCollapsed(false);
-          if (rightPanelTab !== "layers") {
+          if (rightPanelTabRef.current !== "layers") {
             setRightPanelTab("design");
           }
         }
@@ -179,13 +181,7 @@ export function useDomSelection({
 
       setSelectedTimelineElementId(null);
     },
-    [
-      setSelectedTimelineElementId,
-      timelineElements,
-      setRightCollapsed,
-      setRightPanelTab,
-      rightPanelTab,
-    ],
+    [setSelectedTimelineElementId, timelineElements, setRightCollapsed, setRightPanelTab],
   );
 
   const clearDomSelection = useCallback(() => {
@@ -384,14 +380,16 @@ export function useDomSelection({
     applyDomSelection(null, { revealPanel: false });
   }, [applyDomSelection, captionEditMode]);
 
-  // Disabled inspector effect
+  // Disabled inspector: clear selection and force tab to "renders" once.
+  // Read rightPanelTab from a ref so this effect only runs when the feature
+  // flag value or the stable callbacks change — not on every tab switch.
   // eslint-disable-next-line no-restricted-syntax
   useEffect(() => {
     if (STUDIO_INSPECTOR_PANELS_ENABLED) return;
     updateDomEditHoverSelection(null);
     applyDomSelection(null, { revealPanel: false });
-    if (rightPanelTab !== "renders") setRightPanelTab("renders");
-  }, [applyDomSelection, rightPanelTab, updateDomEditHoverSelection, setRightPanelTab]);
+    if (rightPanelTabRef.current !== "renders") setRightPanelTab("renders");
+  }, [applyDomSelection, updateDomEditHoverSelection, setRightPanelTab]);
 
   return {
     // State
