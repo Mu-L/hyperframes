@@ -40,12 +40,12 @@ Same four-phase "presence → action" arc; one paused GSAP timeline; constituent
 
 All boundaries are in **seconds**.
 
-| Phase | Time window                          | What Happens                                                              | Skill Reference                                                                       |
-| ----- | ------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| 1     | `INTRO_START – MORPH_AT`             | Hero enters (y rise + fade) + ambient rotation idle                       | [sine-wave-loop](../rules/sine-wave-loop.md) (onUpdate form, reads `tl.time()`)       |
-| 2     | `MORPH_AT – CURSOR_ENTER_AT`         | Hero shrinks/fades; CTA pops in with overshoot; text reveals after a beat | [scale-swap-transition](../rules/scale-swap-transition.md)                            |
-| 3     | `CURSOR_ENTER_AT – CLICK_DOWN_AT`    | Cursor enters from off-screen bottom-right via spring path                | inline spring tween                                                                   |
-| 4     | `CLICK_DOWN_AT – CLICK_UP_AT + CLICK_UP_DUR` | Cursor and CTA scale-dip together, then recover                   | [physics-press-reaction](../rules/physics-press-reaction.md)                          |
+| Phase | Time window                                  | What Happens                                                              | Skill Reference                                                                 |
+| ----- | -------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 1     | `INTRO_START – MORPH_AT`                     | Hero enters (y rise + fade) + ambient rotation idle                       | [sine-wave-loop](../rules/sine-wave-loop.md) (onUpdate form, reads `tl.time()`) |
+| 2     | `MORPH_AT – CURSOR_ENTER_AT`                 | Hero shrinks/fades; CTA pops in with overshoot; text reveals after a beat | [scale-swap-transition](../rules/scale-swap-transition.md)                      |
+| 3     | `CURSOR_ENTER_AT – CLICK_DOWN_AT`            | Cursor enters from off-screen bottom-right via spring path                | inline spring tween                                                             |
+| 4     | `CLICK_DOWN_AT – CLICK_UP_AT + CLICK_UP_DUR` | Cursor and CTA scale-dip together, then recover                           | [physics-press-reaction](../rules/physics-press-reaction.md)                    |
 
 ## Element Sizing
 
@@ -152,11 +152,7 @@ gsap.set(".cta-text", { opacity: 0, y: TEXT_REVEAL_Y_PX });
 tl.to("#hero", { scale: EXIT_SCALE, duration: MORPH_EXIT_DUR, ease: "power3.out" }, MORPH_AT);
 
 // (2) Hero fades fast (small fraction of MORPH_EXIT_DUR)
-tl.to(
-  "#hero",
-  { opacity: 0, duration: MORPH_FADE_DUR, ease: "power2.out" },
-  MORPH_AT,
-);
+tl.to("#hero", { opacity: 0, duration: MORPH_FADE_DUR, ease: "power2.out" }, MORPH_AT);
 
 // (3) CTA pops in with overshoot
 tl.to(
@@ -386,15 +382,15 @@ Phase 4 → end:
 
 ## Spring → GSAP Ease Cheatsheet (this blueprint)
 
-| Source spring                                            | This blueprint uses                                           |
-| -------------------------------------------------------- | ------------------------------------------------------------- |
-| Spring, low overshoot — hero entrance                    | `power3.out` over `INTRO_DUR`                                 |
-| Spring, low overshoot — hero morph exit                  | `power3.out` over `MORPH_EXIT_DUR`                            |
-| Spring, light mass with overshoot — CTA entrance         | `back.out(${BOUNCE_FACTOR})` over `MORPH_ENT_DUR`             |
-| Spring, heavily damped — cursor approach path            | `power2.out` over `CURSOR_PATH_DUR`                           |
-| Spring, high stiffness short — click down                | `power3.out` over `CLICK_DOWN_DUR`                            |
-| Spring, medium stiffness — click up                      | `power2.out` over `CLICK_UP_DUR`                              |
-| Continuous sine — logo rotation breath                   | `onUpdate` with `Math.sin(t * LOGO_ROT_FREQ) * LOGO_ROT_AMP_DEG` |
+| Source spring                                    | This blueprint uses                                              |
+| ------------------------------------------------ | ---------------------------------------------------------------- |
+| Spring, low overshoot — hero entrance            | `power3.out` over `INTRO_DUR`                                    |
+| Spring, low overshoot — hero morph exit          | `power3.out` over `MORPH_EXIT_DUR`                               |
+| Spring, light mass with overshoot — CTA entrance | `back.out(${BOUNCE_FACTOR})` over `MORPH_ENT_DUR`                |
+| Spring, heavily damped — cursor approach path    | `power2.out` over `CURSOR_PATH_DUR`                              |
+| Spring, high stiffness short — click down        | `power3.out` over `CLICK_DOWN_DUR`                               |
+| Spring, medium stiffness — click up              | `power2.out` over `CLICK_UP_DUR`                                 |
+| Continuous sine — logo rotation breath           | `onUpdate` with `Math.sin(t * LOGO_ROT_FREQ) * LOGO_ROT_AMP_DEG` |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 

@@ -56,10 +56,25 @@ Script is a flat array of N entries. Each entry defines its own text and timing 
 
 ```js
 const SCRIPT = [
-  { textMain: "{phrase1Main}", textAccent: "{phrase1Accent}", charSpeed: CHAR_SPEED, hold: HOLD_MID },
-  { textMain: "{phrase2Main}", textAccent: "{phrase2Accent}", charSpeed: CHAR_SPEED, hold: HOLD_MID },
+  {
+    textMain: "{phrase1Main}",
+    textAccent: "{phrase1Accent}",
+    charSpeed: CHAR_SPEED,
+    hold: HOLD_MID,
+  },
+  {
+    textMain: "{phrase2Main}",
+    textAccent: "{phrase2Accent}",
+    charSpeed: CHAR_SPEED,
+    hold: HOLD_MID,
+  },
   // …
-  { textMain: "{phraseNMain}", textAccent: "{phraseNAccent}", charSpeed: CHAR_SPEED, hold: HOLD_FINAL },
+  {
+    textMain: "{phraseNMain}",
+    textAccent: "{phraseNAccent}",
+    charSpeed: CHAR_SPEED,
+    hold: HOLD_FINAL,
+  },
 ];
 ```
 
@@ -215,7 +230,9 @@ Pick the largest `fontSize` such that the _longest_ phrase fits within the canva
 const longestChars = Math.max(...SCRIPT.map((p) => p.textMain.length + p.textAccent.length));
 // Sans-serif average character advance ≈ CHAR_ADVANCE_RATIO × fontSize.
 // Safe upper bound: SAFE_WIDTH_RATIO × canvasWidth fits the longest phrase.
-const safeFontSize = Math.floor((canvasWidth * SAFE_WIDTH_RATIO) / (longestChars * CHAR_ADVANCE_RATIO));
+const safeFontSize = Math.floor(
+  (canvasWidth * SAFE_WIDTH_RATIO) / (longestChars * CHAR_ADVANCE_RATIO),
+);
 ```
 
 For more accuracy, measure with a hidden canvas after `document.fonts.ready` (see [camera-cursor-tracking](../rules/camera-cursor-tracking.md) for the `ctx.measureText` pattern). For most decks a hand-tuned constant works fine — this is a statement scene, not body copy.

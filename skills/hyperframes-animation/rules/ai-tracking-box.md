@@ -337,7 +337,11 @@ The box fades to {LOST_OPACITY} (~{LOST_DUR}) then re-snaps to a new position wi
 
 ```js
 tl.to(box, { opacity: LOST_OPACITY, duration: LOST_DUR }, LOST_START);
-tl.to(box, { opacity: 1.0, duration: REACQUIRE_DUR, ease: `back.out(${REACQUIRE_BOUNCE})` }, REACQUIRE_START);
+tl.to(
+  box,
+  { opacity: 1.0, duration: REACQUIRE_DUR, ease: `back.out(${REACQUIRE_BOUNCE})` },
+  REACQUIRE_START,
+);
 tl.to(label, { textContent: "REACQUIRED · 99%", duration: 0 }, REACQUIRE_START);
 ```
 
@@ -373,6 +377,6 @@ After tracking, the camera (via [viewport-change](viewport-change.md)) zooms int
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — onUpdate writing multi-element positions
+- `/hyperframes-animation` — onUpdate writing multi-element positions
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

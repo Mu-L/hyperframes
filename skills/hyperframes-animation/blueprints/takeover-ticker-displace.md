@@ -38,11 +38,11 @@ Same four-phase arc; one paused GSAP timeline; the displacement maps to [reactiv
 
 All boundaries are in **seconds**.
 
-| Phase | Time window (s)                 | What Happens                                       | Skill Reference                                                            |
-| ----- | ------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1     | `0 – typeEnd`                   | Static text reveals via typewriter (smooth slice)  | Simple typewriter — continuous `Math.floor(progress)` slice                |
-| 2     | `ticker1 – ticker2 – tickerEnd` | Accent word cycles via vertical ticker             | [vertical-spring-ticker](../rules/vertical-spring-ticker.md)               |
-| 3     | `displaceStart – displaceEnd`   | Hero enters off-screen, physically pushes text out | [reactive-displacement](../rules/reactive-displacement.md)                 |
+| Phase | Time window (s)                 | What Happens                                       | Skill Reference                                                             |
+| ----- | ------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- |
+| 1     | `0 – typeEnd`                   | Static text reveals via typewriter (smooth slice)  | Simple typewriter — continuous `Math.floor(progress)` slice                 |
+| 2     | `ticker1 – ticker2 – tickerEnd` | Accent word cycles via vertical ticker             | [vertical-spring-ticker](../rules/vertical-spring-ticker.md)                |
+| 3     | `displaceStart – displaceEnd`   | Hero enters off-screen, physically pushes text out | [reactive-displacement](../rules/reactive-displacement.md)                  |
 | 4     | `idleStart – end`               | Hero breathes                                      | [sine-wave-loop](../rules/sine-wave-loop.md) (multiplicative onUpdate form) |
 
 ## Layout Strategy
@@ -382,11 +382,11 @@ Phase 3 → Phase 4:
 
 ## Spring → GSAP Ease Cheatsheet (this blueprint)
 
-| Source spring                                                                  | This blueprint uses                            |
-| ------------------------------------------------------------------------------ | ---------------------------------------------- |
-| Snappy spring on ticker step                                                   | `back.out(${BOUNCE_FACTOR})`                   |
-| Heavy spring on hero impact (high mass)                                        | `power2.out` over longer `HERO_DUR`            |
-| Continuous breath with different scale / rotation periods                      | Two `Math.sin()` calls in one `onUpdate`       |
+| Source spring                                             | This blueprint uses                      |
+| --------------------------------------------------------- | ---------------------------------------- |
+| Snappy spring on ticker step                              | `back.out(${BOUNCE_FACTOR})`             |
+| Heavy spring on hero impact (high mass)                   | `power2.out` over longer `HERO_DUR`      |
+| Continuous breath with different scale / rotation periods | Two `Math.sin()` calls in one `onUpdate` |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 

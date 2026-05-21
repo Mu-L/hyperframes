@@ -124,7 +124,11 @@ This is **different from [coordinate-target-zoom](coordinate-target-zoom.md)**, 
 
   // Phase 1 — content reveal at neutral camera
   tl.from(".hero", { opacity: 0, y: HERO_Y, duration: HERO_DUR, ease: "power3.out" }, HERO_START);
-  tl.from(".tagline", { opacity: 0, y: TAGLINE_Y, duration: TAGLINE_DUR, ease: "power3.out" }, TAGLINE_START);
+  tl.from(
+    ".tagline",
+    { opacity: 0, y: TAGLINE_Y, duration: TAGLINE_DUR, ease: "power3.out" },
+    TAGLINE_START,
+  );
 
   // Phase 2 — zoom in on CTA (single-element composite transform)
   // CSS applies scale FIRST then translate: world point (ox, oy) lands at
@@ -147,7 +151,12 @@ This is **different from [coordinate-target-zoom](coordinate-target-zoom.md)**, 
   // Phase 3 — CTA reveals/dwells after zoom settles
   tl.from(
     "#cta",
-    { opacity: 0, scale: CTA_REVEAL_SCALE, duration: CTA_REVEAL_DUR, ease: `back.out(${BOUNCE_FACTOR})` },
+    {
+      opacity: 0,
+      scale: CTA_REVEAL_SCALE,
+      duration: CTA_REVEAL_DUR,
+      ease: `back.out(${BOUNCE_FACTOR})`,
+    },
     CTA_REVEAL_START,
   );
 
@@ -209,8 +218,16 @@ function applyCompositeCamera() {
   cam.scale = scaleUp.v * scaleDown.v;
   applyCamera();
 }
-tl.to(scaleUp, { v: SCALE_UP_TARGET, duration: SCALE_UP_DUR, onUpdate: applyCompositeCamera }, SCALE_UP_START);
-tl.to(scaleDown, { v: SCALE_DOWN_TARGET, duration: SCALE_DOWN_DUR, onUpdate: applyCompositeCamera }, SCALE_DOWN_START);
+tl.to(
+  scaleUp,
+  { v: SCALE_UP_TARGET, duration: SCALE_UP_DUR, onUpdate: applyCompositeCamera },
+  SCALE_UP_START,
+);
+tl.to(
+  scaleDown,
+  { v: SCALE_DOWN_TARGET, duration: SCALE_DOWN_DUR, onUpdate: applyCompositeCamera },
+  SCALE_DOWN_START,
+);
 ```
 
 ### Camera mode transition (centered → follow)
@@ -327,6 +344,6 @@ Crossfade between two camera modes via a 0→1 weight tween. At weight 0, mode A
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — single tween writing composite transform
+- `/hyperframes-animation` — single tween writing composite transform
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

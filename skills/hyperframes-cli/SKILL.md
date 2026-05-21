@@ -35,8 +35,6 @@ Cross-cutting rules that hold for every command:
 - **CI gating on render**: `--strict` fails on lint errors, `--strict-all` fails on warnings too, `--strict-variables` fails on undeclared `--variables` keys.
 - **Paths in `--json` are redacted** — `$HOME` becomes the literal `$HOME` so output is safe to paste into bug reports and agent contexts.
 - **Post-render verification.** After `render` returns exit 0, confirm the output file exists and has plausible size before reporting success: `[ -s "$OUTPUT" ] || echo "render produced no output"`. The CLI prints `◇  <path>` on success; for long renders also sanity-check duration with `ffprobe -i "$OUTPUT" -show_format -v error`.
-- **Look up framework behavior in skills or `npx hyperframes docs <topic>`.** Do **not** grep `node_modules/hyperframes/dist/` to reverse-engineer behavior — the compiled source is minified, version-specific, and likely to mislead. If a question isn't answered in the skills or `docs`, report the gap instead of spelunking.
-- **Visual QA uses `snapshot`, not draft renders.** Reach for `npx hyperframes snapshot` (PNGs at meaningful timeline states) when you need to eyeball a scene — not `render --quality draft` + `ffmpeg` frame extraction. Snapshot is the supported still-frame path and is orders of magnitude faster than rendering an mp4 just to look at it.
 
 ## Routing
 
@@ -51,9 +49,9 @@ Cross-cutting rules that hold for every command:
 
 ## Cross-Skill Hand-Offs
 
-- **Tailwind projects** (`init --tailwind`) → use `hyperframes-tailwind` before editing classes or theme tokens.
+- **Tailwind projects** (`init --tailwind`) → use `hyperframes-core` (Tailwind reference) before editing classes or theme tokens.
 - **Registry blocks/components** (`hyperframes add`, `hyperframes catalog`) → use `hyperframes-registry` for install paths, sub-composition wiring, and snippet merging.
-- **Asset preprocessing** (`tts`, `transcribe`, `remove-background`) → use `hyperframes-media` for voice selection, Whisper model rules, and TTS-to-captions chain.
+- **Asset preprocessing** (`tts`, `transcribe`, `remove-background`) → use `hyperframes-media` for voice selection, Whisper model rules, captions, and TTS-to-captions chain.
 - **Parametrized renders** (`--variables`) → declared via `data-composition-variables` on `<html>`; see `hyperframes-core` for the full schema.
 
 ## Lambda (Cloud Rendering)
@@ -72,9 +70,39 @@ See `references/lambda.md` for prerequisites, all 6 subcommands (`deploy`, `site
 
 ## Minimum Completion Gate
 
+### Static gates
+
 ```bash
 npx hyperframes lint
 npx hyperframes validate
 ```
 
 Add `inspect` for layout-sensitive work and `render --strict` in CI to fail on lint errors.
+
+### Visual smoke test — required when the project uses sub-compositions
+
+`lint` / `validate` / `inspect` evaluate each composition **in isolation**. They never load `index.html` and mount sub-compositions via `data-composition-src`, so they cannot catch cross-file mount failures (see `hyperframes-core` → `references/sub-compositions.md`, "Common pitfalls"). The only gate that catches them is one that actually loads `index.html` and seeks the timeline.
+
+Use `hyperframes snapshot` — it loads the project the same way `render` does (so it exercises the same mount path) but only captures the timestamps you request, so it's seconds instead of a full render:
+
+```bash
+# Capture one frame at the midpoint of every sub-composition.
+# Midpoints = data-start + data-duration/2 for each host slot in index.html.
+npx hyperframes snapshot --at <t1>,<t2>,<t3>,...
+
+# Or, if you don't need per-scene targeting, an evenly-spaced sample:
+npx hyperframes snapshot --frames 9
+```
+
+Output lands in `snapshots/frame-NN-at-Xs.png`. Eyeball each frame against the scene plan.
+
+Per-frame red flags (each maps to a specific failure mode the static gates miss):
+
+| What you see                                                                       | Root cause                                                                                  |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Text shows up tiny + unstyled in the top-left corner                               | `<style>` block left in `<head>` outside `<template>` (Pitfall 1) — no CSS reached live DOM |
+| SVG/icon elements blown up to canvas-size                                          | Same as above — no width/height constraints applied                                         |
+| Hero element of the scene is missing entirely; only background + watermark visible | Host-id ≠ template id (Pitfall 2) — timeline never ran, frame captured at initial state     |
+| Snapshot command logs `Sub-composition timelines not registered after 45000ms`     | Pitfall 2 — direct confirmation                                                             |
+
+`snapshots/` can be deleted after eyeballing; the user-facing final render is a separate pass with `npx hyperframes render`.

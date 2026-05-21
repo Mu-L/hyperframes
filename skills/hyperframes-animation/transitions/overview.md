@@ -104,9 +104,7 @@ CSS transitions animate scene containers with opacity, transforms, clip-path, an
 
 **Both are first-class options.** Shaders are provided by the `@hyperframes/shader-transitions` package — import from the package instead of writing raw GLSL. CSS transitions are simpler to set up. Choose based on the effect you want, not based on which is easier.
 
-**Mixing within a shader-transitions composition is supported.** Each entry in the package's `transitions[]` array has an optional `shader` field — set it to a shader id for a WebGL transition, omit it for a CSS opacity crossfade. The package schedules a real GSAP opacity tween for the CSS entries while the WebGL compositor handles the shader entries; index alignment with `scenes[i]/scenes[i+1]` is preserved either way. Use this to keep most scene changes on a signature shader and drop in CSS crossfades for breath / wind-down moments where a shader effect would overdramatise.
-
-Pure-CSS compositions (no `@hyperframes/shader-transitions` import at all) animate scene containers directly and have no capture pipeline involved.
+When a composition uses shader transitions, ALL transitions in that composition should be shader-based (the WebGL canvas replaces DOM-based scene switching). Don't mix CSS and shader transitions in the same composition.
 
 ## Shader-Compatible CSS Rules
 
@@ -119,7 +117,7 @@ Shader transitions capture DOM scenes to WebGL textures via html2canvas. The can
 5. **No gradient opacity below 0.15.** Gradient elements below 10% opacity render differently in canvas vs CSS. Increase to 0.15+ or use a solid color at equivalent brightness.
 6. **Every `.scene` div must have explicit `background-color`, AND pass the same color as `bgColor` in the `init()` config.** The package captures scene elements via html2canvas. Both the CSS `background-color` on `.scene` and the `bgColor` config must match. Without either, the texture renders as black.
 
-These rules apply per-scene to any scene captured by an adjacent shader transition (the FROM/TO scenes of a `transitions[]` entry with a `shader` field set). Scenes whose neighbouring transitions are all CSS crossfades — including pure-CSS compositions — have no such restrictions, because they're never sampled into a WebGL texture.
+These rules only apply to shader transition compositions. CSS-only compositions have no restrictions.
 
 ## Visual Pattern Warning
 

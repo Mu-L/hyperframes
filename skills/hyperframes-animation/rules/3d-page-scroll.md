@@ -146,8 +146,16 @@ For multi-step scrolling (scroll → pause → scroll), use multiple `tl.to(".pa
 // Scroll to section A → hold → scroll to section B.
 // SCROLL_DISTANCE_A and SCROLL_DISTANCE_B are both measured from the
 // .page-content origin (NOT delta from previous step).
-tl.to(".page-content", { y: -SCROLL_DISTANCE_A, duration: SCROLL_DUR, ease: "power3.out" }, SCROLL_AT_A);
-tl.to(".page-content", { y: -SCROLL_DISTANCE_B, duration: SCROLL_DUR, ease: "power3.out" }, SCROLL_AT_B);
+tl.to(
+  ".page-content",
+  { y: -SCROLL_DISTANCE_A, duration: SCROLL_DUR, ease: "power3.out" },
+  SCROLL_AT_A,
+);
+tl.to(
+  ".page-content",
+  { y: -SCROLL_DISTANCE_B, duration: SCROLL_DUR, ease: "power3.out" },
+  SCROLL_AT_B,
+);
 ```
 
 GSAP composes successive `y:` tweens additively when targeting the same property — each tween starts from the value left by the previous tween.
@@ -214,6 +222,6 @@ Pick one and use it across all scrolls in the scene — mixing easings within on
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — timeline + ease reference; `y:` tween basics
+- `/hyperframes-animation` — timeline + ease reference; `y:` tween basics
 - `/hyperframes-core` — composition wiring, `data-*` attributes
 - `/hyperframes-cli` — `hyperframes lint` to verify the registry key + duration

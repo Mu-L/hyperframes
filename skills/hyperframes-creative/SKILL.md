@@ -1,72 +1,58 @@
 ---
 name: hyperframes-creative
-description: Creative direction and recipes for HyperFrames videos. Use for design.md handling, visual styles, palettes, motion principles, typography, scene transitions, beat planning, narration, audio-reactive visuals, marker effects, title cards, data-in-motion, and advanced composition techniques.
+description: Non-animation creative direction for HyperFrames videos. Use for design.md handling, palettes, typography, narration, beat planning, audio-reactive visuals, composition patterns, and brand / style decisions. For atomic motion patterns and scene blueprints, use `hyperframes-animation`.
 ---
 
 # HyperFrames Creative
 
-Use this skill after the technical composition contract is clear. For minimal renderable HTML and framework rules, use `hyperframes-core`. This skill adds brand, pacing, style, transitions, and recipe-level guidance.
+Brand, pacing, style, narration, and composition direction. Use after the technical contract from `hyperframes-core` is in place.
+
+For motion patterns, scene blueprints, transitions, and CSS marker effects, use `hyperframes-animation` — this skill is intentionally non-animation.
 
 ## Workflow
 
 1. If a project has `design.md` or `DESIGN.md`, treat it as brand truth: colors, fonts, spacing, tone, and constraints.
 2. If no design file exists and the user asks for visual direction, choose a route:
-   - Named style or mood: read `visual-styles.md`.
-   - Fast defaults: read `house-style.md`.
-   - Interactive selection: read `references/design-picker.md`.
-3. For multi-scene work, plan beats and rhythm before writing HTML. Read `references/beat-direction.md` and `references/transitions/overview.md`.
-4. For motion-heavy work, read `references/motion-principles.md` and the relevant recipe reference.
-5. After authoring significant animation, run the animation map script and inspect its flags.
+   - Named style or mood → `references/visual-styles.md`
+   - Fast defaults → `references/house-style.md`
+   - Interactive selection → `references/design-picker.md`
+3. For multi-scene work, plan beats and rhythm before writing HTML → `references/beat-direction.md`. For scene transitions, jump to `hyperframes-animation/transitions/`.
+4. For motion-heavy work, read `references/motion-principles.md` (high-level guardrails), then go to `hyperframes-animation` for atomic rules.
 
-## Structured Prompt Fast Path
+## Routing
 
-When the prompt is already structured, convert it directly into an implementation beat map:
-
-- Preserve specified constraints unless they are impossible to render.
-- Build timing first, styling second.
-- Prefer native render primitives before adding assets.
-- Use shared background layers for global state changes.
-- Choose snapshots from meaningful timeline states.
-- Interpret animation-map flags against the intended rhythm before changing choreography.
-
-## References
-
-- `house-style.md`: default palettes, motion, typography, and lazy defaults to question.
-- `visual-styles.md`: named style presets and mood-to-style routing.
-- `palettes/*.md`: palette-specific color tokens.
-- `patterns.md`: PiP, text-behind-subject, title card, slide show, and top-level examples.
-- `data-in-motion.md`: stats and infographic presentation rules.
-- `references/prompt-expansion.md`: structured expansion for open-ended prompts.
-- `references/video-composition.md`: video-medium density, scale, color, and frame-composition guidance.
-- `references/beat-direction.md`: per-beat direction, rhythm planning, and transition timing.
-- `references/transitions/overview.md`: scene transition selection, energy/mood mapping, and shader-CSS rules.
-- `references/transitions/catalog.md`: transition implementation catalog with GSAP code per type.
-- `references/transitions/css-*.md`: per-category CSS implementations (push, scale, dissolve, distortion, etc.).
-- `references/motion-principles.md`: motion guardrails and GSAP rules that affect visual quality.
-- `references/typography.md`: font selection, pairings, and rendered-video type guardrails.
-- `references/narration.md`: script pacing, tone, openings, and number pronunciation.
-- `references/audio-reactive.md`: precomputed audio data mapped to motion.
-- `references/css-patterns.md`: marker highlight, circle, burst, scribble, and sketchout effects.
-- `references/techniques.md`: SVG, Canvas 2D, CSS 3D, kinetic type, Lottie, compositing, variable fonts, and other advanced techniques.
-- `references/gsap-effects.md`: typewriter and audio visualizer recipes moved out of the core GSAP API skill.
+| Topic                                                                   | Read                                 |
+| ----------------------------------------------------------------------- | ------------------------------------ |
+| Default palettes, motion, typography, lazy defaults to question         | `references/house-style.md`          |
+| Named style presets, mood-to-style routing                              | `references/visual-styles.md`        |
+| Palette-specific color tokens                                           | `palettes/*.md`                      |
+| Composition patterns — PiP, text-behind-subject, title card, slide show | `references/composition-patterns.md` |
+| Stats / infographic presentation                                        | `references/data-in-motion.md`       |
+| Structured expansion for open-ended prompts                             | `references/prompt-expansion.md`     |
+| Video-medium density, scale, color, frame composition                   | `references/video-composition.md`    |
+| Per-beat direction, rhythm planning, transition timing                  | `references/beat-direction.md`       |
+| High-level motion guardrails and GSAP-quality rules                     | `references/motion-principles.md`    |
+| Font selection, pairings, rendered-video type guardrails                | `references/typography.md`           |
+| Script pacing, tone, openings, number pronunciation                     | `references/narration.md`            |
+| Precomputed audio bands mapped to motion                                | `references/audio-reactive.md`       |
 
 ## Scripts
 
-- `scripts/animation-map.mjs`: analyze GSAP choreography, dead zones, stagger, lifecycle, and flags.
-- `scripts/contrast-report.mjs`: inspect contrast warnings from rendered frames.
-- `scripts/extract-audio-data.py`: pre-extract audio bands for audio-reactive compositions.
-- `scripts/package-loader.mjs`: support script for bundled creative tooling.
+- `scripts/contrast-report.mjs` — inspect contrast warnings from rendered frames.
+- `scripts/extract-audio-data.py` — pre-extract audio bands for audio-reactive compositions.
+- `scripts/package-loader.mjs` — support script for bundled creative tooling.
 
-Run scripts from the repo root with explicit paths, for example:
+Run from the repo root with explicit paths, for example:
 
 ```bash
-node skills/hyperframes-creative/scripts/animation-map.mjs <composition-dir> \
-  --out <composition-dir>/.hyperframes/anim-map
+python skills/hyperframes-creative/scripts/extract-audio-data.py <audio-file>
 ```
+
+Animation analysis (`animation-map.mjs`) lives in `hyperframes-animation/scripts/`.
 
 ## Boundaries
 
 - Do not override `hyperframes-core` technical rules.
 - Do not require a design system for a minimal technical composition.
 - Do not add extra scenes, narration, music, captions, or transitions unless the request calls for them or you first propose the expansion.
-- Keep creative recipe references task-specific; do not read every reference for simple edits.
+- Keep recipe references task-specific; do not read every reference for simple edits.

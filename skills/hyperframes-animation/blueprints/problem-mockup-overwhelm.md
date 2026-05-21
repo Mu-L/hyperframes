@@ -98,7 +98,9 @@ In the source, the source uses `{showMockups && <MockupCluster />}` / `{showAvat
                                        width: {MOCKUP_W}px; height: {MOCKUP_H}px; border-radius: {MOCKUP_RADIUS}px;
                                        overflow: hidden;"
     >
-      <div class="mockup-center-content"><!-- {mockupLabelCenter} content (the morph subject) --></div>
+      <div class="mockup-center-content">
+        <!-- {mockupLabelCenter} content (the morph subject) -->
+      </div>
     </div>
 
     <!-- Platform icons (positions pre-baked via CSS variables or inline left/top) -->
@@ -139,20 +141,32 @@ Three mockups: center (largest, highest z-index, intrinsic size matches `MOCKUP_
 
 ```js
 // Composition constants — assign in your example only. See "How to Choose Values".
-const COMP_W;          // px — composition width (matches data-width)
-const COMP_H;          // px — composition height (matches data-height)
+const COMP_W; // px — composition width (matches data-width)
+const COMP_H; // px — composition height (matches data-height)
 
-const MOCKUP_W;        // px — center mockup intrinsic width
-const MOCKUP_H;        // px — center mockup intrinsic height
-const AVATAR_SIZE;     // px — final avatar diameter
+const MOCKUP_W; // px — center mockup intrinsic width
+const MOCKUP_H; // px — center mockup intrinsic height
+const AVATAR_SIZE; // px — final avatar diameter
 const MORPH_END_SCALE = AVATAR_SIZE / MOCKUP_W; // derived — uniform scale at morph end
 
 const MOCKUP_REST_SCALE; // 0..1 — non-center mockup base scale
-const ENTRY_TILT;        // deg — small static rotation on side mockups
+const ENTRY_TILT; // deg — small static rotation on side mockups
 
 // Initial states (set once at script load — GSAP owns the transform from now on)
-gsap.set(".mockup-left", { xPercent: 0, yPercent: -50, rotation: -ENTRY_TILT, scale: MOCKUP_REST_SCALE, opacity: 0 });
-gsap.set(".mockup-right", { xPercent: 0, yPercent: -50, rotation: ENTRY_TILT, scale: MOCKUP_REST_SCALE, opacity: 0 });
+gsap.set(".mockup-left", {
+  xPercent: 0,
+  yPercent: -50,
+  rotation: -ENTRY_TILT,
+  scale: MOCKUP_REST_SCALE,
+  opacity: 0,
+});
+gsap.set(".mockup-right", {
+  xPercent: 0,
+  yPercent: -50,
+  rotation: ENTRY_TILT,
+  scale: MOCKUP_REST_SCALE,
+  opacity: 0,
+});
 gsap.set(".mockup-center", { xPercent: -50, yPercent: -50, scale: 1, opacity: 0 });
 gsap.set(".platform-icon", { scale: 0, opacity: 0 });
 ```
@@ -162,20 +176,30 @@ gsap.set(".platform-icon", { scale: 0, opacity: 0 });
 Three near-simultaneous spring-in entries with small inter-element delays. The "subtle floating" component is a finite `sine.inOut` yoyo (see [sine-wave-loop](../rules/sine-wave-loop.md)) — **not** a frame-driven `Math.sin(frame * ...)` like in
 
 ```js
-const MOCKUPS_APPEAR;        // s — phase 1 anchor
-const MOCKUP_ENTRY_DUR;      // s — single mockup spring-in
-const MOCKUP_ENTRY_STAGGER;  // s — gap between left / right / center entries
-const ENTRY_BOUNCE;          // ease coefficient for back.out
+const MOCKUPS_APPEAR; // s — phase 1 anchor
+const MOCKUP_ENTRY_DUR; // s — single mockup spring-in
+const MOCKUP_ENTRY_STAGGER; // s — gap between left / right / center entries
+const ENTRY_BOUNCE; // ease coefficient for back.out
 // spring(stiffness:70, damping:14) → back.out(${ENTRY_BOUNCE}) is close enough for sub-second tweens.
 
 tl.to(
   ".mockup-left",
-  { opacity: 1, scale: MOCKUP_REST_SCALE, duration: MOCKUP_ENTRY_DUR, ease: `back.out(${ENTRY_BOUNCE})` },
+  {
+    opacity: 1,
+    scale: MOCKUP_REST_SCALE,
+    duration: MOCKUP_ENTRY_DUR,
+    ease: `back.out(${ENTRY_BOUNCE})`,
+  },
   MOCKUPS_APPEAR,
 );
 tl.to(
   ".mockup-right",
-  { opacity: 1, scale: MOCKUP_REST_SCALE, duration: MOCKUP_ENTRY_DUR, ease: `back.out(${ENTRY_BOUNCE})` },
+  {
+    opacity: 1,
+    scale: MOCKUP_REST_SCALE,
+    duration: MOCKUP_ENTRY_DUR,
+    ease: `back.out(${ENTRY_BOUNCE})`,
+  },
   MOCKUPS_APPEAR + MOCKUP_ENTRY_STAGGER,
 );
 tl.to(
@@ -192,10 +216,10 @@ Floating idle (Phase 1 → all phases): see the [sine-wave-loop](../rules/sine-w
 Platform icons enter staggered. Each icon's `left`/`top` is **pre-baked into CSS** (deterministic positions); GSAP tweens only `scale` and `opacity`. This is critical: HyperFrames forbids tweening `left` / `top`.
 
 ```js
-const ICONS_APPEAR;       // s — phase 2 anchor; ≥ last mockup entry + small settle
-const ICON_ENTRY_DUR;     // s — per-icon spring-in
-const ICON_STAGGER;       // s — gap between successive icon entries
-const ICON_BOUNCE;        // ease coefficient — slightly snappier than ENTRY_BOUNCE
+const ICONS_APPEAR; // s — phase 2 anchor; ≥ last mockup entry + small settle
+const ICON_ENTRY_DUR; // s — per-icon spring-in
+const ICON_STAGGER; // s — gap between successive icon entries
+const ICON_BOUNCE; // ease coefficient — slightly snappier than ENTRY_BOUNCE
 
 // stagger across all icons; spring(stiffness:180, damping:14) → back.out(${ICON_BOUNCE})
 tl.to(
@@ -220,18 +244,18 @@ The morph in the source asset tweens `width`, `height`, and `borderRadius` in lo
 **HyperFrames substitution**: tween `scale` (uniform, intrinsic dimensions stay fixed) + `borderRadius` (paint-only, allowed). The content fades during the first slice of the morph, and near the end the entire morph container fades to 0, revealing the real avatar circle rendered underneath. The viewer reads this exactly as "rect morphs to circle" — the hand-off is the trick. See [card-morph-anchor](../rules/card-morph-anchor.md) for the atomic rule.
 
 ```js
-const MORPH_TRIGGER;         // s — phase 3 anchor
-const MORPH_DUR;             // s — full morph length
-const CONTENT_FADE_FRAC;     // 0..0.5 — fraction of MORPH_DUR for content fade-out
-const HANDOFF_TAIL_FRAC;     // 0..0.3 — fraction of MORPH_DUR for final container fade
-const EXITING_MOCKUP_SCALE;  // <1 — scale that non-center mockups shrink to on exit
-const EXITING_ICON_SCALE;    // <1 — scale that icons shrink to on exit
-const EXIT_DUR_FRAC;         // 0..1 — fraction of MORPH_DUR for concurrent exits
-const ICON_EXIT_STAGGER;     // s — tight stagger for edge-out icon exits
-const AVATAR_LAYER_IN_FRAC;  // 0..1 — when avatar layer opacity starts (× MORPH_DUR)
-const AVATAR_LAYER_IN_DUR;   // s — avatar layer fade-in length
-const AVATAR_POP_DUR;        // s — avatar scale-in spring length
-const AVATAR_BOUNCE;         // ease coefficient for avatar pop
+const MORPH_TRIGGER; // s — phase 3 anchor
+const MORPH_DUR; // s — full morph length
+const CONTENT_FADE_FRAC; // 0..0.5 — fraction of MORPH_DUR for content fade-out
+const HANDOFF_TAIL_FRAC; // 0..0.3 — fraction of MORPH_DUR for final container fade
+const EXITING_MOCKUP_SCALE; // <1 — scale that non-center mockups shrink to on exit
+const EXITING_ICON_SCALE; // <1 — scale that icons shrink to on exit
+const EXIT_DUR_FRAC; // 0..1 — fraction of MORPH_DUR for concurrent exits
+const ICON_EXIT_STAGGER; // s — tight stagger for edge-out icon exits
+const AVATAR_LAYER_IN_FRAC; // 0..1 — when avatar layer opacity starts (× MORPH_DUR)
+const AVATAR_LAYER_IN_DUR; // s — avatar layer fade-in length
+const AVATAR_POP_DUR; // s — avatar scale-in spring length
+const AVATAR_BOUNCE; // ease coefficient for avatar pop
 // spring(stiffness:80, damping:18) ≈ power3.out (morph driver)
 // spring(stiffness:120, damping:14) → back.out(${AVATAR_BOUNCE}) (avatar pop)
 
@@ -342,9 +366,9 @@ Task bubbles enter in radial positions around the avatar. In the the source sour
 const BUBBLE_TASKS = [
   { label: "{task1}", angle: 270 }, // top
   { label: "{task2}", angle: 315 }, // top-right
-  { label: "{task3}", angle:   0 }, // right
-  { label: "{task4}", angle:  45 }, // bottom-right
-  { label: "{task5}", angle:  90 }, // bottom
+  { label: "{task3}", angle: 0 }, // right
+  { label: "{task4}", angle: 45 }, // bottom-right
+  { label: "{task5}", angle: 90 }, // bottom
   { label: "{task6}", angle: 135 }, // bottom-left
   { label: "{task7}", angle: 180 }, // left
   { label: "{task8}", angle: 225 }, // top-left
@@ -352,18 +376,18 @@ const BUBBLE_TASKS = [
 
 const BUBBLE_CENTER_X = COMP_W / 2;
 const BUBBLE_CENTER_Y = COMP_H / 2;
-const BUBBLE_RADIUS;          // px — distance from avatar center to bubble center
+const BUBBLE_RADIUS; // px — distance from avatar center to bubble center
 
-const BUBBLES_START_FRAC;     // 0..1 — when bubbles begin entering, as fraction of MORPH_DUR past MORPH_TRIGGER
-const BUBBLE_DUR;             // s — per-bubble spring-in
-const BUBBLE_STAGGER;         // s — gap between successive bubble entries
-const BUBBLE_BOUNCE;          // ease coefficient
-const BUBBLE_FINAL_OPACITY;   // 0.85-1.0 — settled opacity
-const BUBBLE_RADIUS_CSS;      // px — bubble corner radius
-const BUBBLE_BORDER_PX;       // px — bubble border thickness
-const BUBBLE_PAD_Y;           // px — vertical padding
-const BUBBLE_PAD_X;           // px — horizontal padding
-const BUBBLE_FONT_PX;         // px — label size
+const BUBBLES_START_FRAC; // 0..1 — when bubbles begin entering, as fraction of MORPH_DUR past MORPH_TRIGGER
+const BUBBLE_DUR; // s — per-bubble spring-in
+const BUBBLE_STAGGER; // s — gap between successive bubble entries
+const BUBBLE_BOUNCE; // ease coefficient
+const BUBBLE_FINAL_OPACITY; // 0.85-1.0 — settled opacity
+const BUBBLE_RADIUS_CSS; // px — bubble corner radius
+const BUBBLE_BORDER_PX; // px — bubble border thickness
+const BUBBLE_PAD_Y; // px — vertical padding
+const BUBBLE_PAD_X; // px — horizontal padding
+const BUBBLE_FONT_PX; // px — label size
 
 const stage = document.querySelector(".avatar-with-bubbles");
 BUBBLE_TASKS.forEach((task, i) => {
@@ -444,6 +468,7 @@ Phase 3 → Phase 4:
 ## How to Choose Values
 
 Composition layout
+
 - **COMP_W / COMP_H** — composition canvas size
   - Range: must equal `data-width` / `data-height` on the root
   - Reference: examples/problem-mockup-overwhelm.html uses 1920 × 1080
@@ -461,6 +486,7 @@ Composition layout
   - Effects: > 3 deg starts reading as a fan-out card stack instead of a tight cluster
 
 Phase timing anchors
+
 - **MOCKUPS_APPEAR** — phase 1 anchor
   - Range: 0-0.2 s (usually 0)
 - **MOCKUP_ENTRY_DUR** — single mockup spring-in length
@@ -484,12 +510,13 @@ Phase timing anchors
   - Constraints: must be > AVATAR_LAYER_IN_FRAC
 
 Morph internals
+
 - **CONTENT_FADE_FRAC** — fraction of MORPH_DUR for content fade-out
   - Range: 0.3-0.5
   - Effects: low end leaves rectangular content visible too long; high end fades before the morph shape change registers
 - **HANDOFF_TAIL_FRAC** — fraction of MORPH_DUR for final container fade
   - Range: 0.1-0.2
-  - Constraints: AVATAR_POP_DUR < (1 - HANDOFF_TAIL_FRAC) * MORPH_DUR
+  - Constraints: AVATAR_POP_DUR < (1 - HANDOFF_TAIL_FRAC) \* MORPH_DUR
 - **EXIT_DUR_FRAC** — fraction of MORPH_DUR for non-center mockup / icon exits
   - Range: 0.4-0.6
   - Effects: shorter feels premature; longer overlaps with avatar reveal
@@ -500,15 +527,17 @@ Morph internals
   - Range: 0.01-0.04 s — tight, so they read as a single coordinated dissolve
 
 Avatar
+
 - **AVATAR_LAYER_IN_FRAC** — fraction of MORPH_DUR after MORPH_TRIGGER when avatar layer opacity starts
   - Range: 0.4-0.6
 - **AVATAR_LAYER_IN_DUR** — avatar layer fade-in length
   - Range: 0.2-0.4 s
 - **AVATAR_POP_DUR** — avatar scale-in spring length
   - Range: 0.45-0.7 s
-  - Constraints: AVATAR_POP_DUR + MORPH_TRIGGER ≤ MORPH_TRIGGER + (1 - HANDOFF_TAIL_FRAC) * MORPH_DUR
+  - Constraints: AVATAR_POP_DUR + MORPH_TRIGGER ≤ MORPH_TRIGGER + (1 - HANDOFF_TAIL_FRAC) \* MORPH_DUR
 
 Bubbles
+
 - **BUBBLE_RADIUS** — distance from avatar center to each bubble center
   - Range: depends on avatar + bubble size; keep all bubbles inside the safe area (≥ 60 px from canvas edges)
 - **BUBBLE_DUR** — per-bubble spring-in
@@ -521,6 +550,7 @@ Bubbles
   - Range: pick so labels fit on one line at the chosen font size; bubble width should not exceed the radial gap to neighbors
 
 Ease coefficients (`back.out(coef)`)
+
 - **ENTRY_BOUNCE** — mockup entry bounce intensity
   - Range: 1.2-1.6; lower = subtler overshoot, higher = playful
 - **ICON_BOUNCE** — icon entry bounce
@@ -531,6 +561,7 @@ Ease coefficients (`back.out(coef)`)
   - Range: 1.2-1.6
 
 Placeholder content (replace in the example)
+
 - **{mockupLabel1} / {mockupLabel2} / {mockupLabelCenter}** — short product / workflow labels for the three mockups; center one is the morph subject
 - **{platformIcon}** — icon assets in `assets/icons/`
 - **{avatarAsset}** — looping muted video, or substitute a CSS gradient circle
@@ -556,27 +587,27 @@ Placeholder content (replace in the example)
 
 ## the source → HyperFrames Mapping (this blueprint)
 
-| Source pattern (frame-driven Remotion-style scene)                          | HyperFrames equivalent                                                                          |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `frame = useCurrentFrame()`                                                 | Implicit — GSAP timeline carries time                                                           |
-| `useVideoConfig().fps`                                                      | Not needed; everything is in seconds                                                            |
-| `useVideoConfig().width / height`                                           | `COMP_W` / `COMP_H` constants matching `data-width` / `data-height`                              |
-| `toFrame(seconds)` (relative-to-scene frame)                                | seconds, relative to composition start                                                          |
-| `spring({ stiffness:70, damping:14 })` (mockup entry)                       | `ease: "back.out(${ENTRY_BOUNCE})"`, `duration: MOCKUP_ENTRY_DUR`                                |
-| `spring({ stiffness:80, damping:18 })` (morph driver)                       | `ease: "power3.out"`, `duration: MORPH_DUR`                                                     |
-| `spring({ stiffness:120, damping:14 })` (avatar pop)                        | `ease: "back.out(${AVATAR_BOUNCE})"`, `duration: AVATAR_POP_DUR`                                 |
-| `spring({ stiffness:180, damping:12 })` (bubble pop)                        | `ease: "back.out(${BUBBLE_BOUNCE})"`, `duration: BUBBLE_DUR`                                     |
-| `interpolate(morphProgress, [0,1], [MOCKUP_W, AVATAR_SIZE])` (`width`)      | `scale: MORPH_END_SCALE` tween                                                                   |
-| `interpolate(morphProgress, [0,1], [MOCKUP_H, AVATAR_SIZE])` (`height`)     | covered by uniform `scale` + content fade-out                                                    |
-| `interpolate(morphProgress, [0,1], [cornerStart, cornerEnd])` (`borderRadius`) | `borderRadius: (MOCKUP_W * MORPH_END_SCALE / 2) + "px"` tween                                 |
-| `interpolate(morphProgress, [0,CONTENT_FADE_FRAC], [1,0])` (content opacity) | `duration: MORPH_DUR * CONTENT_FADE_FRAC` opacity tween                                         |
-| `interpolate(morphProgress, [1-HANDOFF_TAIL_FRAC, 1], [1,0])` (final fade)  | tween at `MORPH_TRIGGER + (1-HANDOFF_TAIL_FRAC) * MORPH_DUR`, `duration: HANDOFF_TAIL_FRAC * MORPH_DUR` |
-| `Math.sin(frame * ...)` (icon float)                                        | Per-icon finite `sine.inOut` yoyo, or shared `onUpdate`                                          |
-| `frame < TIMING.avatarAppear + N` (showMockups gate)                        | Opacity tween — both layers stay in DOM                                                          |
-| `<AbsoluteFill>`                                                            | `<div style="position: absolute; inset: 0;">`                                                   |
-| `<OffthreadVideo src={staticFile(...)} volume={0}>`                         | `<video src="{avatarAsset}" muted playsinline>`                                                  |
-| `<Img src={staticFile(ICONS.foo)}>`                                         | `<img src="{platformIcon}">`                                                                     |
-| `POSITIONS.map(...)` JSX                                                    | `forEach` that builds DOM at script load                                                         |
+| Source pattern (frame-driven Remotion-style scene)                             | HyperFrames equivalent                                                                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `frame = useCurrentFrame()`                                                    | Implicit — GSAP timeline carries time                                                                   |
+| `useVideoConfig().fps`                                                         | Not needed; everything is in seconds                                                                    |
+| `useVideoConfig().width / height`                                              | `COMP_W` / `COMP_H` constants matching `data-width` / `data-height`                                     |
+| `toFrame(seconds)` (relative-to-scene frame)                                   | seconds, relative to composition start                                                                  |
+| `spring({ stiffness:70, damping:14 })` (mockup entry)                          | `ease: "back.out(${ENTRY_BOUNCE})"`, `duration: MOCKUP_ENTRY_DUR`                                       |
+| `spring({ stiffness:80, damping:18 })` (morph driver)                          | `ease: "power3.out"`, `duration: MORPH_DUR`                                                             |
+| `spring({ stiffness:120, damping:14 })` (avatar pop)                           | `ease: "back.out(${AVATAR_BOUNCE})"`, `duration: AVATAR_POP_DUR`                                        |
+| `spring({ stiffness:180, damping:12 })` (bubble pop)                           | `ease: "back.out(${BUBBLE_BOUNCE})"`, `duration: BUBBLE_DUR`                                            |
+| `interpolate(morphProgress, [0,1], [MOCKUP_W, AVATAR_SIZE])` (`width`)         | `scale: MORPH_END_SCALE` tween                                                                          |
+| `interpolate(morphProgress, [0,1], [MOCKUP_H, AVATAR_SIZE])` (`height`)        | covered by uniform `scale` + content fade-out                                                           |
+| `interpolate(morphProgress, [0,1], [cornerStart, cornerEnd])` (`borderRadius`) | `borderRadius: (MOCKUP_W * MORPH_END_SCALE / 2) + "px"` tween                                           |
+| `interpolate(morphProgress, [0,CONTENT_FADE_FRAC], [1,0])` (content opacity)   | `duration: MORPH_DUR * CONTENT_FADE_FRAC` opacity tween                                                 |
+| `interpolate(morphProgress, [1-HANDOFF_TAIL_FRAC, 1], [1,0])` (final fade)     | tween at `MORPH_TRIGGER + (1-HANDOFF_TAIL_FRAC) * MORPH_DUR`, `duration: HANDOFF_TAIL_FRAC * MORPH_DUR` |
+| `Math.sin(frame * ...)` (icon float)                                           | Per-icon finite `sine.inOut` yoyo, or shared `onUpdate`                                                 |
+| `frame < TIMING.avatarAppear + N` (showMockups gate)                           | Opacity tween — both layers stay in DOM                                                                 |
+| `<AbsoluteFill>`                                                               | `<div style="position: absolute; inset: 0;">`                                                           |
+| `<OffthreadVideo src={staticFile(...)} volume={0}>`                            | `<video src="{avatarAsset}" muted playsinline>`                                                         |
+| `<Img src={staticFile(ICONS.foo)}>`                                            | `<img src="{platformIcon}">`                                                                            |
+| `POSITIONS.map(...)` JSX                                                       | `forEach` that builds DOM at script load                                                                |
 
 ## Golden Sample
 

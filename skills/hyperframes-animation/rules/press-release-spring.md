@@ -184,7 +184,11 @@ When the press signals confirmation, swap the button's resting color to a succes
 
 ```js
 tl.to("#btn", { backgroundColor: "{successColor}", duration: RELEASE_DUR }, RELEASE_START);
-tl.to(".btn-check", { scale: 1, duration: CHECK_POP_DUR, ease: `back.out(${CHECK_BOUNCE})` }, RELEASE_START);
+tl.to(
+  ".btn-check",
+  { scale: 1, duration: CHECK_POP_DUR, ease: `back.out(${CHECK_BOUNCE})` },
+  RELEASE_START,
+);
 ```
 
 ## How to Choose Values
@@ -287,6 +291,6 @@ tl.to(".btn-check", { scale: 1, duration: CHECK_POP_DUR, ease: `back.out(${CHECK
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — `back.out` ease + multi-tween coordination
+- `/hyperframes-animation` — `back.out` ease + multi-tween coordination
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

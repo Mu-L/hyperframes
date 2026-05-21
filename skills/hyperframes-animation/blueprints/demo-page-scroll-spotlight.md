@@ -137,9 +137,24 @@ tl.fromTo(
 );
 
 // Internal elements fade in with small offsets so navbar lands first, title second, CTA last.
-tl.fromTo(".page-navbar", { opacity: 0 }, { opacity: 1, duration: NAVBAR_FADE_DUR, ease: "power2.out" }, 0);
-tl.fromTo(".hero-title", { opacity: 0 }, { opacity: 1, duration: TITLE_FADE_DUR, ease: "power2.out" }, TITLE_FADE_AT);
-tl.fromTo(".cta-row",    { opacity: 0 }, { opacity: 1, duration: CTA_FADE_DUR,   ease: "power2.out" }, CTA_FADE_AT);
+tl.fromTo(
+  ".page-navbar",
+  { opacity: 0 },
+  { opacity: 1, duration: NAVBAR_FADE_DUR, ease: "power2.out" },
+  0,
+);
+tl.fromTo(
+  ".hero-title",
+  { opacity: 0 },
+  { opacity: 1, duration: TITLE_FADE_DUR, ease: "power2.out" },
+  TITLE_FADE_AT,
+);
+tl.fromTo(
+  ".cta-row",
+  { opacity: 0 },
+  { opacity: 1, duration: CTA_FADE_DUR, ease: "power2.out" },
+  CTA_FADE_AT,
+);
 ```
 
 ## Phase 2: ASR-Synced Keyword Highlighting
@@ -333,12 +348,12 @@ Ease families used (discrete choice, not numeric):
 
 ## Spring → GSAP Ease Cheatsheet (this blueprint)
 
-| Source spring                                          | This blueprint uses                                                              |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| `spring({ stiffness: 70, damping: 14 })` — card entry  | `power2.out` over CARD_ENTRY_DUR                                                 |
-| `spring({ stiffness: 60, damping: 20 })` — page scroll | `power2.inOut` over SCROLL_DUR (programmatic-scroll feel)                        |
-| `interpolate(...)` per-frame envelope                  | `--glow` CSS variable + two GSAP `power2.out` tweens per word                    |
-| Pulsing glow (sine)                                    | Optional second tween on a separate `--pulse` variable, finite yoyo              |
+| Source spring                                          | This blueprint uses                                                 |
+| ------------------------------------------------------ | ------------------------------------------------------------------- |
+| `spring({ stiffness: 70, damping: 14 })` — card entry  | `power2.out` over CARD_ENTRY_DUR                                    |
+| `spring({ stiffness: 60, damping: 20 })` — page scroll | `power2.inOut` over SCROLL_DUR (programmatic-scroll feel)           |
+| `interpolate(...)` per-frame envelope                  | `--glow` CSS variable + two GSAP `power2.out` tweens per word       |
+| Pulsing glow (sine)                                    | Optional second tween on a separate `--pulse` variable, finite yoyo |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 

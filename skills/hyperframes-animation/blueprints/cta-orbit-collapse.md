@@ -41,13 +41,13 @@ Same five-phase arc; one paused GSAP timeline; constituent patterns map to [orbi
 
 All boundaries are in **seconds**. Named constants live in the Constants block; concrete values for the golden sample are in How to Choose Values.
 
-| Phase | Time window           | What Happens                                                    | Skill Reference                                                            |
-| ----- | --------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| 1     | `0 → CURSOR_AT`       | Icons enter with 3D flip, staggered; orbit motion runs from t=0 | [orbit-3d-entry](../rules/orbit-3d-entry.md)                               |
-| 2     | `CURSOR_AT → CLICK_AT`| Cursor enters off-screen, moves to CTA, clicks with ripple     | [cursor-click-ripple](../rules/cursor-click-ripple.md)                     |
-| 3     | `CLICK_AT → CLICK_AT + COLLAPSE_DUR` | Icons collapse toward the click point; CTA pulses | [center-outward-expansion](../rules/center-outward-expansion.md) (reversed driver) |
-| 4     | `DEMO_AT → DEMO_AT + DEMO_DUR` | Product demo springs out of the collapse point         | inline                                                                     |
-| 5     | `IDLE_START → TOTAL`  | Demo floats with a breathing yoyo                              | [sine-wave-loop](../rules/sine-wave-loop.md) (finite-yoyo form)            |
+| Phase | Time window                          | What Happens                                                    | Skill Reference                                                                    |
+| ----- | ------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 1     | `0 → CURSOR_AT`                      | Icons enter with 3D flip, staggered; orbit motion runs from t=0 | [orbit-3d-entry](../rules/orbit-3d-entry.md)                                       |
+| 2     | `CURSOR_AT → CLICK_AT`               | Cursor enters off-screen, moves to CTA, clicks with ripple      | [cursor-click-ripple](../rules/cursor-click-ripple.md)                             |
+| 3     | `CLICK_AT → CLICK_AT + COLLAPSE_DUR` | Icons collapse toward the click point; CTA pulses               | [center-outward-expansion](../rules/center-outward-expansion.md) (reversed driver) |
+| 4     | `DEMO_AT → DEMO_AT + DEMO_DUR`       | Product demo springs out of the collapse point                  | inline                                                                             |
+| 5     | `IDLE_START → TOTAL`                 | Demo floats with a breathing yoyo                               | [sine-wave-loop](../rules/sine-wave-loop.md) (finite-yoyo form)                    |
 
 Phase 3 and Phase 4 **overlap by `COLLAPSE_OVERLAP`** — the demo entry begins just before the collapse fully completes, so the click reads as energy transfer rather than two separate moments.
 
@@ -85,10 +85,7 @@ Each icon uses **three nested wrappers** so the orbit position, the collapse sca
   </div>
 
   <!-- Center CTA — fixed at viewport center; click target lives here -->
-  <div
-    class="cta"
-    style="position: absolute; left: 50%; top: 50%; z-index: 5;"
-  >
+  <div class="cta" style="position: absolute; left: 50%; top: 50%; z-index: 5;">
     <span class="cta-placeholder">{ctaCopy}</span>
     <div class="cta-button">{ctaButtonLabel}</div>
   </div>
@@ -128,14 +125,14 @@ All constants are named only; concrete values are documented in How to Choose Va
 
 ```js
 // Frame
-const W, H;                          // composition width/height in px
+const W, H; // composition width/height in px
 const CENTER_X = W / 2;
 const CENTER_Y = H / 2;
 
 // Orbit geometry
-const RADIUS_X;                      // elliptical horizontal radius
-const RADIUS_Y;                      // elliptical vertical radius (perspective-flattened)
-const ORBIT_SPEED;                   // radians per second
+const RADIUS_X; // elliptical horizontal radius
+const RADIUS_Y; // elliptical vertical radius (perspective-flattened)
+const ORBIT_SPEED; // radians per second
 
 // Icons — N entries distributed evenly around 2π
 const ICONS = [
@@ -143,25 +140,25 @@ const ICONS = [
 ];
 
 // Phase durations / boundaries
-const ENTRY_DUR;                     // per-icon 3D flip
-const ENTRY_STAGGER;                 // delay between consecutive icon entries
-const CURSOR_AT;                     // cursor fades in and starts moving
-const CURSOR_MOVE;                   // duration of the cursor move
-const CLICK_AT;                      // click instant — collapse pivot
-const COLLAPSE_DUR;                  // icons converge to center
-const COLLAPSE_OVERLAP;              // demo begins this many seconds before collapse finishes
+const ENTRY_DUR; // per-icon 3D flip
+const ENTRY_STAGGER; // delay between consecutive icon entries
+const CURSOR_AT; // cursor fades in and starts moving
+const CURSOR_MOVE; // duration of the cursor move
+const CLICK_AT; // click instant — collapse pivot
+const COLLAPSE_DUR; // icons converge to center
+const COLLAPSE_OVERLAP; // demo begins this many seconds before collapse finishes
 const DEMO_AT = CLICK_AT + COLLAPSE_DUR - COLLAPSE_OVERLAP;
-const DEMO_DUR;                      // demo spring-out
-const IDLE_TAIL;                     // gap between demo entry end and breath start
+const DEMO_DUR; // demo spring-out
+const IDLE_TAIL; // gap between demo entry end and breath start
 const IDLE_START = DEMO_AT + DEMO_DUR + IDLE_TAIL;
-const TOTAL;                         // matches data-duration on the composition root
+const TOTAL; // matches data-duration on the composition root
 
 // Ease coefficients
-const ENTRY_BACK;                    // icon flip-in back.out coefficient
-const CURSOR_BACK;                   // cursor move back.out coefficient
-const COLLAPSE_BACK;                 // collapse driver back.out coefficient
-const DEMO_BACK;                     // demo spring back.out coefficient
-const RECOVER_BACK;                  // press-recover back.out coefficient
+const ENTRY_BACK; // icon flip-in back.out coefficient
+const CURSOR_BACK; // cursor move back.out coefficient
+const COLLAPSE_BACK; // collapse driver back.out coefficient
+const DEMO_BACK; // demo spring back.out coefficient
+const RECOVER_BACK; // press-recover back.out coefficient
 ```
 
 ## Phase 1: 3D Flip Entry + Orbit (Core Glue, Part A)
@@ -231,7 +228,11 @@ tl.to(
   CLICK_AT + PRESS_DUR,
 );
 
-tl.to(".cta-button", { scale: TARGET_PRESS_SCALE, duration: PRESS_DUR, ease: "power2.out" }, CLICK_AT);
+tl.to(
+  ".cta-button",
+  { scale: TARGET_PRESS_SCALE, duration: PRESS_DUR, ease: "power2.out" },
+  CLICK_AT,
+);
 tl.to(
   ".cta-button",
   { scale: 1, duration: RECOVER_DUR, ease: `back.out(${RECOVER_BACK})` },
@@ -246,9 +247,9 @@ tl.to(
   {
     duration: RIPPLE_DUR,
     keyframes: {
-      "0%":   { scale: RIPPLE_START_SCALE, opacity: 0 },
-      "20%":  { opacity: RIPPLE_PEAK_OPACITY },
-      "100%": { scale: RIPPLE_END_SCALE,   opacity: 0 },
+      "0%": { scale: RIPPLE_START_SCALE, opacity: 0 },
+      "20%": { opacity: RIPPLE_PEAK_OPACITY },
+      "100%": { scale: RIPPLE_END_SCALE, opacity: 0 },
       easeEach: "power2.out",
     },
   },
@@ -517,13 +518,13 @@ Phase 4 → Phase 5:
 
 The blueprint maps four spring-shaped motions to `back.out` eases. Coefficient values live in How to Choose Values.
 
-| Spring intent                              | Maps to               |
-| ------------------------------------------ | --------------------- |
-| Calm-arrive — icon 3D flip entry           | `back.out(ENTRY_BACK)`  |
-| Calm-settle — cursor move                  | `back.out(CURSOR_BACK)` |
-| Snappy-contract — collapse driver          | `back.out(COLLAPSE_BACK)` (via `gsap.parseEase` inside onUpdate) |
-| Snappy-arrive with overshoot — demo entry  | `back.out(DEMO_BACK)`   |
-| Continuous float                           | `sine.inOut` yoyo with finite `repeat` |
+| Spring intent                             | Maps to                                                          |
+| ----------------------------------------- | ---------------------------------------------------------------- |
+| Calm-arrive — icon 3D flip entry          | `back.out(ENTRY_BACK)`                                           |
+| Calm-settle — cursor move                 | `back.out(CURSOR_BACK)`                                          |
+| Snappy-contract — collapse driver         | `back.out(COLLAPSE_BACK)` (via `gsap.parseEase` inside onUpdate) |
+| Snappy-arrive with overshoot — demo entry | `back.out(DEMO_BACK)`                                            |
+| Continuous float                          | `sine.inOut` yoyo with finite `repeat`                           |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 

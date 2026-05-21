@@ -69,18 +69,11 @@ will not match CI. Use it only for local-only experimentation.
 
 Composition authoring (not repo development) is guided by skills installed via `npx skills add heygen-com/hyperframes`. See `skills/` for source. The active skills are:
 
-- `/hyperframes-core` — HTML composition contract: data attributes, clips, tracks, sub-compositions, variables, media playback, deterministic render rules, and validation of minimal renderable projects.
-- `/hyperframes-creative` — Creative direction: `design.md` handling, palettes, typography, motion principles, scene transitions, beat planning, narration, audio-reactive visuals, title cards, data-in-motion, and advanced recipes.
-- `/hyperframes-animation` — Promo-video scene blueprints (brand-reveal, social-proof, product-demo, comparison) and atomic animation rules (hacker-flip, avatar-cloud, vertical ticker, coordinate-target zoom, etc.) for HyperFrames-native GSAP timelines.
-- `/hyperframes-captions` — Subtitles, lyrics, karaoke, per-word styling, transcript JSON/SRT/VTT import, and caption timing from audio. Consumes transcripts produced by `/hyperframes-media`.
-- `/hyperframes-cli` — CLI dev loop: `init`, `lint`, `validate`, `inspect`, `preview`, `render`, `doctor`, `browser`, `info`, `upgrade`, `compositions`, `docs`, `benchmark`, and environment troubleshooting.
+- `/hyperframes-core` — HTML composition contract: data attributes, clips, tracks, sub-compositions, variables, media playback, deterministic render rules, validation of minimal renderable projects, and the pinned Tailwind v4 browser-runtime setup (`references/tailwind.md`).
+- `/hyperframes-creative` — Non-animation creative direction: `design.md` handling, palettes, typography, narration, beat planning, audio-reactive visuals, composition patterns, house style, and visual styles.
+- `/hyperframes-animation` — All motion knowledge in one skill: atomic **rules**, multi-phase scene **blueprints**, scene **transitions**, broader motion **techniques**, plus the seven runtime **adapters** (`adapters/gsap.md`, `lottie.md`, `three.md`, `animejs.md`, `css-animations.md`, `waapi.md`, `typegpu.md`).
+- `/hyperframes-cli` — CLI dev loop: `init`, `add`, `catalog`, `capture`, `lint`, `validate`, `inspect`, `layout`, `snapshot`, `preview`, `play`, `render`, `publish`, `lambda`, `doctor`, `browser`, `info`, `upgrade`, `skills`, `compositions`, `docs`, `benchmark`, `telemetry`, and the media commands (`transcribe`, `tts`, `remove-background`).
+- `/hyperframes-media` — Asset preprocessing and consumption: TTS (Kokoro-82M), Whisper transcription, background removal, and **captions** (subtitles, lyrics, karaoke, per-word styling, transcript JSON/SRT/VTT, TTS-to-captions). Captions live under `references/captions/`.
 - `/hyperframes-registry` — Installing registry blocks and components via `hyperframes add`, wiring them into `index.html`, and working with `hyperframes.json`.
-- `/hyperframes-tailwind` — Use for projects created with `hyperframes init --tailwind`. Pinned Tailwind v4 browser-runtime contract (distinct from Studio's Tailwind v3 setup).
-- `/hyperframes-media` — Asset preprocessing: `npx hyperframes tts`, `transcribe`, `remove-background`. Has its own skill so the CLI skill stays focused on the dev loop.
-- `/hyperframes-gsap` — GSAP timeline API reference for writing seekable GSAP animations registered on `window.__timelines`, scoped to the HyperFrames runtime contract.
-- `/hyperframes-lottie` — Lottie / dotLottie adapter: embedding lottie-web JSON, .lottie players, `window.__hfLottie` registration, making After Effects exports deterministic.
-- `/hyperframes-three` — Three.js / WebGL adapter: deterministic scenes, `AnimationMixer`, camera motion, shader-driven visuals, `hf-seek` event handling.
-- `/hyperframes-animejs` — Anime.js adapter: timelines registered on `window.__hfAnime`, seek-driven and deterministic.
-- `/hyperframes-css-animations` — Native CSS keyframes adapter: `animation-delay` / `animation-play-state` / `animation-fill-mode` patterns that HyperFrames can seek.
-- `/hyperframes-waapi` — Web Animations API adapter: `element.animate()`, `Animation.currentTime` seeking, `KeyframeEffect` timing, native browser animations.
-- `/hyperframes-typegpu` — TypeGPU / raw WebGPU / WGSL adapter: GPU-rendered canvases driven by `navigator.gpu`, responding to `hf-seek` events.
+
+Internal authoring tooling for the skills themselves lives in `skills/_meta/` and is not loaded as a user-facing skill.

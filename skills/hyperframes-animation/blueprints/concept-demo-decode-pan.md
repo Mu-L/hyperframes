@@ -59,10 +59,17 @@ This pattern places multiple complete shots **side by side** in a flex row. Came
   data-width="VIEWPORT_W"
   data-height="VIEWPORT_H"
 >
-  <div class="viewport" data-layout-allow-overflow style="position:absolute; inset:0; overflow:hidden;">
+  <div
+    class="viewport"
+    data-layout-allow-overflow
+    style="position:absolute; inset:0; overflow:hidden;"
+  >
     <div class="strip" data-layout-allow-overflow style="display:flex; height:100%;">
       <!-- Shot 1: static phrase + hacker-flip accent word -->
-      <div class="shot shot1" style="width: VIEWPORT_W; height:100%; position:relative; flex-shrink:0;">
+      <div
+        class="shot shot1"
+        style="width: VIEWPORT_W; height:100%; position:relative; flex-shrink:0;"
+      >
         <div class="shot1-content">
           <div class="shot1-row">
             <span class="shot1-static">{phrase}</span>
@@ -74,7 +81,10 @@ This pattern places multiple complete shots **side by side** in a flex row. Came
       </div>
 
       <!-- Shot 2: interactive search bar -->
-      <div class="shot shot2" style="width: VIEWPORT_W; height:100%; position:relative; flex-shrink:0;">
+      <div
+        class="shot shot2"
+        style="width: VIEWPORT_W; height:100%; position:relative; flex-shrink:0;"
+      >
         <div class="shot2-bar">
           <span class="search-text"></span><span class="search-cursor">_</span>
         </div>
@@ -157,19 +167,11 @@ A single timeline position drives three concurrent tweens: camera pan, Shot 1 pa
 
 ```js
 // (1) Camera pan — strip slides one full viewport left.
-tl.to(
-  ".strip",
-  { x: -VIEWPORT_W, duration: PAN_DUR, ease: "power3.inOut" },
-  PAN_START,
-);
+tl.to(".strip", { x: -VIEWPORT_W, duration: PAN_DUR, ease: "power3.inOut" }, PAN_START);
 
 // (2) Shot 1 parallax exit — content moves an EXTRA -PARALLAX_DIST beyond the strip
 //     (near-plane appears to move faster than the camera).
-tl.to(
-  ".shot1-content",
-  { x: -PARALLAX_DIST, duration: PAN_DUR, ease: "power3.inOut" },
-  PAN_START,
-);
+tl.to(".shot1-content", { x: -PARALLAX_DIST, duration: PAN_DUR, ease: "power3.inOut" }, PAN_START);
 
 // Shot 1 also fades out during the pan so the eye lands on Shot 2.
 tl.to(
@@ -191,7 +193,7 @@ tl.fromTo(
 
 - `power3.inOut` — cinematic, slow start + slow finish. Feels like a camera.
 - `power2.out` — quick start, gentle landing. Feels more like a UI swipe.
-- `back.out(${BOUNCE_FACTOR})` — **avoid for the camera pan itself**. The overshoot at the end reads as a UI bounce, not a camera move. Reserve `back.out` for the *element entry* inside Shot 2.
+- `back.out(${BOUNCE_FACTOR})` — **avoid for the camera pan itself**. The overshoot at the end reads as a UI bounce, not a camera move. Reserve `back.out` for the _element entry_ inside Shot 2.
 
 ## Phase 4: Cursor-Tracked Typing
 
@@ -213,7 +215,7 @@ barWidth           = PADDING_LEFT + measuredTextWidth + cursorWidth + PADDING_RI
 
 The natural source pattern recomputes the bar's `left` per frame from typing progress. In HyperFrames, **`left` is a forbidden tween target** (layout property). Two compatible options:
 
-1. **Pre-position the bar** at the world coordinate where its empty cursor sits at `CURSOR_TARGET_FRACTION × VIEWPORT_W`, then move the *camera* (via the strip's `x`) to follow the cursor — see [camera-cursor-tracking](../rules/camera-cursor-tracking.md).
+1. **Pre-position the bar** at the world coordinate where its empty cursor sits at `CURSOR_TARGET_FRACTION × VIEWPORT_W`, then move the _camera_ (via the strip's `x`) to follow the cursor — see [camera-cursor-tracking](../rules/camera-cursor-tracking.md).
 2. **Pre-allocate the bar's full width** and move the bar with GSAP `x` (transform alias) — but the camera is already controlled by the strip, so this requires nested transforms and is harder to reason about. Prefer option 1.
 
 ```js
@@ -350,11 +352,11 @@ Inside Phase 4:
 
 ## Spring → GSAP Ease Cheatsheet (this blueprint)
 
-| Source spring                                                          | This blueprint uses                                                  |
-| ---------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| Cinematic camera (low stiffness, high damping, heavy mass)             | `power3.inOut`                                                       |
-| Character flip (high stiffness, medium damping)                        | `back.out(${FLIP_BOUNCE})`                                           |
-| Shot 2 entry with mild overshoot                                       | `back.out(${ENTRY_BOUNCE})`                                          |
+| Source spring                                              | This blueprint uses         |
+| ---------------------------------------------------------- | --------------------------- |
+| Cinematic camera (low stiffness, high damping, heavy mass) | `power3.inOut`              |
+| Character flip (high stiffness, medium damping)            | `back.out(${FLIP_BOUNCE})`  |
+| Shot 2 entry with mild overshoot                           | `back.out(${ENTRY_BOUNCE})` |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 

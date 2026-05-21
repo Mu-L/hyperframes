@@ -1,8 +1,3 @@
----
-name: hyperframes-tailwind
-description: Tailwind CSS v4 browser-runtime guidance for HyperFrames compositions. Use when editing projects created with hyperframes init --tailwind, writing Tailwind utility classes in composition HTML, adding CSS-first v4 theme tokens, or debugging Tailwind render readiness.
----
-
 # HyperFrames Tailwind
 
 HyperFrames `init --tailwind` uses the Tailwind browser runtime pinned by the scaffold. Treat it as Tailwind v4, not Studio's Tailwind v3 setup.

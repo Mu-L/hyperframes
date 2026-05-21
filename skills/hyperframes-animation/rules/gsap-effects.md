@@ -188,8 +188,8 @@ Pre-extract audio data, drive Canvas / DOM rendering from a single `tl.call(...)
 Use the bundled extractor (requires `ffmpeg` and Python `numpy`):
 
 ```bash
-python skills/hyperframes-gsap/scripts/extract-audio-data.py audio.mp3 -o audio-data.json
-python skills/hyperframes-gsap/scripts/extract-audio-data.py video.mp4 --fps 30 --bands 16 -o audio-data.json
+python skills/hyperframes-creative/scripts/extract-audio-data.py audio.mp3 -o audio-data.json
+python skills/hyperframes-creative/scripts/extract-audio-data.py video.mp4 --fps 30 --bands 16 -o audio-data.json
 ```
 
 ### Data Format

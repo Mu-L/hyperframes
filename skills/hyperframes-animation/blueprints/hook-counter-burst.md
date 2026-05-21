@@ -39,12 +39,12 @@ Four-phase opening-hook arc on a single paused GSAP timeline. Constituent patter
 
 All boundaries are in **seconds**.
 
-| Phase | Time window           | What Happens                                                            | Skill Reference                                                                                                                 |
-| ----- | --------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | `0 – ICON_ENTRY_AT_1` | Background visible with dark overlay; nothing else                      | inline                                                                                                                          |
-| 2     | staggered entry beat  | Icons enter staggered, clustered at `START_OFFSET`                      | [svg-icon-enrichment](../rules/svg-icon-enrichment.md) entry pattern                                                            |
-| 3     | `COUNT_AT` + `COUNT_DUR` | Counter counts up; icons expand from `START_OFFSET` to final positions | [counting-dynamic-scale](../rules/counting-dynamic-scale.md) + [center-outward-expansion](../rules/center-outward-expansion.md) |
-| 4     | `CAMERA_FOCUS_AT` → `CAMERA_PUSH_AT` end | Multi-phase camera: focus-in then push                              | [multi-phase-camera](../rules/multi-phase-camera.md)                                                                            |
+| Phase | Time window                              | What Happens                                                           | Skill Reference                                                                                                                 |
+| ----- | ---------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | `0 – ICON_ENTRY_AT_1`                    | Background visible with dark overlay; nothing else                     | inline                                                                                                                          |
+| 2     | staggered entry beat                     | Icons enter staggered, clustered at `START_OFFSET`                     | [svg-icon-enrichment](../rules/svg-icon-enrichment.md) entry pattern                                                            |
+| 3     | `COUNT_AT` + `COUNT_DUR`                 | Counter counts up; icons expand from `START_OFFSET` to final positions | [counting-dynamic-scale](../rules/counting-dynamic-scale.md) + [center-outward-expansion](../rules/center-outward-expansion.md) |
+| 4     | `CAMERA_FOCUS_AT` → `CAMERA_PUSH_AT` end | Multi-phase camera: focus-in then push                                 | [multi-phase-camera](../rules/multi-phase-camera.md)                                                                            |
 
 Phase 2 and Phase 3 intentionally overlap so the eye sees motion continuously — no static gap between icon arrival and the count starting.
 
@@ -143,7 +143,10 @@ tl.to(
     onUpdate: () => {
       counterEl.textContent = Math.round(counterProxy.p * COUNT_TARGET);
       counterEl.style.fontSize =
-        W * (COUNT_START_FONT_RATIO + counterProxy.p * (COUNT_END_FONT_RATIO - COUNT_START_FONT_RATIO)) + "px";
+        W *
+          (COUNT_START_FONT_RATIO +
+            counterProxy.p * (COUNT_END_FONT_RATIO - COUNT_START_FONT_RATIO)) +
+        "px";
     },
   },
   COUNT_AT,
@@ -172,8 +175,16 @@ The wrapper `.camera` element scales through three values: `CAMERA_SCALE_START` 
 ```js
 gsap.set(".camera", { scale: CAMERA_SCALE_START });
 
-tl.to(".camera", { scale: CAMERA_SCALE_FOCUS, duration: CAMERA_FOCUS_DUR, ease: CAMERA_EASE }, CAMERA_FOCUS_AT);
-tl.to(".camera", { scale: CAMERA_SCALE_PUSH,  duration: CAMERA_PUSH_DUR,  ease: CAMERA_EASE }, CAMERA_PUSH_AT);
+tl.to(
+  ".camera",
+  { scale: CAMERA_SCALE_FOCUS, duration: CAMERA_FOCUS_DUR, ease: CAMERA_EASE },
+  CAMERA_FOCUS_AT,
+);
+tl.to(
+  ".camera",
+  { scale: CAMERA_SCALE_PUSH, duration: CAMERA_PUSH_DUR, ease: CAMERA_EASE },
+  CAMERA_PUSH_AT,
+);
 ```
 
 Each successive phase should feel softer than the previous one (longer duration OR more out-easing). See [multi-phase-camera](../rules/multi-phase-camera.md) for the optional drift overlay (often omitted on short hook scenes — drift is barely perceptible in a few-second comp).
@@ -304,14 +315,14 @@ Continuous (Phase 1+):
 
 ## Spring → Ease Cheatsheet
 
-| Source spring                                | Ease family used in this blueprint            |
-| -------------------------------------------- | --------------------------------------------- |
-| Stiff icon entry (high stiffness, low damp)  | `back.out(${BOUNCE_FACTOR})` over ENTRY_DUR   |
-| Counter 3D entry (mid stiff, mid damp)       | `power3.out`                                  |
-| Camera focus (low stiff, high damp)          | `power2.out` over CAMERA_FOCUS_DUR            |
-| Camera push (lower stiff, higher damp)       | `power2.out` over CAMERA_PUSH_DUR             |
-| Counter + expansion shared (`1 - (1-x)^k`)   | `power2.out` (k≈2.5) or `power3.out` (k≈3)    |
-| Internal SVG sine motion                     | `sine.inOut` yoyo, or onUpdate Math.sin       |
+| Source spring                               | Ease family used in this blueprint          |
+| ------------------------------------------- | ------------------------------------------- |
+| Stiff icon entry (high stiffness, low damp) | `back.out(${BOUNCE_FACTOR})` over ENTRY_DUR |
+| Counter 3D entry (mid stiff, mid damp)      | `power3.out`                                |
+| Camera focus (low stiff, high damp)         | `power2.out` over CAMERA_FOCUS_DUR          |
+| Camera push (lower stiff, higher damp)      | `power2.out` over CAMERA_PUSH_DUR           |
+| Counter + expansion shared (`1 - (1-x)^k`)  | `power2.out` (k≈2.5) or `power3.out` (k≈3)  |
+| Internal SVG sine motion                    | `sine.inOut` yoyo, or onUpdate Math.sin     |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 

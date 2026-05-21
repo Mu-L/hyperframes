@@ -37,13 +37,13 @@ Same five-phase narrative arc; single paused GSAP timeline; the coordinate-zoom 
 
 All boundaries are in **seconds**.
 
-| Phase | Time window (s)             | What Happens                                            | Skill Reference                                              |
-| ----- | --------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
-| 1     | `TEXT_START – TEXT_END`     | Companion text assembles (discrete sequence with holds) | [discrete-text-sequence](../rules/discrete-text-sequence.md) |
-| 2     | `POP_START – POP_END`       | Hero element pops in with elastic spring                | inline `back.out(${BOUNCE_FACTOR})` tween                    |
-| 3     | `SLIDE_START – SLIDE_END`   | Companion exits, layout recenters around hero           | See "Phase 3" below                                          |
-| 4     | `ZOOM_START – ZOOM_END`     | Camera zooms into hero (scale + counter-translate)      | [coordinate-target-zoom](../rules/coordinate-target-zoom.md) |
-| 5     | `BREATH_START – end`        | Hero breathes (sine onUpdate, multiplicative)           | [sine-wave-loop](../rules/sine-wave-loop.md)                 |
+| Phase | Time window (s)           | What Happens                                            | Skill Reference                                              |
+| ----- | ------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
+| 1     | `TEXT_START – TEXT_END`   | Companion text assembles (discrete sequence with holds) | [discrete-text-sequence](../rules/discrete-text-sequence.md) |
+| 2     | `POP_START – POP_END`     | Hero element pops in with elastic spring                | inline `back.out(${BOUNCE_FACTOR})` tween                    |
+| 3     | `SLIDE_START – SLIDE_END` | Companion exits, layout recenters around hero           | See "Phase 3" below                                          |
+| 4     | `ZOOM_START – ZOOM_END`   | Camera zooms into hero (scale + counter-translate)      | [coordinate-target-zoom](../rules/coordinate-target-zoom.md) |
+| 5     | `BREATH_START – end`      | Hero breathes (sine onUpdate, multiplicative)           | [sine-wave-loop](../rules/sine-wave-loop.md)                 |
 
 ## Initial Layout
 

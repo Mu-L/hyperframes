@@ -119,10 +119,28 @@ Placeholders: `{font}` is the project sans-serif stack; `{bgColor1}`/`{bgColor2}
   // Shape: short eyebrow label, short title, longer body sentence, plus per-entry pacing.
   // The final entry typically uses a larger `hold` (closing beat).
   const CONTENT = [
-    { eyebrow: "{eyebrow1}", title: "{title1}", body: "{body1}", speedFactor: SPEED_FACTOR, hold: HOLD_MID },
-    { eyebrow: "{eyebrow2}", title: "{title2}", body: "{body2}", speedFactor: SPEED_FACTOR, hold: HOLD_MID },
+    {
+      eyebrow: "{eyebrow1}",
+      title: "{title1}",
+      body: "{body1}",
+      speedFactor: SPEED_FACTOR,
+      hold: HOLD_MID,
+    },
+    {
+      eyebrow: "{eyebrow2}",
+      title: "{title2}",
+      body: "{body2}",
+      speedFactor: SPEED_FACTOR,
+      hold: HOLD_MID,
+    },
     // …
-    { eyebrow: "{eyebrowN}", title: "{titleN}", body: "{bodyN}", speedFactor: SPEED_FACTOR, hold: HOLD_FINAL },
+    {
+      eyebrow: "{eyebrowN}",
+      title: "{titleN}",
+      body: "{bodyN}",
+      speedFactor: SPEED_FACTOR,
+      hold: HOLD_FINAL,
+    },
   ];
 
   // Pre-compute absolute start times.
@@ -284,6 +302,6 @@ document
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — single driver, reverse-search dispatch
+- `/hyperframes-animation` — single driver, reverse-search dispatch
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

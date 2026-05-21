@@ -47,12 +47,12 @@ Four-phase "show → tell with impact" arc; one paused GSAP timeline; constituen
 
 All boundaries are in **seconds** (typically ASR-driven; convert frame indices to seconds via `frames / fps`).
 
-| Phase | Time window (s)             | What Happens                                                                                                   | Skill Reference                                            |
-| ----- | --------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| 1     | `VIDEO_ENTRY_AT – SLIDE_AT` | Video enters centered with 3D tilt and floats gently                                                            | inline tilt + [sine-wave-loop](../rules/sine-wave-loop.md) |
-| 2     | `SLIDE_AT – PIVOT_AT`       | Video slides aside; stat appears in the freed space with 3D depth layers + breathing                            | [3d-text-depth-layers](../rules/3d-text-depth-layers.md), [sine-wave-loop](../rules/sine-wave-loop.md) |
-| 3     | `PIVOT_AT – PILL_AT`        | Both video and stat exit; kinetic text types center-screen with accent-colored keywords + blinking cursor       | inline typing with static CSS accent classes               |
-| 4     | `PILL_AT – end`             | Gradient pill scales in behind the closing line with a glow halo                                                | inline pill scale                                          |
+| Phase | Time window (s)             | What Happens                                                                                              | Skill Reference                                                                                        |
+| ----- | --------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 1     | `VIDEO_ENTRY_AT – SLIDE_AT` | Video enters centered with 3D tilt and floats gently                                                      | inline tilt + [sine-wave-loop](../rules/sine-wave-loop.md)                                             |
+| 2     | `SLIDE_AT – PIVOT_AT`       | Video slides aside; stat appears in the freed space with 3D depth layers + breathing                      | [3d-text-depth-layers](../rules/3d-text-depth-layers.md), [sine-wave-loop](../rules/sine-wave-loop.md) |
+| 3     | `PIVOT_AT – PILL_AT`        | Both video and stat exit; kinetic text types center-screen with accent-colored keywords + blinking cursor | inline typing with static CSS accent classes                                                           |
+| 4     | `PILL_AT – end`             | Gradient pill scales in behind the closing line with a glow halo                                          | inline pill scale                                                                                      |
 
 When timings are anchored to spoken-word timestamps, bake each anchor as a `const` converted from frame indices.
 
@@ -165,7 +165,7 @@ The 3D tilt is set once in CSS on `.video-tilt`. The float (small `y` sine) runs
 
 ## Phase 2: Video Slide + Stat Reveal
 
-Editorial intent: the video remains visible (context) but yields screen real estate to the stat. Both motions land on the same timeline anchor (`SLIDE_AT`, typically the stat label's spoken-word timestamp) so the slide *creates* the empty space the stat *fills*.
+Editorial intent: the video remains visible (context) but yields screen real estate to the stat. Both motions land on the same timeline anchor (`SLIDE_AT`, typically the stat label's spoken-word timestamp) so the slide _creates_ the empty space the stat _fills_.
 
 ```js
 /* Video slides aside and shrinks slightly to make room for the stat. */
@@ -181,7 +181,12 @@ tl.to(
 );
 
 /* Stat appears in the freed space with a bouncy entry. */
-gsap.set(".stat-pos", { x: STAT_ENTRY_X, y: STAT_ENTRY_Y_OFFSET, scale: STAT_ENTRY_SCALE, opacity: 0 });
+gsap.set(".stat-pos", {
+  x: STAT_ENTRY_X,
+  y: STAT_ENTRY_Y_OFFSET,
+  scale: STAT_ENTRY_SCALE,
+  opacity: 0,
+});
 
 tl.to(
   ".stat-pos",
@@ -260,20 +265,21 @@ The line structure is two lines: line 1 alternates between neutral and accent se
 
 ```js
 const SEG = {
-  main:    "{lineMainBefore}",   // neutral lead-in on line 1
-  accent:  "{lineMainAccent}",   // accent keyword
-  suffix:  "{lineMainBetween}",  // neutral connector
-  accent2: "{lineMainAccent2}",  // accent keyword
-  line2:   "{lineClosing}",      // closing phrase inside the pill
+  main: "{lineMainBefore}", // neutral lead-in on line 1
+  accent: "{lineMainAccent}", // accent keyword
+  suffix: "{lineMainBetween}", // neutral connector
+  accent2: "{lineMainAccent2}", // accent keyword
+  line2: "{lineClosing}", // closing phrase inside the pill
 };
 
 // Boundaries computed from segment lengths (do NOT hard-code character counts).
 const BOUNDS = {
-  mainEnd:    SEG.main.length,
-  accentEnd:  SEG.main.length + SEG.accent.length,
-  suffixEnd:  SEG.main.length + SEG.accent.length + SEG.suffix.length,
+  mainEnd: SEG.main.length,
+  accentEnd: SEG.main.length + SEG.accent.length,
+  suffixEnd: SEG.main.length + SEG.accent.length + SEG.suffix.length,
   accent2End: SEG.main.length + SEG.accent.length + SEG.suffix.length + SEG.accent2.length,
-  line2End:   SEG.main.length + SEG.accent.length + SEG.suffix.length + SEG.accent2.length + SEG.line2.length,
+  line2End:
+    SEG.main.length + SEG.accent.length + SEG.suffix.length + SEG.accent2.length + SEG.line2.length,
 };
 
 const typeProxy = { idx: 0 };
@@ -287,11 +293,23 @@ tl.to(
     ease: "none",
     onUpdate: () => {
       const i = Math.floor(typeProxy.idx);
-      segMain.textContent    = SEG.main.slice(0, Math.min(i, BOUNDS.mainEnd));
-      segAccent.textContent  = SEG.accent.slice(0,  Math.max(0, Math.min(i - BOUNDS.mainEnd,   SEG.accent.length)));
-      segSuffix.textContent  = SEG.suffix.slice(0,  Math.max(0, Math.min(i - BOUNDS.accentEnd, SEG.suffix.length)));
-      segAccent2.textContent = SEG.accent2.slice(0, Math.max(0, Math.min(i - BOUNDS.suffixEnd, SEG.accent2.length)));
-      segLine2.textContent   = SEG.line2.slice(0,   Math.max(0, Math.min(i - BOUNDS.accent2End, SEG.line2.length)));
+      segMain.textContent = SEG.main.slice(0, Math.min(i, BOUNDS.mainEnd));
+      segAccent.textContent = SEG.accent.slice(
+        0,
+        Math.max(0, Math.min(i - BOUNDS.mainEnd, SEG.accent.length)),
+      );
+      segSuffix.textContent = SEG.suffix.slice(
+        0,
+        Math.max(0, Math.min(i - BOUNDS.accentEnd, SEG.suffix.length)),
+      );
+      segAccent2.textContent = SEG.accent2.slice(
+        0,
+        Math.max(0, Math.min(i - BOUNDS.suffixEnd, SEG.accent2.length)),
+      );
+      segLine2.textContent = SEG.line2.slice(
+        0,
+        Math.max(0, Math.min(i - BOUNDS.accent2End, SEG.line2.length)),
+      );
     },
   },
   TYPING_START_AT,
@@ -305,9 +323,9 @@ Accent-colored spans (`.seg.accent`, `.seg.accent2`) get their color from a stat
 Editorial intent: stamp of impact. The pill snaps into shape around the closing line right as line 2 starts typing, so the audience experiences "phrase + frame" as a single graphic. The glow halo arrives slightly slower so the silhouette resolves before the bloom registers.
 
 ```js
-const PILL_AT = TYPING_START_AT + (BOUNDS.accent2End / TYPE_RATE); // line 2 typing begins
+const PILL_AT = TYPING_START_AT + BOUNDS.accent2End / TYPE_RATE; // line 2 typing begins
 
-gsap.set(".pill-bg",   { scaleX: 0, scaleY: PILL_INITIAL_SCALE_Y, opacity: 0 });
+gsap.set(".pill-bg", { scaleX: 0, scaleY: PILL_INITIAL_SCALE_Y, opacity: 0 });
 gsap.set(".pill-glow", { opacity: 0 });
 
 /* Pill scaleX 0 → 1 + scaleY ramps to 1 + opacity → PILL_OPACITY in one ease. */
@@ -486,17 +504,17 @@ Continuous (from t = 0):
 
 ## Spring → GSAP Ease Cheatsheet (this blueprint)
 
-| Source spring                                               | This blueprint uses                              |
-| ----------------------------------------------------------- | ------------------------------------------------ |
-| `spring({ stiffness: 80, damping: 15 })` — video entry      | `power3.out` over `VIDEO_ENTRY_DUR`              |
-| `spring({ stiffness: 100, damping: 18 })` — video slide     | `power3.out` over `VIDEO_SLIDE_DUR`              |
-| `spring({ stiffness: 120, damping: 20 })` — video/stat exit | `power3.out` over `EXIT_DUR`                     |
-| `spring({ stiffness: 150, damping: 12 })` — stat entry      | `back.out(${STAT_BOUNCE_FACTOR})` over `STAT_ENTRY_DUR` |
-| `spring({ stiffness: 80, damping: 15 })` — pill scale       | `power3.out` over `PILL_DUR`                     |
-| `spring({ stiffness: 100, damping: 15 })` — typing stage    | `power3.out` over `TYPING_STAGE_DUR`             |
-| `sin(frame * 0.04) * 0.02` — stat breath                    | `Math.sin(t * STAT_BREATH_FREQ) * STAT_BREATH_AMP` in onUpdate |
+| Source spring                                               | This blueprint uses                                                   |
+| ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| `spring({ stiffness: 80, damping: 15 })` — video entry      | `power3.out` over `VIDEO_ENTRY_DUR`                                   |
+| `spring({ stiffness: 100, damping: 18 })` — video slide     | `power3.out` over `VIDEO_SLIDE_DUR`                                   |
+| `spring({ stiffness: 120, damping: 20 })` — video/stat exit | `power3.out` over `EXIT_DUR`                                          |
+| `spring({ stiffness: 150, damping: 12 })` — stat entry      | `back.out(${STAT_BOUNCE_FACTOR})` over `STAT_ENTRY_DUR`               |
+| `spring({ stiffness: 80, damping: 15 })` — pill scale       | `power3.out` over `PILL_DUR`                                          |
+| `spring({ stiffness: 100, damping: 15 })` — typing stage    | `power3.out` over `TYPING_STAGE_DUR`                                  |
+| `sin(frame * 0.04) * 0.02` — stat breath                    | `Math.sin(t * STAT_BREATH_FREQ) * STAT_BREATH_AMP` in onUpdate        |
 | `sin(frame * 0.03) * 6` — video float                       | `Math.sin(t * floatFreq) * Y_AMP_PX` in onUpdate (see sine-wave-loop) |
-| `frame % 30 < 15` — cursor blink                            | `Math.floor(t * CURSOR_BLINK_HZ * 2) % 2 === 0` in onUpdate |
+| `frame % 30 < 15` — cursor blink                            | `Math.floor(t * CURSOR_BLINK_HZ * 2) % 2 === 0` in onUpdate           |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 

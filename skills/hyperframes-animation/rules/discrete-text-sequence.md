@@ -92,10 +92,10 @@ For continuous per-char typewriter (no pauses, no edits), use the **smooth-slice
   //   [bulk-paste of the corrected continuation] → [completion mark]
   const SEQUENCE = [
     { t: 0.0, text: "" },
-    { t: T_K1, text: "{p1}" },                  // first keystrokes (~3-5 chars, 0.1-0.2s apart)
-    { t: T_K2, text: "{p1 + ' ' + p2_typo}" },  // continuation containing a typo
+    { t: T_K1, text: "{p1}" }, // first keystrokes (~3-5 chars, 0.1-0.2s apart)
+    { t: T_K2, text: "{p1 + ' ' + p2_typo}" }, // continuation containing a typo
     { t: T_BS, text: "{p1 + ' ' + p2_partial}" }, // backspace(s) — peel back to the fork
-    { t: T_BULK, text: "{fullCorrectedText}" },   // bulk paste — replaces several chars at once
+    { t: T_BULK, text: "{fullCorrectedText}" }, // bulk paste — replaces several chars at once
     { t: T_DONE, text: "{fullCorrectedText + ' ✓'}" }, // completion marker
   ];
 
@@ -185,7 +185,11 @@ Insert a state that holds for `THINK_HOLD_DUR` seconds without changes — feels
 When the final state lands (e.g. "✓"), pulse-scale the line briefly for emphasis:
 
 ```js
-tl.to(".text", { scale: COMPLETION_PULSE_SCALE, duration: COMPLETION_PULSE_DUR, yoyo: true, repeat: 1 }, T_DONE);
+tl.to(
+  ".text",
+  { scale: COMPLETION_PULSE_SCALE, duration: COMPLETION_PULSE_DUR, yoyo: true, repeat: 1 },
+  T_DONE,
+);
 ```
 
 ### Per-state color shift
@@ -194,8 +198,7 @@ Color-code states by phase (e.g. dim during edit, success color after the comple
 
 ```js
 // In onUpdate after setting textContent:
-if (driver.t > T_DONE)
-  textEl.style.color = "{successColor}";
+if (driver.t > T_DONE) textEl.style.color = "{successColor}";
 else if (driver.t < T_K2)
   textEl.style.color = "{textColor}"; // normal typing
 else textEl.style.color = "{mutedColor}"; // mid-edit dim
@@ -265,6 +268,6 @@ else textEl.style.color = "{mutedColor}"; // mid-edit dim
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — onUpdate-driven discrete state lookup
+- `/hyperframes-animation` — onUpdate-driven discrete state lookup
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

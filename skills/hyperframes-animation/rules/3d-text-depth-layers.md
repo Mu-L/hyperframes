@@ -151,7 +151,11 @@ Renders the same text N times at increasing offsets, with back layers translucen
 Skip the cascade — render all layers in their final positions from t=0, optionally fade the entire stack in:
 
 ```js
-tl.from(stack, { opacity: 0, scale: STATIC_ENTRY_SCALE, duration: STATIC_ENTRY_DUR, ease: "power3.out" }, 0);
+tl.from(
+  stack,
+  { opacity: 0, scale: STATIC_ENTRY_SCALE, duration: STATIC_ENTRY_DUR, ease: "power3.out" },
+  0,
+);
 ```
 
 ### Dynamic depth pulse
@@ -288,6 +292,6 @@ el.style.color = `hsla(${HUE_BASE - i * HUE_STEP}, ${SAT_PCT}%, ${LIGHT_BASE - i
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — staggered fade-ins + onUpdate for dynamic depth
+- `/hyperframes-animation` — staggered fade-ins + onUpdate for dynamic depth
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

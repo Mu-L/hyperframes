@@ -184,7 +184,9 @@ Default amplitudes (small MAX_BLUR, small MAX_SCALE_BOOST, rest text full white)
 // BRAND_RGB   — bright color at peak (brand word)
 // MAX_BLUR, MAX_SCALE_BOOST, REST_LEVEL all pushed higher than default
 
-function lerpChannel(a, b, t) { return Math.round(a + (b - a) * t); }
+function lerpChannel(a, b, t) {
+  return Math.round(a + (b - a) * t);
+}
 function colorAt(env, isBrand) {
   const target = isBrand ? BRAND_RGB : ACTIVE_RGB;
   return `rgb(${lerpChannel(REST_RGB.r, target.r, env)}, ${lerpChannel(REST_RGB.g, target.g, env)}, ${lerpChannel(REST_RGB.b, target.b, env)})`;
@@ -277,8 +279,8 @@ Ease family — discrete choice:
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — single driver, multi-element envelope
+- `/hyperframes-animation` — single driver, multi-element envelope
 - `/hyperframes-media` — `hyperframes transcribe` outputs real ASR data
-- `/hyperframes-captions` — pair with caption rendering
+- `/hyperframes-media` — pair with caption rendering
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

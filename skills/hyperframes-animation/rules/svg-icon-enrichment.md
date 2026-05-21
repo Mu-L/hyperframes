@@ -38,7 +38,10 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
         <line
           class="clock-hand"
           id="hand-min"
-          x1="60" y1="60" x2="60" y2="22"
+          x1="60"
+          y1="60"
+          x2="60"
+          y2="22"
           stroke="{textColor}"
           stroke-width="6"
           stroke-linecap="round"
@@ -46,7 +49,10 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
         <line
           class="clock-hand"
           id="hand-sec"
-          x1="60" y1="60" x2="60" y2="30"
+          x1="60"
+          y1="60"
+          x2="60"
+          y2="30"
           stroke="{recordColor}"
           stroke-width="3"
           stroke-linecap="round"
@@ -56,16 +62,36 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
 
       <!-- Recording dot — pulses -->
       <svg class="icon-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-        <circle id="rec-ring" cx="60" cy="60" r="50" fill="none" stroke="{recordColor}" stroke-width="4" />
-        <circle id="rec-dot"  cx="60" cy="60" r="22" fill="{recordColor}" />
+        <circle
+          id="rec-ring"
+          cx="60"
+          cy="60"
+          r="50"
+          fill="none"
+          stroke="{recordColor}"
+          stroke-width="4"
+        />
+        <circle id="rec-dot" cx="60" cy="60" r="22" fill="{recordColor}" />
       </svg>
 
       <!-- Data stream — dashes flow along the line -->
       <svg class="icon-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-        <rect x="14" y="48" width="92" height="24" rx="12" fill="none" stroke="{accentColor}" stroke-width="4" />
+        <rect
+          x="14"
+          y="48"
+          width="92"
+          height="24"
+          rx="12"
+          fill="none"
+          stroke="{accentColor}"
+          stroke-width="4"
+        />
         <line
           id="data-flow"
-          x1="14" y1="60" x2="106" y2="60"
+          x1="14"
+          y1="60"
+          x2="106"
+          y2="60"
           stroke="{accentColor}"
           stroke-width="6"
           stroke-linecap="round"
@@ -167,10 +193,11 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
       duration: TOTAL_DURATION,
       ease: "none",
       onUpdate: () => {
-        const dotScale  = 1 + Math.sin(pulseState.p) * PULSE_DOT_AMP;
+        const dotScale = 1 + Math.sin(pulseState.p) * PULSE_DOT_AMP;
         const ringScale = 1 + Math.sin(pulseState.p + Math.PI / 2) * PULSE_RING_AMP;
-        const ringOpacity = PULSE_RING_OPACITY_BASE + Math.sin(pulseState.p) * PULSE_RING_OPACITY_AMP;
-        const dot  = document.getElementById("rec-dot");
+        const ringOpacity =
+          PULSE_RING_OPACITY_BASE + Math.sin(pulseState.p) * PULSE_RING_OPACITY_AMP;
+        const dot = document.getElementById("rec-dot");
         const ring = document.getElementById("rec-ring");
         dot.style.transform = `scale(${dotScale})`;
         dot.style.transformOrigin = "60px 60px";
@@ -297,6 +324,6 @@ For a row of icons all animating, stagger their entries. Each icon's enrichment 
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — onUpdate writes transform/opacity per SVG child
+- `/hyperframes-animation` — onUpdate writes transform/opacity per SVG child
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

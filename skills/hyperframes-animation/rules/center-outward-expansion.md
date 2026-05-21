@@ -32,11 +32,11 @@ When `progress = 0` all elements overlap at the center; when `progress = 1` they
 >
   <div class="burst-wrap">
     <div class="burst-item" data-target-x="-360" data-target-y="-180">{itemA}</div>
-    <div class="burst-item" data-target-x="360"  data-target-y="-180">{itemB}</div>
+    <div class="burst-item" data-target-x="360" data-target-y="-180">{itemB}</div>
     <div class="burst-item" data-target-x="-360" data-target-y="180">{itemC}</div>
-    <div class="burst-item" data-target-x="360"  data-target-y="180">{itemD}</div>
-    <div class="burst-item" data-target-x="0"    data-target-y="-360">{itemE}</div>
-    <div class="burst-item" data-target-x="0"    data-target-y="360">{itemF}</div>
+    <div class="burst-item" data-target-x="360" data-target-y="180">{itemD}</div>
+    <div class="burst-item" data-target-x="0" data-target-y="-360">{itemE}</div>
+    <div class="burst-item" data-target-x="0" data-target-y="360">{itemF}</div>
   </div>
 </div>
 ```
@@ -222,6 +222,6 @@ Pair with `sine-wave-loop` after expansion lands — keeps elements alive instea
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — timeline + stagger
+- `/hyperframes-animation` — timeline + stagger
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

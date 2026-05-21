@@ -44,8 +44,6 @@ document.documentElement.style.setProperty("--accent", accent);
 
 ## Media
 
-Media (and all other static files: fonts, images, etc.) lives in the project's `assets/` directory and is referenced with **relative** paths — `src="assets/demo.mp4"`, not `src="/assets/demo.mp4"` and not `src="public/demo.mp4"`. `assets/` is the served static-file directory created by `init`; `public/` is a different framework's convention and HyperFrames will not serve it.
-
 Video elements must be muted and inline. Audio must be a separate `<audio>` element, even when it uses the same source file.
 
 ```html

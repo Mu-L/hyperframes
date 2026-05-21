@@ -94,13 +94,13 @@ Placeholders: `{monoFont}` is the project's monospace stack (proportional fonts 
   // Shape: a monotonic timeline of N entries where adjacent entries usually share text-prefix
   // but may differ in `segment` (which is what makes the cursor color shift mid-line).
   const SEQUENCE = [
-    { t: 0,            text: "",                    segment: "main",    color: "{mainColor}" },
-    { t: T_LEADIN_END, text: "{leadInChunk}",       segment: "main",    color: "{mainColor}" },
-    { t: T_BRAND_IN,   text: "{leadInBrandPrefix}", segment: "brand",   color: "{brandColor}" },  // brand segment starts
-    { t: T_BRAND_OUT,  text: "{leadInBrandFull}",   segment: "main",    color: "{mainColor}" },   // back to main
-    { t: T_CMD_IN,     text: "{leadInCmdPrefix}",   segment: "cmd",     color: "{cmdColor}" },    // command segment
-    { t: T_BRAND_2,    text: "{leadInCmdBrand}",    segment: "brand",   color: "{brandColor}" },  // brand again (e.g. filename)
-    { t: T_SUCCESS,    text: "{leadInDone}",        segment: "success", color: "{successColor}" },// completion mark
+    { t: 0, text: "", segment: "main", color: "{mainColor}" },
+    { t: T_LEADIN_END, text: "{leadInChunk}", segment: "main", color: "{mainColor}" },
+    { t: T_BRAND_IN, text: "{leadInBrandPrefix}", segment: "brand", color: "{brandColor}" }, // brand segment starts
+    { t: T_BRAND_OUT, text: "{leadInBrandFull}", segment: "main", color: "{mainColor}" }, // back to main
+    { t: T_CMD_IN, text: "{leadInCmdPrefix}", segment: "cmd", color: "{cmdColor}" }, // command segment
+    { t: T_BRAND_2, text: "{leadInCmdBrand}", segment: "brand", color: "{brandColor}" }, // brand again (e.g. filename)
+    { t: T_SUCCESS, text: "{leadInDone}", segment: "success", color: "{successColor}" }, // completion mark
   ];
 
   function entryAt(time) {
@@ -173,7 +173,8 @@ cursorEl.style.opacity = isTyping ? "1" : Math.sin(blink.p) > 0 ? "1" : "0";
 Larger cursor on brand segment for emphasis (`cursorHeightEmphasis > cursorHeight`):
 
 ```js
-cursorEl.style.height = entry.segment === "brand" ? `${cursorHeightEmphasis}px` : `${cursorHeight}px`;
+cursorEl.style.height =
+  entry.segment === "brand" ? `${cursorHeightEmphasis}px` : `${cursorHeight}px`;
 ```
 
 ### Cursor reverses contrast on dark text
@@ -251,6 +252,6 @@ If a segment is rendered DARK text on light bg, cursor should swap to dark too. 
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — onUpdate driving cursor color + sin blink
+- `/hyperframes-animation` — onUpdate driving cursor color + sin blink
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

@@ -39,13 +39,13 @@ Single paused GSAP timeline driven by HyperFrames' seek loop; the four reference
 
 All phase boundaries are expressed in **seconds**, not frames. HyperFrames operates on continuous time; GSAP tween durations carry the choreography.
 
-| Phase | Time window (s)                     | What Happens                                                                | Skill Reference                                                              |
-| ----- | ----------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| 1     | `0 – DECODE_END`                    | Logo pops in + brand name decodes via hacker-flip                           | [hacker-flip-3d](../rules/hacker-flip-3d.md)                                 |
-| 2     | `SWAP_TRIGGER – SWAP_END`           | Brand name slides out, claim text slides in; logo + container shift left    | [vertical-spring-ticker](../rules/vertical-spring-ticker.md) (claim ticker)  |
-| 3     | `RECENTER_TRIGGER – RECENTER_END`   | Claim text exits, logo shifts to screen center + optional vertical adjust   | [coordinate-target-zoom](../rules/coordinate-target-zoom.md) (shift only)    |
-| 4     | `AVATARS_TRIGGER – AVATARS_END`     | Counter appears top, avatar cloud builds around logo with connection lines  | [avatar-cloud-network](../rules/avatar-cloud-network.md)                     |
-| 5     | `LOGOS_TRIGGER – end`               | Partner brand logos stagger-enter at bottom with horizontal scroll          | inline                                                                       |
+| Phase | Time window (s)                   | What Happens                                                               | Skill Reference                                                             |
+| ----- | --------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 1     | `0 – DECODE_END`                  | Logo pops in + brand name decodes via hacker-flip                          | [hacker-flip-3d](../rules/hacker-flip-3d.md)                                |
+| 2     | `SWAP_TRIGGER – SWAP_END`         | Brand name slides out, claim text slides in; logo + container shift left   | [vertical-spring-ticker](../rules/vertical-spring-ticker.md) (claim ticker) |
+| 3     | `RECENTER_TRIGGER – RECENTER_END` | Claim text exits, logo shifts to screen center + optional vertical adjust  | [coordinate-target-zoom](../rules/coordinate-target-zoom.md) (shift only)   |
+| 4     | `AVATARS_TRIGGER – AVATARS_END`   | Counter appears top, avatar cloud builds around logo with connection lines | [avatar-cloud-network](../rules/avatar-cloud-network.md)                    |
+| 5     | `LOGOS_TRIGGER – end`             | Partner brand logos stagger-enter at bottom with horizontal scroll         | inline                                                                      |
 
 ## Initial Layout
 
@@ -101,6 +101,7 @@ Logo and text in a centered flex row. Logo is the persistent element; text conta
 ```
 
 Placeholder tokens:
+
 - `{Brand}` — brand wordmark revealed by the hacker-flip in Phase 1
 - `{heroAsset}` — logo image / SVG that anchors every phase
 - `{claimLead}` / `{claimMid}` — static segments of the Phase-2 claim (e.g. ranking + category)

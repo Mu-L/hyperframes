@@ -180,7 +180,11 @@ Note: the formula does NOT depend on S. The translate amount is the same whether
   );
 
   // Phase 4 — target "tag" reveals inside the zoomed-in target
-  tl.to(".target .tag", { opacity: 1, duration: TAG_REVEAL_DUR, ease: "power2.out" }, TAG_REVEAL_START);
+  tl.to(
+    ".target .tag",
+    { opacity: 1, duration: TAG_REVEAL_DUR, ease: "power2.out" },
+    TAG_REVEAL_START,
+  );
 
   // Phase 5 — climax dwell — viewer reads the target content
   // (no additional motion; the zoomed-in state holds for DWELL_DUR seconds)
@@ -289,6 +293,6 @@ Chain multiple zooms: target A (1.5-2.5s) → pause → target B (3-4s) → pull
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — two coordinated tweens
+- `/hyperframes-animation` — two coordinated tweens
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

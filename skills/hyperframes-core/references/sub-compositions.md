@@ -24,72 +24,130 @@ In the host composition, the sub-composition appears as a clip with `data-compos
 
 ## Sub-Composition File Structure
 
-Sub-composition files use a `<template>` wrapper because they are loaded into a host, not standalone-rendered. The content that HyperFrames mounts is the template payload, so put scene-critical CSS and timeline registration inside the template. Do not rely on `<head><style>` for scene layout.
+### Mental model — what the runtime actually does
+
+When a host loads a sub-composition via `data-composition-src`, the runtime:
+
+1. `fetch`es the HTML file.
+2. Parses it with `DOMParser`.
+3. **Finds the `<template>` element and clones ONLY its contents into the host slot.**
+4. Everything **outside** the `<template>` (including the entire `<head>`) is **discarded**.
+
+So `<template>` is not just a wrapper — it is the **transport container**. If a node needs to exist in the live render, it must be inside `<template>`. Full stop.
+
+### File shape
 
 ```html
-<template id="data-chart-template">
-  <div
-    id="root"
-    data-composition-id="data-chart"
-    data-width="1920"
-    data-height="1080"
-    data-duration="8"
-    style="position:relative; width:1920px; height:1080px; overflow:hidden;"
-  >
-    <style>
-      #data-chart-root,
-      #data-chart-root *,
-      #data-chart-root *::before,
-      #data-chart-root *::after {
-        box-sizing: border-box;
-      }
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <!-- head is metadata for the source file only; the runtime ignores it -->
+  </head>
+  <body>
+    <template>
+      <!-- EVERYTHING the runtime needs goes here: styles, markup, scripts -->
+      <style>
+        .chart-root {
+          position: absolute;
+          inset: 0;
+          color: #fff;
+        }
+        /* ... */
+      </style>
 
-      #data-chart-root {
-        position: absolute;
-        inset: 0;
-        overflow: hidden;
-      }
+      <div class="chart-root" data-composition-id="data-chart" data-width="1920" data-height="1080">
+        <!-- sub-composition markup -->
+      </div>
 
-      #data-chart-root .stage {
-        position: absolute;
-        inset: 0;
-      }
-    </style>
-
-    <div id="data-chart-root">
-      <section class="stage clip" data-start="0" data-duration="8" data-track-index="1">
-        <!-- sub-composition content -->
-      </section>
-    </div>
-
-    <script>
-      window.__timelines = window.__timelines || {};
-      const tl = gsap.timeline({ paused: true });
-      // ... build timeline ...
-      window.__timelines["data-chart"] = tl;
-    </script>
-  </div>
-</template>
+      <script>
+        window.__timelines = window.__timelines || {};
+        const tl = gsap.timeline({ paused: true });
+        // ... build timeline ...
+        window.__timelines["data-chart"] = tl;
+      </script>
+    </template>
+  </body>
+</html>
 ```
 
 Contrast with **standalone** compositions, which put the root directly in `<body>` with no `<template>` wrapper.
 
-### Agent Authoring Contract
+## Common pitfalls that pass static checks but break at render
 
-When writing a scene file under `compositions/scene_*.html`, use this structure exactly unless a project-specific framework skill says otherwise:
+`lint`, `validate`, and `inspect` evaluate each file in isolation. These two failures live in the **cross-file mount contract** and cannot be caught until the runtime actually tries to mount the sub-composition. Watch for them at author time and verify with the pre-render checklist below.
 
-- Use `<template>` for the sub-composition. Never wrap the top-level `index.html` in `<template>`.
-- Use an outer composition root with `id="root"` plus `data-composition-id`, `data-width`, `data-height`, and `data-duration`.
-- Put a scene-specific visual root inside it, e.g. `id="scene-3-root"` or `id="scene_3-root"`, with `position:absolute; inset:0; overflow:hidden`.
-- Put the scene `<style>` block inside the outer root, before the visual DOM. Scope every selector to the scene visual root. Do not write unscoped selectors such as `.stage`, `.cta`, `.card`, `body`, `html`, or `:root` for scene styling.
-- Put the GSAP timeline `<script>` inside the outer root, after the visual DOM, before `</div></template>`.
-- Keep external library `<script src="...">` tags in `<head>` if needed, but do not put scene layout CSS in `<head>`.
-- Register `window.__timelines["<composition-id>"]` with a key that exactly matches the root `data-composition-id`.
-- Do not add narration, voice, or BGM `<audio>` inside worker-authored scene files when the parent host owns audio. In multi-scene videos, put all audio in `index.html` unless the build prompt explicitly says this scene is standalone.
+### Pitfall 1 — `<style>` in `<head>` instead of inside `<template>`
 
-### Failure Mode This Prevents
+```html
+<!-- ❌ WRONG — looks normal, ships catastrophically broken -->
+<head>
+  <style>
+    .chart-root { font-size: 88px; ... }
+  </style>
+</head>
+<body>
+  <template>
+    <div class="chart-root" ...>...</div>
+  </template>
+</body>
 
-If CSS lives in `<head>` or the timeline script sits after `</template>`, lint may only report a narrow issue such as `missing_timeline_registry`, or it may pass after the script is moved. The render can still be wrong: unstyled scene DOM flows below the 1920x1080 canvas, and `inspect` reports text at `top: 2160`, `top: 3240`, or similar off-canvas positions. Treat that as a sub-composition structure bug, not as a font-size or copy-length problem.
+<!-- ✅ RIGHT — styles are inside the template -->
+<head></head>
+<body>
+  <template>
+    <style>
+      .chart-root { font-size: 88px; ... }
+    </style>
+    <div class="chart-root" ...>...</div>
+  </template>
+</body>
+```
+
+**Why this happens:** standard HTML conventions tell you to put `<style>` in `<head>`. In a standalone HTML file that's correct. In a HyperFrames sub-composition it is **not** — the runtime only clones `<template>` contents, so `<head><style>` is dropped on the floor.
+
+**Symptom:** the composition lints / validates / inspects clean, the render completes, but every text element shows up as tiny unstyled default text in the top-left and SVGs blow up to canvas-size because none of the CSS reached the live DOM. The same trap applies to `<script>` blocks, `<link rel="stylesheet">`, custom-element registrations — anything that needs to execute or apply in the render must be inside `<template>`.
+
+### Pitfall 2 — Host `data-composition-id` ≠ inner template `data-composition-id`
+
+```html
+<!-- ❌ WRONG — host renames the slot; runtime can't find the timeline -->
+<!-- host file (e.g. index.html) -->
+<div data-composition-id="chart-mount" data-composition-src="compositions/chart.html" ...></div>
+
+<!-- chart.html -->
+<template>
+  <div data-composition-id="data-chart" ...>...</div>
+  <script>
+    window.__timelines["data-chart"] = tl;
+  </script>
+</template>
+
+<!-- ✅ RIGHT — both ids match, and the timeline key matches them too -->
+<div data-composition-id="data-chart" data-composition-src="compositions/chart.html" ...></div>
+<!-- chart.html template root: data-composition-id="data-chart" -->
+<!-- timeline: window.__timelines["data-chart"] = tl; -->
+```
+
+**Why this happens:** it feels natural to give the host slot a different name like `chart-mount` ("the mount point") vs `data-chart` ("the actual chart"). HyperFrames does not work that way — **the host's `data-composition-id` is the lookup key the framework uses to find the registered timeline**. Lint passes because each file's ids are individually valid; the cross-file mismatch only blows up at render.
+
+**Symptom:** the render logs `Sub-composition timelines not registered after 45000ms: <host-id>` for every mismatched slot, waits 45s per scene, then captures static initial-state frames (so the video is full-length but no animation plays).
+
+### Verification checklist before render
+
+```bash
+# For every sub-composition file in compositions/:
+#   1) <style> + <script> + main markup all live INSIDE <template>
+grep -n "<style\|<script\|<template" compositions/<scene>.html
+#      → first <style>/<script>/<div data-composition-id> should be AFTER <template>, before </template>
+
+#   2) host data-composition-id == internal data-composition-id == window.__timelines key
+grep "data-composition-id" index.html
+grep "data-composition-id\|__timelines\[" compositions/<scene>.html
+#      → all three strings must match exactly per scene
+```
+
+For the runtime end-to-end check (a fast `snapshot` pass + per-scene frame eyeball), see the **Visual smoke test** step in `hyperframes-cli`'s Minimum Completion Gate — that is the only gate that catches these two pitfalls.
 
 ## What HyperFrames Does With the Sub-Composition
 

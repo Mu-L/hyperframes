@@ -39,11 +39,11 @@ Same three-phase "concept → dual proof" arc; one paused GSAP timeline; constit
 
 All boundaries are in **seconds**.
 
-| Phase | Time window (s)           | What Happens                                                         | Skill Reference                                  |
-| ----- | ------------------------- | -------------------------------------------------------------------- | ------------------------------------------------ |
-| 1     | `TITLE_AT – TITLE_END`    | Title slides down from top with accent keyword                       | inline `power3.out` entry                        |
-| 2     | `LEFT_AT – CARDS_END`     | Left card enters from left, right from right; opposing 3D tilts      | [split-tilt-cards](../rules/split-tilt-cards.md) |
-| 3     | `BADGE_LEFT_AT – end`     | Pill badges pop in near each card with bouncy spring + floating idle | [sine-wave-loop](../rules/sine-wave-loop.md)     |
+| Phase | Time window (s)        | What Happens                                                         | Skill Reference                                  |
+| ----- | ---------------------- | -------------------------------------------------------------------- | ------------------------------------------------ |
+| 1     | `TITLE_AT – TITLE_END` | Title slides down from top with accent keyword                       | inline `power3.out` entry                        |
+| 2     | `LEFT_AT – CARDS_END`  | Left card enters from left, right from right; opposing 3D tilts      | [split-tilt-cards](../rules/split-tilt-cards.md) |
+| 3     | `BADGE_LEFT_AT – end`  | Pill badges pop in near each card with bouncy spring + floating idle | [sine-wave-loop](../rules/sine-wave-loop.md)     |
 
 ## Layout
 
@@ -387,13 +387,13 @@ Continuous (Phase 1+):
 
 ## Spring → GSAP Ease Cheatsheet (this blueprint)
 
-| Source spring                                                      | This blueprint uses                          |
-| ------------------------------------------------------------------ | -------------------------------------------- |
-| `spring({ stiffness: 100, damping: 16 })` — title + cards entry    | `power3.out` over `TITLE_DUR` / `ENTRY_DUR`  |
+| Source spring                                                      | This blueprint uses                                 |
+| ------------------------------------------------------------------ | --------------------------------------------------- |
+| `spring({ stiffness: 100, damping: 16 })` — title + cards entry    | `power3.out` over `TITLE_DUR` / `ENTRY_DUR`         |
 | `spring(...)` (entranceBouncy, ~stiffness:180 damping:14) — badges | `back.out(${BOUNCE_FACTOR})` over `BADGE_ENTRY_DUR` |
-| `sin(frame * 0.02)` — card y float                                 | `Math.sin(t * FLOAT_Y_SPEED)` in onUpdate    |
-| `sin(frame * 0.015)` — card rotation float                         | `Math.sin(t * FLOAT_R_SPEED)` in onUpdate    |
-| `sin(frame * 0.025)` — badge y float                               | `Math.sin(t * BADGE_Y_SPEED)` in onUpdate    |
+| `sin(frame * 0.02)` — card y float                                 | `Math.sin(t * FLOAT_Y_SPEED)` in onUpdate           |
+| `sin(frame * 0.015)` — card rotation float                         | `Math.sin(t * FLOAT_R_SPEED)` in onUpdate           |
+| `sin(frame * 0.025)` — badge y float                               | `Math.sin(t * BADGE_Y_SPEED)` in onUpdate           |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 

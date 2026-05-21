@@ -86,13 +86,13 @@ The path length is computed via the DOM API `path.getTotalLength()`.
 
   // Named constants — assignments live in the example, not here.
   // See "How to Choose Values" below for ranges and selection criteria.
-  const SEGMENT_DRAW_DUR;     // per-segment stroke duration
-  const FINAL_SEGMENT_DUR;    // shorter draw on the last (shorter) segment
-  const SEG_1_START;          // first segment start time
-  const SEG_2_START;          // second segment start time (overlaps SEG_1 tail)
-  const SEG_3_START;          // third segment start time (overlaps SEG_2 tail)
-  const BRAND_FADE_DUR;       // wordmark fade-in duration
-  const BRAND_FADE_START;     // wordmark fade-in start (after last stroke settles)
+  const SEGMENT_DRAW_DUR; // per-segment stroke duration
+  const FINAL_SEGMENT_DUR; // shorter draw on the last (shorter) segment
+  const SEG_1_START; // first segment start time
+  const SEG_2_START; // second segment start time (overlaps SEG_1 tail)
+  const SEG_3_START; // third segment start time (overlaps SEG_2 tail)
+  const BRAND_FADE_DUR; // wordmark fade-in duration
+  const BRAND_FADE_START; // wordmark fade-in start (after last stroke settles)
 
   // Measure each path's total length and set up its dash pattern.
   // getTotalLength() is a real DOM API — its return value is dynamic
@@ -172,13 +172,13 @@ The path length is computed via the DOM API `path.getTotalLength()`.
   - Reference: a small lead-in of ~0.2s lets the viewer settle before motion
 
 - **SEG_2_START** — second segment start time
-  - Range: SEG_1_START + (0.5 * SEGMENT_DRAW_DUR) to SEG_1_START + SEGMENT_DRAW_DUR
-  - Effects: closer to SEG_1_START + 0.5*SEGMENT_DRAW_DUR feels rapid/overlapping; closer to SEG_1_START + SEGMENT_DRAW_DUR feels sequential
+  - Range: SEG_1_START + (0.5 \* SEGMENT_DRAW_DUR) to SEG_1_START + SEGMENT_DRAW_DUR
+  - Effects: closer to SEG_1_START + 0.5\*SEGMENT_DRAW_DUR feels rapid/overlapping; closer to SEG_1_START + SEGMENT_DRAW_DUR feels sequential
   - Constraints: stagger ~70-80% of SEGMENT_DRAW_DUR reads as continuous motion (not 3 isolated animations)
   - Reference: SEG_1_START + ~0.25s (about half of SEGMENT_DRAW_DUR)
 
 - **SEG_3_START** — third segment start time
-  - Range: SEG_2_START + (0.5 * SEGMENT_DRAW_DUR) to SEG_2_START + SEGMENT_DRAW_DUR
+  - Range: SEG_2_START + (0.5 \* SEGMENT_DRAW_DUR) to SEG_2_START + SEGMENT_DRAW_DUR
   - Effects: same as SEG_2_START — controls perceived rhythm
   - Constraints: should preserve the same stagger ratio used between SEG_1 and SEG_2
   - Reference: SEG_2_START + ~0.4s
@@ -230,8 +230,16 @@ tl.to("#path", { strokeDashoffset: 0, duration: SEGMENT_DRAW_DUR, ease: "none" }
 For SVG shapes that have a fill color, animate fill opacity to come in AFTER the stroke completes:
 
 ```js
-tl.to("#path", { strokeDashoffset: 0, duration: SEGMENT_DRAW_DUR, ease: "power2.out" }, SEG_1_START);
-tl.to("#path", { fillOpacity: 1, duration: FILL_FADE_DUR, ease: "power1.out" }, SEG_1_START + SEGMENT_DRAW_DUR);
+tl.to(
+  "#path",
+  { strokeDashoffset: 0, duration: SEGMENT_DRAW_DUR, ease: "power2.out" },
+  SEG_1_START,
+);
+tl.to(
+  "#path",
+  { fillOpacity: 1, duration: FILL_FADE_DUR, ease: "power1.out" },
+  SEG_1_START + SEGMENT_DRAW_DUR,
+);
 ```
 
 Requires `fill-opacity: 0` initially and a real `fill` color in CSS.
@@ -261,6 +269,6 @@ Requires `fill-opacity: 0` initially and a real `fill` color in CSS.
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — timeline + stroke property tween
+- `/hyperframes-animation` — timeline + stroke property tween
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

@@ -110,15 +110,15 @@ Card starts as a wide rectangle (shot 1 state). All properties present from the 
   const tl = gsap.timeline({ paused: true });
 
   // Named constants — assign in your example only. See "How to Choose Values".
-  const HOLD_BEAT;                       // s — pre-morph dwell on shot 1
-  const MORPH_START;                     // s — usually = HOLD_BEAT
-  const MORPH_DUR;                       // s — full container morph length
-  const SHOT_TWO_W;                      // px — final container width
-  const SHOT_TWO_H;                      // px — final container height
-  const SHOT_TWO_RADIUS;                 // px — ≤ min(SHOT_TWO_W, SHOT_TWO_H) / 2
-  const OLD_FADE_FRAC;                   // 0..0.5 — fraction of MORPH_DUR for old content fade
-  const NEW_FADE_FRAC;                   // 0..0.5 — fraction of MORPH_DUR for new content fade
-  const FINAL_FADE_FRAC;                 // 0..0.3 — optional tail fade for handoff
+  const HOLD_BEAT; // s — pre-morph dwell on shot 1
+  const MORPH_START; // s — usually = HOLD_BEAT
+  const MORPH_DUR; // s — full container morph length
+  const SHOT_TWO_W; // px — final container width
+  const SHOT_TWO_H; // px — final container height
+  const SHOT_TWO_RADIUS; // px — ≤ min(SHOT_TWO_W, SHOT_TWO_H) / 2
+  const OLD_FADE_FRAC; // 0..0.5 — fraction of MORPH_DUR for old content fade
+  const NEW_FADE_FRAC; // 0..0.5 — fraction of MORPH_DUR for new content fade
+  const FINAL_FADE_FRAC; // 0..0.3 — optional tail fade for handoff
   // {surfaceShotTwo} is a CSS background token (solid or gradient).
 
   // Hold shot 1 — let the viewer register the wide banner before morphing.
@@ -177,12 +177,12 @@ Card starts as a wide rectangle (shot 1 state). All properties present from the 
 
 ## Key Properties to Morph
 
-| Property           | Shape of change                                                  | Visual effect                |
-| ------------------ | ---------------------------------------------------------------- | ---------------------------- |
-| `width` / `height` | `SHOT_ONE_W × SHOT_ONE_H` → `SHOT_TWO_W × SHOT_TWO_H`             | wide card shrinks to an icon |
-| `borderRadius`     | `SHOT_ONE_RADIUS` → `SHOT_TWO_RADIUS` (≤ half of smaller side)   | rectangle becomes a circle   |
-| `background`       | `{surfaceShotOne}` → `{surfaceShotTwo}` (solid or gradient)       | container identity shifts    |
-| `boxShadow`        | base shadow → accent glow token                                   | emphasis changes             |
+| Property           | Shape of change                                                | Visual effect                |
+| ------------------ | -------------------------------------------------------------- | ---------------------------- |
+| `width` / `height` | `SHOT_ONE_W × SHOT_ONE_H` → `SHOT_TWO_W × SHOT_TWO_H`          | wide card shrinks to an icon |
+| `borderRadius`     | `SHOT_ONE_RADIUS` → `SHOT_TWO_RADIUS` (≤ half of smaller side) | rectangle becomes a circle   |
+| `background`       | `{surfaceShotOne}` → `{surfaceShotTwo}` (solid or gradient)    | container identity shifts    |
+| `boxShadow`        | base shadow → accent glow token                                | emphasis changes             |
 
 GSAP tweens all of these simultaneously when included in one `tl.to(...)` call.
 
@@ -262,6 +262,6 @@ Always **measure the target element with `getBoundingClientRect()`** before the 
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — timeline + multi-property tween reference
+- `/hyperframes-animation` — timeline + multi-property tween reference
 - `/hyperframes-core` — composition wiring, `data-*` attributes
 - `/hyperframes-cli` — `hyperframes lint` to verify scene structure

@@ -144,9 +144,9 @@ Both run inside the GSAP timeline so HF seeks frame-by-frame deterministically.
   );
 
   // Content reveals (entry beats inside the camera frame)
-  tl.from(".hero",    { opacity: 0, y: 32, scale: 0.96, duration: 0.9, ease: "power3.out" }, HERO_AT);
-  tl.from(".tagline", { opacity: 0, y: 16,             duration: 0.7, ease: "power3.out" }, TAGLINE_AT);
-  tl.from(".cta",     { opacity: 0, y: 8,              duration: 0.7, ease: "power3.out" }, CTA_AT);
+  tl.from(".hero", { opacity: 0, y: 32, scale: 0.96, duration: 0.9, ease: "power3.out" }, HERO_AT);
+  tl.from(".tagline", { opacity: 0, y: 16, duration: 0.7, ease: "power3.out" }, TAGLINE_AT);
+  tl.from(".cta", { opacity: 0, y: 8, duration: 0.7, ease: "power3.out" }, CTA_AT);
 
   window.__timelines["cam-scene"] = tl;
 </script>
@@ -268,6 +268,6 @@ const offsetY = (viewportCenter.y - (tRect.top + tRect.height / 2)) / phase.scal
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — multi-phase tween + drift onUpdate
+- `/hyperframes-animation` — multi-phase tween + drift onUpdate
 - `/hyperframes-core` — composition wiring, scene wrapper
 - `/hyperframes-cli` — `hyperframes lint`

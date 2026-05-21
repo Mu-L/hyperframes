@@ -19,7 +19,8 @@ when_not_to_use:
   - Workflow has more than 3-4 steps (cannot read in a ~5s scene)
   - No user-action metaphor needed (fully automated)
   - Scene is purely informational without interaction
-triggers: [review and approve, step-by-step workflow, user control, approve button, with-you metaphor]
+triggers:
+  [review and approve, step-by-step workflow, user control, approve button, with-you metaphor]
 ---
 
 # Workflow · Approve & Press (HyperFrames)
@@ -38,12 +39,12 @@ A single paused GSAP timeline drives everything. State transitions that would be
 
 All boundaries are in **seconds**. Each named constant is documented in [How to Choose Values](#how-to-choose-values).
 
-| Phase | Time window                  | What Happens                                                                                  | Skill Reference                                          |
-| ----- | ---------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| 1     | `HEADLINE_START – HEADLINE_END` | Headline slides down from top with accent keyword                                          | inline `back.out(${HEADLINE_BOUNCE})` entry              |
-| 2     | `VIDEO_START – VIDEO_END`     | Center product video / animation enters with scale                                            | inline scale-in                                          |
-| 3     | `STEPS_START – PRESS_FRAME`   | Step indicators stagger-enter left, progress pending → active → complete via attr toggles    | inline staggered entry + `tl.set()` state machine        |
-| 4     | `PRESS_FRAME – end`           | Action button depresses (linear) → color shifts → checkmark pops (spring)                    | [press-release-spring](../rules/press-release-spring.md) |
+| Phase | Time window                     | What Happens                                                                              | Skill Reference                                          |
+| ----- | ------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 1     | `HEADLINE_START – HEADLINE_END` | Headline slides down from top with accent keyword                                         | inline `back.out(${HEADLINE_BOUNCE})` entry              |
+| 2     | `VIDEO_START – VIDEO_END`       | Center product video / animation enters with scale                                        | inline scale-in                                          |
+| 3     | `STEPS_START – PRESS_FRAME`     | Step indicators stagger-enter left, progress pending → active → complete via attr toggles | inline staggered entry + `tl.set()` state machine        |
+| 4     | `PRESS_FRAME – end`             | Action button depresses (linear) → color shifts → checkmark pops (spring)                 | [press-release-spring](../rules/press-release-spring.md) |
 
 ## Initial Layout
 
@@ -236,7 +237,11 @@ tl.to(
 // ── Phase 4b: Press (linear depression → linear return) ───────────
 // Two adjacent tweens. End value of (1) = start value of (2) — see
 // press-release-spring's state-continuity principle.
-tl.to(".btn-press", { scale: PRESS_SCALE, duration: PRESS_DIP_DUR, ease: "power1.out" }, PRESS_FRAME);
+tl.to(
+  ".btn-press",
+  { scale: PRESS_SCALE, duration: PRESS_DIP_DUR, ease: "power1.out" },
+  PRESS_FRAME,
+);
 tl.to(
   ".btn-press",
   { scale: 1.0, duration: PRESS_DUR - PRESS_DIP_DUR, ease: "power1.in" },
@@ -257,17 +262,18 @@ tl.to(
 tl.set(".btn-label", { textContent: "{confirmedLabel}" }, CHECK_POP);
 
 // ── Phase 4d: Checkmark pop (spring) ──────────────────────────────
-tl.to(".btn-check", { scale: 1, duration: CHECK_POP_DUR, ease: `back.out(${CHECK_BOUNCE})` }, CHECK_POP);
+tl.to(
+  ".btn-check",
+  { scale: 1, duration: CHECK_POP_DUR, ease: `back.out(${CHECK_BOUNCE})` },
+  CHECK_POP,
+);
 
 // ── Ambient pulsing glow on the button (finite yoyo) ──────────────
 // boxShadow string is not GSAP-tweenable — drive a CSS custom property
 // `--btn-glow-blur` that the button's `box-shadow` declaration reads.
 // `repeat: -1` is forbidden by the HF render contract, so derive a finite
 // count from remaining scene time.
-const PULSE_HALVES = Math.max(
-  2,
-  Math.floor((SCENE_END - BUTTON_ENTER) / (PULSE_PERIOD / 2)),
-);
+const PULSE_HALVES = Math.max(2, Math.floor((SCENE_END - BUTTON_ENTER) / (PULSE_PERIOD / 2)));
 tl.fromTo(
   ".btn",
   { "--btn-glow-blur": GLOW_BLUR_MIN },
@@ -307,11 +313,11 @@ Step state is a discrete attribute, never animated. The CSS maps `[data-state]` 
 .step[data-state="complete"] .step-check { display: inline-flex; }
 ```
 
-| State        | Circle                       | Label             | Shadow      |
-| ------------ | ---------------------------- | ----------------- | ----------- |
-| **Pending**  | Number, muted border         | Muted text        | None        |
-| **Active**   | Number, accent-color border  | Bold primary text | Accent glow |
-| **Complete** | Filled success + checkmark   | Normal text       | None        |
+| State        | Circle                      | Label             | Shadow      |
+| ------------ | --------------------------- | ----------------- | ----------- |
+| **Pending**  | Number, muted border        | Muted text        | None        |
+| **Active**   | Number, accent-color border | Bold primary text | Accent glow |
+| **Complete** | Filled success + checkmark  | Normal text       | None        |
 
 ## Phase 4 Detail: Button Press Sequence (Core Glue)
 
@@ -469,15 +475,15 @@ Phase 4 internal handoffs:
 
 ## Spring → GSAP Ease Cheatsheet (this blueprint)
 
-| Spring feel                                  | Ease family used here              |
-| -------------------------------------------- | ---------------------------------- |
-| Soft settle — headline entry                 | `back.out(${HEADLINE_BOUNCE})`     |
-| Cinematic ease-out — demo scale-in           | `power3.out`                       |
-| Tight enter — steps stagger                  | `power3.out`                       |
-| Firm pop — button entry                      | `back.out(${BTN_ENTRY_BOUNCE})`    |
-| Mechanical / tactile — press dip + return    | `power1.out` then `power1.in`      |
-| Punctuating "stamp" — checkmark              | `back.out(${CHECK_BOUNCE})`        |
-| Ambient breathing — pulsing glow             | `sine.inOut` finite-yoyo           |
+| Spring feel                               | Ease family used here           |
+| ----------------------------------------- | ------------------------------- |
+| Soft settle — headline entry              | `back.out(${HEADLINE_BOUNCE})`  |
+| Cinematic ease-out — demo scale-in        | `power3.out`                    |
+| Tight enter — steps stagger               | `power3.out`                    |
+| Firm pop — button entry                   | `back.out(${BTN_ENTRY_BOUNCE})` |
+| Mechanical / tactile — press dip + return | `power1.out` then `power1.in`   |
+| Punctuating "stamp" — checkmark           | `back.out(${CHECK_BOUNCE})`     |
+| Ambient breathing — pulsing glow          | `sine.inOut` finite-yoyo        |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 

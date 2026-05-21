@@ -140,9 +140,7 @@ If entry is interactive or skippable, gate the idle:
 
 ```js
 const idleActive = entryProgress >= GATE_THRESHOLD;
-const scale = idleActive
-  ? 1 + Math.sin((time - IDLE_START_TIME) / PERIOD) * SCALE_AMP
-  : 1;
+const scale = idleActive ? 1 + Math.sin((time - IDLE_START_TIME) / PERIOD) * SCALE_AMP : 1;
 ```
 
 ### Period vs cycle math
@@ -240,6 +238,6 @@ For HF (`onUpdate` doesn't expose frame directly), use the tween's `phase` value
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — `onUpdate` writing transform
+- `/hyperframes-animation` — `onUpdate` writing transform
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

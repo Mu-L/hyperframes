@@ -109,7 +109,7 @@ The fact that the victim's exit finishes BEFORE the intruder's entry creates the
 
   // Off-stage distances are derived from the stage width.
   const INTRUDER_START_X = STAGE_W; // off-stage right
-  const VICTIM_END_X = -STAGE_W;    // off-stage left, opposite direction
+  const VICTIM_END_X = -STAGE_W; // off-stage left, opposite direction
 
   // Initial state — victim centered, intruder off-stage right
   gsap.set("#victim", { x: 0, opacity: 1, rotation: 0 });
@@ -234,8 +234,7 @@ tl.to(
     ease: "none",
     onUpdate: () => {
       const rot =
-        Math.sin(wobble.p) * WOBBLE_AMP_DEG *
-        (1 - wobble.p / (Math.PI * WOBBLE_CYCLES * 2)); // linear decay
+        Math.sin(wobble.p) * WOBBLE_AMP_DEG * (1 - wobble.p / (Math.PI * WOBBLE_CYCLES * 2)); // linear decay
       intruder.style.transform = `translate(-50%, -50%) rotate(${rot}deg)`;
     },
   },
@@ -273,6 +272,6 @@ Intruder displaces multiple aligned cards, each victim getting a slightly delaye
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — single driver, multi-value onUpdate
+- `/hyperframes-animation` — single driver, multi-value onUpdate
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`

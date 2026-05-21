@@ -10,7 +10,6 @@ When the composition is animation-driven, run the checks before you reach for `p
 - Capture `snapshot` at meaningful timeline states; look at the PNGs.
 - Inspect snapshots _before_ tuning automated warnings — your eye catches what the auditor misses.
 - Treat layout warnings as defects unless a snapshot proves the overflow is intentional, in which case mark it with `data-layout-allow-overflow`.
-- **Do not use `render --quality draft` + `ffmpeg` frame extraction as a still-frame QA shortcut.** Rendering an mp4 just to inspect a frame is orders of magnitude slower than `snapshot` and produces an artifact you have to clean up. Save `render` for the actual deliverable.
 
 ## lint
 

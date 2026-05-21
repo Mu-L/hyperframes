@@ -54,6 +54,7 @@ Animation phases:
 ```
 
 Placeholder tokens:
+
 - `{counterValue}` / `{counterLabel}` — the hub copy (numeric proof + category)
 - `{footerLine}` — optional attribution line under the cloud
 - `{avatar[i]}` — per-avatar image source (or emoji glyph if using the emoji variation below)
@@ -365,6 +366,6 @@ Replace face images with flags / emoji / iconography. Reads as "global community
 
 ## Pairs with HF skills
 
-- `/hyperframes-gsap` — staggered spring entries + SVG dash draw
+- `/hyperframes-animation` — staggered spring entries + SVG dash draw
 - `/hyperframes-core` — composition wiring
 - `/hyperframes-cli` — `hyperframes lint`
