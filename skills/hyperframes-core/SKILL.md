@@ -9,13 +9,13 @@ HyperFrames renders video from HTML. A composition is an HTML file whose DOM dec
 
 This skill is the **technical contract**. Other concerns live in sibling skills:
 
-- `hyperframes-adapters` — animation runtimes (GSAP, Lottie, Three, Anime.js, CSS, WAAPI, TypeGPU)
-- `hyperframes-animation` — atomic motion rules + scene blueprints
+- `hyperframes-animation` — atomic motion rules + scene blueprints + per-runtime adapters (GSAP, Lottie, Three, Anime.js, CSS, WAAPI, TypeGPU)
 - `hyperframes-creative` — palettes, typography, narration, beat planning, audio-reactive
 - `hyperframes-media` — TTS, Whisper transcribe, background removal, captions
 - `hyperframes-registry` — install blocks and components (`hyperframes add`)
-- `hyperframes-tailwind` — Tailwind v4 browser runtime (for `init --tailwind` projects)
 - `hyperframes-cli` — dev loop commands (lint / validate / preview / render)
+
+For **Tailwind v4 projects** (`hyperframes init --tailwind`), see `references/tailwind.md` — the browser-runtime contract is distinct from Studio's Tailwind v3 setup.
 
 ## Routing
 
@@ -35,8 +35,9 @@ This skill is the **technical contract**. Other concerns live in sibling skills:
 | Know what can / cannot be animated (visual-property allowlist; not `display`/`visibility`) | `references/determinism-rules.md`   |
 | Fit text and prevent overflow (`fitTextFontSize` signature, `<br>` rule, layout contract)  | `references/determinism-rules.md`   |
 | Author full-frame motion with shared backgrounds                                           | `references/full-screen-motion.md`  |
+| Work in a Tailwind v4 project (`init --tailwind`)                                          | `references/tailwind.md`            |
 
-For animation runtime specifics (GSAP API, Lottie, Three.js, etc.) go to `hyperframes-adapters`.
+For animation runtime specifics (GSAP API, Lottie, Three.js, etc.) go to `hyperframes-animation` → `adapters/<runtime>.md`.
 
 ## Composition Structure
 
@@ -57,15 +58,15 @@ Every composition registers exactly one GSAP timeline.
 
 - Create with `gsap.timeline({ paused: true })` — the player owns playback.
 - Register at `window.__timelines["<composition-id>"]`; the key **must exactly match** the root's `data-composition-id`.
-- Build the timeline **synchronously** during page load — not inside `async`, `setTimeout`, `Promise`, or event handlers.
+- Build the timeline **synchronously** during page load — not inside `async`, `setTimeout`, `Promise`, or event handlers. The renderer samples after page load completes; any deferred timeline construction misses the sample.
 - Render duration comes from `data-duration` on the root, **not** from GSAP timeline length. Do not pad the timeline with empty tweens to set duration.
 - For sub-compositions, do **not** manually nest sub-timelines into the host (`master.add(sub)`); the framework drives them independently.
 
-For non-GSAP runtimes (Lottie / Three / WAAPI / CSS / Anime.js / TypeGPU), the equivalent contract lives in `hyperframes-adapters/references/<runtime>.md`. See `references/determinism-rules.md` for the cross-runtime Animation Runtime Contract.
+For non-GSAP runtimes (Lottie / Three / WAAPI / CSS / Anime.js / TypeGPU), the equivalent contract lives in `hyperframes-animation/adapters/<runtime>.md`. See `references/determinism-rules.md` for the cross-runtime Animation Runtime Contract.
 
 ## Non-Negotiable Rules
 
-These break the renderer.
+These break the renderer. (Synchronous timeline construction is covered above in **Timeline Contract**.)
 
 1. No `Math.random()` / `Date.now()` / `performance.now()` driving visuals — use a seeded PRNG.
 2. No `repeat: -1`. Use `repeat: Math.ceil(duration / cycleDuration) - 1`.
@@ -73,7 +74,6 @@ These break the renderer.
 4. No `gsap.set()` on clip elements from later scenes (they are not in the DOM yet). Use `tl.set(selector, vars, time)` at or after the clip's `data-start`.
 5. No animating `display` / `visibility`. Animate `opacity` / transforms; the clip lifecycle handles show/hide.
 6. No `<br>` in body text. Let text wrap via `max-width`.
-7. No timeline construction inside `async` / `setTimeout` / `Promise`. The renderer samples after page load, synchronously.
 
 ## Editing Existing Compositions
 
