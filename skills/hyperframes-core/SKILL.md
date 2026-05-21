@@ -19,23 +19,26 @@ For **Tailwind v4 projects** (`hyperframes init --tailwind`), see `references/ta
 
 ## Routing
 
-| Want to…                                                                                   | Read                                |
-| ------------------------------------------------------------------------------------------ | ----------------------------------- |
-| See a minimal renderable composition                                                       | `references/minimal-composition.md` |
-| Look up a `data-*` attribute (root, clip, sub-comp host, legacy aliases)                   | `references/data-attributes.md`     |
-| Use `class="clip"` correctly                                                               | `references/data-attributes.md`     |
-| Pick a `data-track-index`; same-track overlap; track-index vs CSS `z-index`                | `references/tracks-and-clips.md`    |
-| Time a clip relative to another (`data-start="intro + 2"`, crossfade overlap, chains)      | `references/tracks-and-clips.md`    |
-| Wire a sub-composition (host attributes, `<template>` wrapper, per-instance variables)     | `references/sub-compositions.md`    |
-| Animate inside a sub-composition (`gsap.fromTo` over `gsap.from`, seek-back behavior)      | `references/sub-compositions.md`    |
-| Declare variables (types, extra options, defaults, `--strict-variables` in CI)             | `references/variables-and-media.md` |
-| Place `<video>` / `<audio>`, set volume, trim with `data-media-start`                      | `references/variables-and-media.md` |
-| Build a seekable timeline (paused, sync construction, `gsap.set` later-scene trap)         | `references/determinism-rules.md`   |
-| Avoid non-deterministic state (clocks, `Math.random`, `repeat: -1`, finite repeat formula) | `references/determinism-rules.md`   |
-| Know what can / cannot be animated (visual-property allowlist; not `display`/`visibility`) | `references/determinism-rules.md`   |
-| Fit text and prevent overflow (`fitTextFontSize` signature, `<br>` rule, layout contract)  | `references/determinism-rules.md`   |
-| Author full-frame motion with shared backgrounds                                           | `references/full-screen-motion.md`  |
-| Work in a Tailwind v4 project (`init --tailwind`)                                          | `references/tailwind.md`            |
+| Want to…                                                                                   | Read                                 |
+| ------------------------------------------------------------------------------------------ | ------------------------------------ |
+| See a minimal renderable composition                                                       | `references/minimal-composition.md`  |
+| Decide between monolithic single-file and modular sub-comp architecture                    | `references/composition-patterns.md` |
+| Structure a modular `index.html` (orchestrator + slots + root audio)                       | `references/composition-patterns.md` |
+| Pick a sub-comp archetype (content / driver-only / multi-scene merge / audio-reactive)     | `references/composition-patterns.md` |
+| Look up a `data-*` attribute (root, clip, sub-comp host, legacy aliases)                   | `references/data-attributes.md`      |
+| Use `class="clip"` correctly                                                               | `references/data-attributes.md`      |
+| Pick a `data-track-index`; same-track overlap; track-index vs CSS `z-index`                | `references/tracks-and-clips.md`     |
+| Time a clip relative to another (`data-start="intro + 2"`, crossfade overlap, chains)      | `references/tracks-and-clips.md`     |
+| Wire a sub-composition (host attributes, `<template>` wrapper, per-instance variables)     | `references/sub-compositions.md`     |
+| Animate inside a sub-composition (`gsap.fromTo` over `gsap.from`, seek-back behavior)      | `references/sub-compositions.md`     |
+| Declare variables (types, extra options, defaults, `--strict-variables` in CI)             | `references/variables-and-media.md`  |
+| Place `<video>` / `<audio>`, set volume, trim with `data-media-start`                      | `references/variables-and-media.md`  |
+| Build a seekable timeline (paused, sync construction, `gsap.set` later-scene trap)         | `references/determinism-rules.md`    |
+| Avoid non-deterministic state (clocks, `Math.random`, `repeat: -1`, finite repeat formula) | `references/determinism-rules.md`    |
+| Know what can / cannot be animated (visual-property allowlist; not `display`/`visibility`) | `references/determinism-rules.md`    |
+| Fit text and prevent overflow (`fitTextFontSize` signature, `<br>` rule, layout contract)  | `references/determinism-rules.md`    |
+| Author full-frame motion with shared backgrounds                                           | `references/full-screen-motion.md`   |
+| Work in a Tailwind v4 project (`init --tailwind`)                                          | `references/tailwind.md`             |
 
 For animation runtime specifics (GSAP API, Lottie, Three.js, etc.) go to `hyperframes-animation` → `adapters/<runtime>.md`.
 
