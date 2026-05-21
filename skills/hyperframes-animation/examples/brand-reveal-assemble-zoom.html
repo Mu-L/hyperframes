@@ -19,8 +19,8 @@
         - Single paused GSAP timeline registered to window.__timelines["main"]
         - brandTextWidth measured via getBoundingClientRect after document.fonts.ready
         - HERO_FINAL_OFFSET_X derived from real measurement, not estimate
-        - Breathing uses onUpdate (Form 2) so it multiplies onto the pop scale,
-          not a yoyo (Form 1) which would overwrite the pop value
+        - Breathing uses the onUpdate (multiplicative) form so it multiplies
+          onto the pop scale, not a fromTo + yoyo which would overwrite the pop value
         - Three nested transform layers: zoom-scale → zoom-translate → recenter-shift
         - Logo is loaded from a static PNG asset
     -->
@@ -202,7 +202,7 @@
 
       /* ================================================================
          DISCRETE TEXT SEQUENCE for the companion assembly.
-         Converted from the the source frame-based sequence to seconds at 30fps.
+         Converted from the source frame-based sequence to seconds at 30fps.
          ================================================================ */
       const SEQUENCE = [
         { t: 0.0, text: "J" },
@@ -228,7 +228,7 @@
         probe.style.font = `700 ${BRAND_FONT_SIZE}px "Google Sans", "Roboto", Inter, system-ui, sans-serif`;
         probe.style.whiteSpace = "pre";
         probe.style.lineHeight = "1";
-        probe.textContent = "hyperframes";
+        probe.textContent = "Hyperframes"; // MUST match the rendered .brand-text casing
         document.body.appendChild(probe);
         const brandTextWidth = probe.getBoundingClientRect().width;
         probe.remove();

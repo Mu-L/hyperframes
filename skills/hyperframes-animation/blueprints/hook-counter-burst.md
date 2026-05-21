@@ -22,62 +22,62 @@ when_not_to_use:
 triggers: [opening hook, statistic, counting number, dramatic number, attention grabber]
 ---
 
-# Hook · Counter Burst (HyperFrames)
+# Hook · Counter Burst
 
-Background → icons enter clustered at center → number counts up while icons expand outward → camera pushes in for closing emphasis.
+Background → thematic icons enter clustered at center → number counts up while icons expand outward → camera pushes in for closing emphasis.
 
-Same four-phase opening-hook arc; one paused GSAP timeline; constituent patterns map to [svg-icon-enrichment](../rules/svg-icon-enrichment.md), [center-outward-expansion](../rules/center-outward-expansion.md), [counting-dynamic-scale](../rules/counting-dynamic-scale.md), and [multi-phase-camera](../rules/multi-phase-camera.md).
+Four-phase opening-hook arc on a single paused GSAP timeline. Constituent patterns: [svg-icon-enrichment](../rules/svg-icon-enrichment.md), [center-outward-expansion](../rules/center-outward-expansion.md), [counting-dynamic-scale](../rules/counting-dynamic-scale.md), [multi-phase-camera](../rules/multi-phase-camera.md).
 
 ## When to Use
 
 - Opening scene needs a single dramatic statistic as the hook
-- The statistic is reinforced by thematic icons (clock, scissors, video, play...)
-- Scene should feel kinetic from frame 1 — no static moments
-- Total duration 3–5 seconds (any longer and the hook starts to feel like the main scene)
+- The statistic is reinforced by 3-5 thematic icons (e.g. clock, scissors, video, play)
+- Scene must feel kinetic from frame 1 — no static moments
+- Total duration short enough that the hook does not start to read as the main scene
 
 ## Phase Pipeline
 
-All boundaries are in **seconds** (at 30 fps; multiply by 30 to recover frames).
+All boundaries are in **seconds**.
 
-| Phase | Time window (s) | What Happens                                                 | Skill Reference                                                                                                                 |
-| ----- | --------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| 1     | `0 – 0.17`      | Background visible with dark overlay; nothing else           | inline                                                                                                                          |
-| 2     | `0.17 – 0.57`   | Icons enter staggered, clustered at `startOffset` (40 %)     | [svg-icon-enrichment](../rules/svg-icon-enrichment.md) entry pattern                                                            |
-| 3     | `0.47 – 1.47`   | Counter counts up; icons expand from 40 % to 100 % position  | [counting-dynamic-scale](../rules/counting-dynamic-scale.md) + [center-outward-expansion](../rules/center-outward-expansion.md) |
-| 4     | `0.50 – 3.50`   | Multi-phase camera: focus-in (0.5–2.33) then push (2.33–3.5) | [multi-phase-camera](../rules/multi-phase-camera.md)                                                                            |
+| Phase | Time window                              | What Happens                                                           | Skill Reference                                                                                                                 |
+| ----- | ---------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | `0 – ICON_ENTRY_AT_1`                    | Background visible with dark overlay; nothing else                     | inline                                                                                                                          |
+| 2     | staggered entry beat                     | Icons enter staggered, clustered at `START_OFFSET`                     | [svg-icon-enrichment](../rules/svg-icon-enrichment.md) entry pattern                                                            |
+| 3     | `COUNT_AT` + `COUNT_DUR`                 | Counter counts up; icons expand from `START_OFFSET` to final positions | [counting-dynamic-scale](../rules/counting-dynamic-scale.md) + [center-outward-expansion](../rules/center-outward-expansion.md) |
+| 4     | `CAMERA_FOCUS_AT` → `CAMERA_PUSH_AT` end | Multi-phase camera: focus-in then push                                 | [multi-phase-camera](../rules/multi-phase-camera.md)                                                                            |
 
-Phase 2 and 3 overlap: icons keep entering through 0.57 s, while the counter starts at 0.47 s. The overlap is intentional — the eye sees motion continuously, no static gap.
+Phase 2 and Phase 3 intentionally overlap so the eye sees motion continuously — no static gap between icon arrival and the count starting.
 
-## Layout
+## Initial Layout
 
-Counter is absolutely centered. Icons each have their target position set in CSS once; a GSAP `x` / `y` tween shifts them from the inverse-lerped startOffset position to target.
+Counter is absolutely centered. Each icon's target position is set in CSS (or via `gsap.set()`) once; a GSAP `x` / `y` tween shifts it from the inverse-lerped `START_OFFSET` position to target.
 
 ```html
 <div class="stage">
   <div class="bg"></div>
-  <!-- video / animated gradient -->
+  <!-- background video or animated gradient -->
 
   <div class="camera">
     <!-- GSAP-managed scale phases -->
 
     <div class="icons-stage">
-      <div class="icon-pos clock" style="left: 115px;  top: 195px;">
-        <div class="icon-entry"><svg class="icon-svg">...</svg></div>
+      <div class="icon-pos icon-a">
+        <div class="icon-entry"><svg class="icon-svg">{iconA}</svg></div>
       </div>
-      <div class="icon-pos scissors" style="left: 1632px; top: 216px;">
-        <div class="icon-entry"><svg class="icon-svg">...</svg></div>
+      <div class="icon-pos icon-b">
+        <div class="icon-entry"><svg class="icon-svg">{iconB}</svg></div>
       </div>
-      <div class="icon-pos video" style="left: 77px;   top: 734px;">
-        <div class="icon-entry"><svg class="icon-svg">...</svg></div>
+      <div class="icon-pos icon-c">
+        <div class="icon-entry"><svg class="icon-svg">{iconC}</svg></div>
       </div>
-      <div class="icon-pos play" style="left: 1690px; top: 702px;">
-        <div class="icon-entry"><svg class="icon-svg">...</svg></div>
+      <div class="icon-pos icon-d">
+        <div class="icon-entry"><svg class="icon-svg">{iconD}</svg></div>
       </div>
     </div>
 
     <div class="counter-stage">
       <div class="counter-3d">
-        <span class="counter-number">0</span><span class="counter-percent">%</span>
+        <span class="counter-number">0</span><span class="counter-suffix">{suffix}</span>
       </div>
     </div>
   </div>
@@ -86,43 +86,52 @@ Counter is absolutely centered. Icons each have their target position set in CSS
 </div>
 ```
 
-Each `.icon-pos`'s `left` / `top` are the **target** coordinates. GSAP `x` / `y` shift it back toward center. `.icon-entry` is a nested wrapper so the entry scale/opacity tweens don't overwrite the position tweens.
+```css
+html, body {
+  font-family: {font};
+  color: {textColor};
+  background: {bgColor};
+}
+.bg-overlay { background: {overlayColor}; }     /* dark overlay over bg */
+.counter-number { color: {textColor}; font-variant-numeric: tabular-nums; }
+.counter-suffix { color: {accentColor}; }
+```
+
+Each `.icon-pos`'s `left` / `top` are the **target** coordinates. GSAP `x` / `y` shift it back toward center. `.icon-entry` is a nested wrapper so the entry scale/opacity/rotation tweens never overwrite the position tweens.
+
+## Phase 1: Cold Open
+
+Background and dark overlay are visible from t=0. No element animates yet; this opens a beat of compositional quiet before the burst starts. The icons are present in the DOM but invisible (scale 0, opacity 0) and pre-positioned at `START_OFFSET` via `gsap.set()`.
 
 ## Phase 2: Icon Entries
 
-Each icon enters with its own spring (scale 0 → 1 + opacity 0 → 1 + rotation), staggered ~0.13 s each. Internal SVG animations (clock hand rotating, scissors oscillating, video record dot pulsing, play button pulsing) run **from time 0** — they're invisible during Phase 1 but already in motion when each icon appears.
+Each icon enters with its own spring (scale 0 → 1 + opacity 0 → 1 + rotation), staggered by `ICON_STAGGER`. Internal SVG animations (rotating hands, oscillating blades, pulsing dots, dash flows) run **from t=0** — they are invisible during Phase 1 but already in motion when each icon appears, so the icon feels alive on landing.
 
 ```js
-const ICON_DELAYS = { clock: 0.17, scissors: 0.3, video: 0.43, play: 0.57 };
-
-Object.entries(ICON_DELAYS).forEach(([name, delay]) => {
+ICONS.forEach(({ name, delay }) => {
   tl.fromTo(
     `.${name} .icon-entry`,
-    { scale: 0, opacity: 0, rotation: -180 },
-    { scale: 1, opacity: 0.85, rotation: 0, duration: 0.55, ease: "back.out(1.5)" },
+    { scale: 0, opacity: 0, rotation: ENTRY_ROTATION },
+    {
+      scale: 1,
+      opacity: ENTRY_OPACITY,
+      rotation: 0,
+      duration: ENTRY_DUR,
+      ease: `back.out(${BOUNCE_FACTOR})`,
+    },
     delay,
   );
 });
 ```
 
-See [svg-icon-enrichment](../rules/svg-icon-enrichment.md) for the full internal-motion patterns (linear rotation for clock hand, sine yoyo for scissors, etc.).
+See [svg-icon-enrichment](../rules/svg-icon-enrichment.md) for the four internal-motion patterns (rotation, oscillation, pulse, dash flow).
 
 ## Phase 3: Count + Expansion (Core Glue)
 
-Single shared ease and duration drive both the counter and the icon expansion. Because GSAP tweens with identical `duration` + `ease` advance their progress in lockstep, the counter's display number and the icons' positions stay mathematically synchronized — no shared driver needed.
+A shared ease and duration drive **both** the counter and the icon expansion. Because GSAP tweens with identical `duration` + `ease` advance their progress in lockstep, the counter's display number and the icons' positions stay mathematically synchronized — no shared driver needed.
 
 ```js
-const COUNT_AT = 0.47;
-const COUNT_DUR = 1.0;
-const START_OFFSET = 0.4;
-const W = 1920,
-  H = 1080,
-  ICON_SIZE = 180;
-const CENTER_X = W / 2 - ICON_SIZE / 2;
-const CENTER_Y = H / 2 - ICON_SIZE / 2;
-
 // (a) Counter — proxy tween. onUpdate writes text + font size to one element.
-const counterEl = document.querySelector(".counter-number");
 const counterProxy = { p: 0 };
 
 tl.to(
@@ -130,106 +139,193 @@ tl.to(
   {
     p: 1,
     duration: COUNT_DUR,
-    ease: "power2.out", // approximates the source's 1 - (1-x)^2.5
+    ease: COUNT_EASE,
     onUpdate: () => {
-      counterEl.textContent = Math.round(counterProxy.p * 90);
-      counterEl.style.fontSize = W * (0.2 + counterProxy.p * 0.22) + "px";
+      counterEl.textContent = Math.round(counterProxy.p * COUNT_TARGET);
+      counterEl.style.fontSize =
+        W *
+          (COUNT_START_FONT_RATIO +
+            counterProxy.p * (COUNT_END_FONT_RATIO - COUNT_START_FONT_RATIO)) +
+        "px";
     },
   },
   COUNT_AT,
 );
 
 // (b) Icons — per-icon tween to (x: 0, y: 0). gsap.set() positioned them at
-// startOffset before the timeline; this tween moves them the rest of the way.
-const ICONS = [
-  { sel: ".clock", targetX: W * 0.06, targetY: H * 0.18 },
-  { sel: ".scissors", targetX: W * 0.85, targetY: H * 0.2 },
-  { sel: ".video", targetX: W * 0.04, targetY: H * 0.68 },
-  { sel: ".play", targetX: W * 0.88, targetY: H * 0.65 },
-];
-
+// START_OFFSET before the timeline; this tween moves them the rest of the way.
 ICONS.forEach(({ sel, targetX, targetY }) => {
-  // Pre-position at startOffset
+  // Pre-position at START_OFFSET
   gsap.set(`${sel}.icon-pos`, {
     x: (CENTER_X - targetX) * (1 - START_OFFSET),
     y: (CENTER_Y - targetY) * (1 - START_OFFSET),
   });
 
   // Expansion tween — same start, dur, ease as the counter
-  tl.to(`${sel}.icon-pos`, { x: 0, y: 0, duration: COUNT_DUR, ease: "power2.out" }, COUNT_AT);
+  tl.to(`${sel}.icon-pos`, { x: 0, y: 0, duration: COUNT_DUR, ease: COUNT_EASE }, COUNT_AT);
 });
 ```
 
-**Why a separate tween per icon instead of one onUpdate?** GSAP runs many simultaneous tweens cheaply — the compositor batches the transform writes. Separate tweens are easier to inspect in DevTools and don't share `onUpdate` overhead. For 4 icons that's 4 cheap tweens vs 1 onUpdate with 8 `gsap.set()` calls inside; perf is a wash, readability wins.
+**Why a separate tween per icon instead of one `onUpdate`?** GSAP runs many simultaneous tweens cheaply — the compositor batches the transform writes. Separate tweens are easier to inspect in DevTools and don't share `onUpdate` overhead. For 3–5 icons, performance is a wash and readability wins.
 
 ## Phase 4: Multi-Phase Camera
 
-Wrapper `.camera` element scales through three values: `0.92` (initial) → `1.0` (focus settle) → `1.08` (closing push). The two transition tweens are sequenced at specific timeline positions; GSAP overwrite handles the merging on `scale`.
+The wrapper `.camera` element scales through three values: `CAMERA_SCALE_START` (initial) → `CAMERA_SCALE_FOCUS` (settle) → `CAMERA_SCALE_PUSH` (closing emphasis). The two transition tweens are sequenced at scripted timeline positions; GSAP overwrite handles the merging on `scale`.
 
 ```js
-gsap.set(".camera", { scale: 0.92 });
+gsap.set(".camera", { scale: CAMERA_SCALE_START });
 
-tl.to(".camera", { scale: 1.0, duration: 1.83, ease: "power2.out" }, 0.5);
-
-tl.to(".camera", { scale: 1.08, duration: 1.17, ease: "power2.out" }, 2.33);
+tl.to(
+  ".camera",
+  { scale: CAMERA_SCALE_FOCUS, duration: CAMERA_FOCUS_DUR, ease: CAMERA_EASE },
+  CAMERA_FOCUS_AT,
+);
+tl.to(
+  ".camera",
+  { scale: CAMERA_SCALE_PUSH, duration: CAMERA_PUSH_DUR, ease: CAMERA_EASE },
+  CAMERA_PUSH_AT,
+);
 ```
 
-Each phase has lower stiffness than the previous (50→40 stiffness). In GSAP we use the same `power2.out` ease for both — visually close enough. For a more pronounced cinematic decay, replace the second push with `power3.out`.
-
-See [multi-phase-camera](../rules/multi-phase-camera.md) for the optional drift overlay (omitted here — drift is barely visible in a 3.5 s scene).
+Each successive phase should feel softer than the previous one (longer duration OR more out-easing). See [multi-phase-camera](../rules/multi-phase-camera.md) for the optional drift overlay (often omitted on short hook scenes — drift is barely perceptible in a few-second comp).
 
 ## Inter-Phase State Handoff
 
 ```
 Phase 1 → Phase 2:
-  Background renders immediately. Icons stay at start-offset positions
+  Background renders immediately. Icons stay at START_OFFSET positions
   (set via gsap.set before the timeline). No value dependency.
 
 Phase 2 → Phase 3:
-  Last icon enters at 0.57s. Count starts at 0.47s — slight overlap is
-  intentional (no static gap). The last icon's entry tween finishes
-  around 0.57 + 0.55 = 1.12s, before the count completes at 1.47s.
+  Last icon's entry delay + ENTRY_DUR must complete near, but no later
+  than, COUNT_AT + COUNT_DUR. Constraint: last_icon_delay + ENTRY_DUR
+  ≤ COUNT_AT + COUNT_DUR. Slight overlap (last entry still settling
+  while count starts) is intentional — no static gap.
 
 Phase 3 → Phase 4:
-  Camera push triggers at 2.33s — well after count completes at 1.47s.
-  The 0.86s gap gives the eye time to read the final number before the
-  camera adds emphasis.
+  Camera push (CAMERA_PUSH_AT) must trigger AFTER the count completes
+  (COUNT_AT + COUNT_DUR). The gap gives the eye time to read the final
+  number before the camera adds emphasis.
 
 Continuous (Phase 1+):
-  Internal SVG animations (clock hand, scissor angle, pulses) run from
-  t=0 on a shared scene-ticker onUpdate. Icons enter visible at their
-  delays but the internal motion has already been turning.
+  Internal SVG animations (rotating hands, oscillating blades, pulses,
+  dash flows) run from t=0 on a shared scene-ticker onUpdate. Icons
+  enter visible at their delays but the internal motion has already
+  been turning. See svg-icon-enrichment for patterns.
 ```
+
+## How to Choose Values
+
+- **ICON_COUNT** — how many enriched icons in the burst
+  - Range: 3–5
+  - Effects: 3 = sparse, deliberate; 5 = busy but still legible
+  - Constraints: > 5 causes center clustering to read as collision even at high `START_OFFSET`
+  - Reference: examples/hook-counter-burst.html uses 4
+
+- **START_OFFSET** — fraction of the path from center to target where icons begin
+  - Range: 0.3–0.5
+  - Effects: low end = tighter cluster, more dramatic expansion; high end = looser cluster, gentler expansion
+  - Constraints: exact center (`0`) reads as an explosion debris field; > 0.5 makes the expansion vanish
+  - Reference: examples/hook-counter-burst.html uses 0.4
+
+- **ICON_STAGGER** — gap between successive icon entry delays
+  - Range: 0.10–0.18 s
+  - Effects: low end = burst feels simultaneous (chord); high end = burst feels paced (arpeggio)
+  - Constraints: ICON_COUNT × ICON_STAGGER must complete before COUNT_AT + COUNT_DUR
+  - Reference: examples/hook-counter-burst.html uses ≈ 0.13 s
+
+- **ENTRY_DUR** — duration of each icon's scale/opacity/rotation spring
+  - Range: 0.45–0.7 s
+  - Effects: shorter = snappier pop; longer = floatier landing
+  - Constraints: must finish before or overlapping with COUNT_AT + COUNT_DUR
+  - Reference: examples/hook-counter-burst.html uses 0.55 s
+
+- **ENTRY_OPACITY** — final opacity of icons after entry
+  - Range: 0.75–1.0
+  - Effects: < 1 keeps icons supporting (not competing with) the counter
+  - Reference: examples/hook-counter-burst.html uses 0.85
+
+- **ENTRY_ROTATION** — initial rotation per icon (each can differ)
+  - Range: −180° to 180°
+  - Effects: matched signs = wave; mixed signs = burst
+  - Reference: examples/hook-counter-burst.html mixes per icon
+
+- **BOUNCE_FACTOR** — back.out coefficient on icon entries
+  - Range: 1.2–1.8
+  - Effects: 1.2 = minimal overshoot; 1.8 = pronounced pop
+  - Reference: examples/hook-counter-burst.html uses 1.4–1.5
+
+- **COUNT_AT** — when the count + expansion begins
+  - Range: 0.4–0.7 s (depends on first icon delay)
+  - Constraints: must overlap with the icon entries (no static gap)
+  - Reference: examples/hook-counter-burst.html uses 0.47 s
+
+- **COUNT_DUR** — duration of the count + expansion
+  - Range: 0.8–1.5 s
+  - Effects: shorter = aggressive; longer = settles, gives reading time
+  - Reference: examples/hook-counter-burst.html uses 1.0 s
+
+- **COUNT_EASE** — shared ease for counter proxy AND icon expansion
+  - Discrete choice: `power2.out`, `power3.out`, `expo.out`
+  - Selection: `power2.out` ≈ `1 - (1-x)^2.5`; `power3.out` for stronger settle; `expo.out` for very dramatic decel
+  - Constraint: must be identical across counter and all icon expansion tweens
+  - Reference: examples/hook-counter-burst.html uses `power2.out`
+
+- **COUNT_TARGET** — final value the counter lands on
+  - Effects: pick a number that the headline statistic needs; 2–3 digits reads best at this scale
+  - Reference: examples/hook-counter-burst.html uses 90
+
+- **COUNT_START_FONT_RATIO / COUNT_END_FONT_RATIO** — font size as fraction of stage width
+  - Range: start 0.15–0.25; end 0.35–0.5
+  - Effects: ratio gap is the "growth" amount; bigger gap = more dramatic
+  - Constraints: end ratio × digit count must fit horizontally with the suffix
+  - Reference: examples/hook-counter-burst.html uses 0.20 → 0.42
+
+- **CAMERA_SCALE_START / FOCUS / PUSH** — three-step zoom values
+  - Range: start 0.88–0.96; focus 0.98–1.02; push 1.04–1.12
+  - Effects: tighter spread = subtler camera; wider = more cinematic
+  - Reference: examples/hook-counter-burst.html uses 0.92 / 1.00 / 1.08
+
+- **CAMERA_FOCUS_AT / CAMERA_FOCUS_DUR** — when and how long the focus phase lasts
+  - Constraints: should be running as the count completes (the focus settles the count)
+  - Reference: examples/hook-counter-burst.html uses 0.5 / 1.83
+
+- **CAMERA_PUSH_AT / CAMERA_PUSH_DUR** — when and how long the push phase lasts
+  - Constraints: CAMERA_PUSH_AT > COUNT_AT + COUNT_DUR (push after count lands)
+  - Reference: examples/hook-counter-burst.html uses 2.33 / 1.17
+
+- **CAMERA_EASE** — ease for both camera transitions
+  - Discrete choice: `power2.out` (uniform), `power3.out` (push deeper than focus)
+  - Reference: examples/hook-counter-burst.html uses `power2.out` for both
 
 ## Critical Constraints
 
-- **Single progress source for count + expansion**: Same `COUNT_AT`, same `COUNT_DUR`, same `ease: "power2.out"` on the counter proxy and each icon's x/y tween. Drift in any of these breaks the synchronization.
-- **`font-variant-numeric: tabular-nums`**: On the counter element — prevents layout shift as digit count changes (0 → 90 transitions 1-digit → 2-digit).
-- **Icon entry completes before / overlapping count**: Icons should be visible (entry spring well underway) before the expansion they're attached to begins. With the timings above, all 4 icons have entered by 0.57 s and the expansion runs 0.47 – 1.47 s.
-- **3–5 icons maximum**: More causes center clustering to read as a collision even with `START_OFFSET: 0.4`.
-- **`START_OFFSET: 0.3 – 0.4`**: Icons begin partially spread. Starting at exact center looks like an explosion debris field.
-- **Dark overlay on background**: Text and icons need contrast — `rgba(0,0,0, 0.6 – 0.7)` over a video / animated gradient.
-- **`left` / `top` set once, never tweened**: Icon target positions in CSS or via `gsap.set()` before the timeline. GSAP only tweens `x` / `y` (transform aliases).
+- **Single progress source for count + expansion**: identical `COUNT_AT`, `COUNT_DUR`, `COUNT_EASE` on the counter proxy and each icon's x/y tween. Drift in any of these breaks the synchronization.
+- **`font-variant-numeric: tabular-nums`** on the counter element — prevents layout shift as digit count changes (single → double → triple digits).
+- **Icon entry overlaps or precedes count**: icons should be visible (entry spring well underway) before the expansion they participate in begins.
+- **3–5 icons maximum** in the cluster. More than 5 reads as collision even with high `START_OFFSET`.
+- **`START_OFFSET` ≥ 0.3** — icons must begin partially spread. Exact center reads as debris field.
+- **Dark overlay on background** — counter text needs contrast against any video / gradient backdrop.
+- **`left` / `top` set once, never tweened** — icon target positions in CSS or via `gsap.set()` before the timeline. GSAP only tweens `x` / `y` (transform aliases).
 - **Two nested wrappers per icon**: `.icon-pos` (expansion x/y) wraps `.icon-entry` (scale/opacity/rotation). Their tweens never compete.
-- **Internal SVG motion from t=0**: Don't gate enrichment behind icon entry. The user should see a living icon appear, not a static icon that starts moving on landing.
-- **No `Math.random` / `Date.now`**: All motion pure functions of `tl.time()`.
-- **No infinite repeats**: Camera, breathing, internal pulses — all use finite `repeat` counts computed from `data-duration`.
-- **Single paused timeline**: All phases on one `gsap.timeline({ paused: true })`, registered to `window.__timelines[data-composition-id]`.
+- **Internal SVG motion from t=0** — don't gate enrichment behind icon entry. Users should see a living icon appear, not a static icon that starts moving on landing.
+- **No `Math.random` / `Date.now`** — all motion pure functions of `tl.time()`.
+- **No infinite repeats** — camera, breathing, internal pulses all use finite values computed from `data-duration`.
+- **Single paused timeline** — all phases on one `gsap.timeline({ paused: true })`, registered to `window.__timelines[data-composition-id]`.
 
-## Spring → GSAP Ease Cheatsheet (this blueprint)
+## Spring → Ease Cheatsheet
 
-| Source spring                                                           | This blueprint uses                                                                         |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `spring({ stiffness: 200, damping: 16 })` — clock entry                 | `back.out(1.5)` over 0.55s                                                                  |
-| `spring({ stiffness: 180, damping: 14 })` — scissors entry              | `back.out(1.5)`                                                                             |
-| `spring({ stiffness: 100, damping: 16, mass: 1.1 })` — counter 3D entry | `power3.out` over 0.7s                                                                      |
-| `spring({ stiffness: 50, damping: 20 })` — camera focus                 | `power2.out` over 1.83s                                                                     |
-| `spring({ stiffness: 40, damping: 22 })` — camera push                  | `power2.out` over 1.17s                                                                     |
-| `1 - (1-x)^2.5` — count + expansion ease                                | `power2.out` (close enough)                                                                 |
-| `sin(t * speed) * amp` — internal SVG motion                            | `sine.inOut` yoyo (symmetric) or `onUpdate` with `Math.sin(tl.time() * speed)` (asymmetric) |
+| Source spring                               | Ease family used in this blueprint          |
+| ------------------------------------------- | ------------------------------------------- |
+| Stiff icon entry (high stiffness, low damp) | `back.out(${BOUNCE_FACTOR})` over ENTRY_DUR |
+| Counter 3D entry (mid stiff, mid damp)      | `power3.out`                                |
+| Camera focus (low stiff, high damp)         | `power2.out` over CAMERA_FOCUS_DUR          |
+| Camera push (lower stiff, higher damp)      | `power2.out` over CAMERA_PUSH_DUR           |
+| Counter + expansion shared (`1 - (1-x)^k`)  | `power2.out` (k≈2.5) or `power3.out` (k≈3)  |
+| Internal SVG sine motion                    | `sine.inOut` yoyo, or onUpdate Math.sin     |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 
 ## Golden Sample
 
-- [hook-counter-burst.html](../examples/hook-counter-burst.html) — "90%" opening hook with four enriched SVG icons (clock with rotating minute hand, scissors oscillating ±15°, video frame with pulsing red record dot, play button with pulse scale). Single paused GSAP timeline drives all four phases over 3.5 seconds.
+- [hook-counter-burst.html](../examples/hook-counter-burst.html)

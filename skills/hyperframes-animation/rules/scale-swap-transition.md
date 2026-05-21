@@ -13,10 +13,10 @@ Simulates a "morph" between two DOM elements by overlapping exit and entrance sc
 
 At a single trigger time, two coordinated tweens fire:
 
-1. **Outgoing element**: scale 1.0 → 0.7 + opacity 1 → 0 (fast `power2.in`)
-2. **Incoming element**: scale 0.7 → 1.0 + opacity 0 → 1 (bouncy `back.out(1.8)` with overshoot)
+1. **Outgoing element**: scale `1.0 → EXIT_SCALE` + opacity `1 → 0` (fast `power2.in`)
+2. **Incoming element**: scale `EXIT_SCALE → 1.0` + opacity `0 → 1` (bouncy `back.out(${BOUNCE_FACTOR})` with overshoot)
 
-The 0.1-0.2s overlap during which both are mid-tween creates the "morph" illusion. Incoming sits on top via z-index so the outgoing's fade-tail doesn't bleed through.
+A small `OVERLAP` window during which both are mid-tween creates the "morph" illusion. Incoming sits on top via z-index so the outgoing's fade-tail doesn't bleed through.
 
 ## HTML
 
@@ -32,16 +32,16 @@ The 0.1-0.2s overlap during which both are mid-tween creates the "morph" illusio
   <div class="stack">
     <div class="swap-wrap">
       <div class="card outgoing" id="outgoing">
-        <div class="icon">📝</div>
-        <div class="title">DRAFT</div>
+        <div class="icon">{outgoingIcon}</div>
+        <div class="title">{outgoingLabel}</div>
       </div>
       <div class="card incoming" id="incoming">
-        <div class="icon">🚀</div>
-        <div class="title">SHIPPED</div>
-        <div class="sub" id="sub">to heygenverse.com</div>
+        <div class="icon">{incomingIcon}</div>
+        <div class="title">{incomingLabel}</div>
+        <div class="sub" id="sub">{incomingSubline}</div>
       </div>
     </div>
-    <div class="brand">HEYGENVERSE</div>
+    <div class="brand">{Brand}</div>
   </div>
 </div>
 ```
@@ -55,19 +55,19 @@ The 0.1-0.2s overlap during which both are mid-tween creates the "morph" illusio
   height: 100%;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at center, #161a3a 0%, #0b0d1f 70%);
-  font-family: "Inter", sans-serif;
+  background: {sceneBg};
+  font-family: {font};
 }
 .stack {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 64px;
+  gap: STACK_GAP;
 }
 .swap-wrap {
   position: relative;
-  width: 640px;
-  height: 360px;
+  width: SWAP_WRAP_W;
+  height: SWAP_WRAP_H;
 }
 .card {
   position: absolute;
@@ -76,49 +76,49 @@ The 0.1-0.2s overlap during which both are mid-tween creates the "morph" illusio
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 24px;
-  border-radius: 32px;
-  padding: 48px;
+  gap: CARD_INNER_GAP;
+  border-radius: CARD_RADIUS;
+  padding: CARD_PADDING;
   /* Both elements share transform-origin so they "morph" around the same anchor */
   transform-origin: 50% 50%;
   will-change: transform, opacity;
 }
 .card .icon {
-  font-size: 120px;
+  font-size: ICON_SIZE;
 }
 .card .title {
-  font-size: 80px;
+  font-size: TITLE_SIZE;
   font-weight: 900;
-  letter-spacing: 8px;
+  letter-spacing: TITLE_TRACKING;
   text-transform: uppercase;
 }
 .card .sub {
-  font-size: 32px;
+  font-size: SUB_SIZE;
   font-weight: 700;
-  color: #a78bfa;
+  color: {accentColor};
   opacity: 0;
 }
 .outgoing {
   z-index: 1;
-  background: linear-gradient(160deg, rgba(245, 196, 81, 0.4) 0%, rgba(20, 24, 56, 0.85) 70%);
-  border: 1px solid rgba(245, 196, 81, 0.4);
-  color: #f5f6fb;
+  background: {outgoingBg};
+  border: 1px solid {outgoingBorder};
+  color: {textColor};
 }
 .incoming {
   /* Incoming starts hidden + smaller, will pop in */
   z-index: 2;
-  background: linear-gradient(160deg, rgba(167, 139, 250, 0.4) 0%, rgba(20, 24, 56, 0.85) 70%);
-  border: 1px solid rgba(167, 139, 250, 0.6);
-  color: #f5f6fb;
+  background: {incomingBg};
+  border: 1px solid {incomingBorder};
+  color: {textColor};
   opacity: 0;
-  transform: scale(0.7);
+  transform: scale(EXIT_SCALE);
 }
 .brand {
-  font-size: 56px;
+  font-size: BRAND_SIZE;
   font-weight: 900;
-  letter-spacing: 14px;
+  letter-spacing: BRAND_TRACKING;
   text-transform: uppercase;
-  color: #cdb8ff;
+  color: {brandColor};
 }
 ```
 
@@ -130,44 +130,45 @@ The 0.1-0.2s overlap during which both are mid-tween creates the "morph" illusio
   window.__timelines = window.__timelines || {};
   const tl = gsap.timeline({ paused: true });
 
-  const TRIGGER = 0.8; // when the swap happens
-  const OVERLAP = 0.15; // how much exit and entrance overlap (s)
-
   // Outgoing: shrink + fade fast
   tl.to(
     "#outgoing",
     {
-      scale: 0.7,
+      scale: EXIT_SCALE,
       opacity: 0,
-      duration: 0.4,
+      duration: EXIT_DUR,
       ease: "power2.in",
     },
     TRIGGER,
   );
 
   // Incoming: scale up + fade in with overshoot, starts slightly BEFORE outgoing
-  // finishes (overlap creates the morph illusion).
+  // finishes (OVERLAP creates the morph illusion).
   tl.to(
     "#incoming",
     {
       scale: 1.0,
       opacity: 1,
-      duration: 0.6,
-      ease: "back.out(1.8)",
+      duration: ENTER_DUR,
+      ease: `back.out(${BOUNCE_FACTOR})`,
     },
-    TRIGGER + 0.4 - OVERLAP,
+    TRIGGER + EXIT_DUR - OVERLAP,
   );
 
   // Subline reveals AFTER the incoming card settles
   tl.fromTo(
     "#sub",
-    { opacity: 0, y: 12 },
-    { opacity: 1, y: 0, duration: 0.4, ease: "power3.out" },
-    TRIGGER + 1.1,
+    { opacity: 0, y: SUB_REVEAL_Y_PX },
+    { opacity: 1, y: 0, duration: SUB_REVEAL_DUR, ease: "power3.out" },
+    TRIGGER + EXIT_DUR + SUB_REVEAL_DELAY,
   );
 
   // Brand fades in early for context
-  tl.from(".brand", { opacity: 0, y: 16, duration: 0.6, ease: "power3.out" }, 0.2);
+  tl.from(
+    ".brand",
+    { opacity: 0, y: BRAND_REVEAL_Y_PX, duration: BRAND_REVEAL_DUR, ease: "power3.out" },
+    BRAND_REVEAL_AT,
+  );
 
   window.__timelines["swap-scene"] = tl;
 </script>
@@ -181,27 +182,98 @@ The classic pattern: morph the container, then reveal inner text once the contai
 
 ### Triple swap (3-state cycle)
 
-Chain: A→B→C with two triggers. Each transition needs its own pair of tweens, and the previous incoming becomes the next outgoing. Useful for state evolution narratives ("DRAFT → REVIEW → SHIPPED").
+Chain: A→B→C with two triggers `TRIGGER_AB` and `TRIGGER_BC`. Each transition needs its own pair of tweens, and the previous incoming becomes the next outgoing. Useful for state evolution narratives (e.g. early-state → mid-state → final-state labels).
 
 ```js
-tl.to("#stateA", { scale: 0.7, opacity: 0, duration: 0.4 }, 0.5);
-tl.to("#stateB", { scale: 1.0, opacity: 1, duration: 0.6, ease: "back.out(1.8)" }, 0.65);
-tl.to("#stateB", { scale: 0.7, opacity: 0, duration: 0.4 }, 1.8);
-tl.to("#stateC", { scale: 1.0, opacity: 1, duration: 0.6, ease: "back.out(1.8)" }, 1.95);
+tl.to("#stateA", { scale: EXIT_SCALE, opacity: 0, duration: EXIT_DUR }, TRIGGER_AB);
+tl.to(
+  "#stateB",
+  { scale: 1.0, opacity: 1, duration: ENTER_DUR, ease: `back.out(${BOUNCE_FACTOR})` },
+  TRIGGER_AB + EXIT_DUR - OVERLAP,
+);
+tl.to("#stateB", { scale: EXIT_SCALE, opacity: 0, duration: EXIT_DUR }, TRIGGER_BC);
+tl.to(
+  "#stateC",
+  { scale: 1.0, opacity: 1, duration: ENTER_DUR, ease: `back.out(${BOUNCE_FACTOR})` },
+  TRIGGER_BC + EXIT_DUR - OVERLAP,
+);
 ```
 
 ### Color-shift transition (no scale)
 
 For a flat morph between two same-shape states, drop the scale and keep only opacity + a brief background hue tween. Less dramatic but matches a more product-UI tone.
 
+## How to Choose Values
+
+### Timing (seconds)
+
+- **TRIGGER** — when the swap fires.
+  - Constraints: must be ≥ the outgoing element's settled time + a presence-dwell so the outgoing "lands" before transforming
+- **EXIT_DUR** — outgoing shrink + fade duration.
+  - Range: 0.3-0.5 s
+- **ENTER_DUR** — incoming pop-in duration.
+  - Range: 0.45-0.7 s (longer than `EXIT_DUR` to let the overshoot settle)
+- **OVERLAP** — how much the entrance starts before the exit finishes.
+  - Range: 0.1-0.2 s
+  - Constraints: too much (>0.3 s) makes both clearly visible together (no morph); too little (<0.05 s) leaves a visible empty gap
+- **SUB_REVEAL_DELAY** — gap between incoming settle and subline reveal.
+  - Range: 0.2-0.4 s; reveals during the morph compete with the swap for attention
+- **SUB_REVEAL_DUR** — subline fade-in.
+  - Range: 0.3-0.5 s
+- **BRAND_REVEAL_AT** — when the brand/context line fades in.
+  - Constraints: must be < `TRIGGER` (brand is context for the swap, not synchronous with it)
+- **BRAND_REVEAL_DUR** — brand fade-in duration.
+  - Range: 0.4-0.8 s
+
+### Physics
+
+- **EXIT_SCALE** — target scale for outgoing (and starting scale for incoming).
+  - Range: 0.6-0.8; smaller exits feel more dramatic but risk reading as "vanish" instead of "morph"
+- **BOUNCE_FACTOR** — `back.out(${BOUNCE_FACTOR})` overshoot on the incoming.
+  - Range: 1.4 (soft) - 1.8 (firm) - 2.2 (cartoony)
+
+### Positioning offsets
+
+- **SUB_REVEAL_Y_PX** — subline initial y offset (positive = below resting).
+  - Range: 8-20 px
+- **BRAND_REVEAL_Y_PX** — brand initial y offset.
+  - Range: 10-24 px
+
+### Layout
+
+- **STACK_GAP** — gap between swap container and brand line.
+  - Range: 40-96 px
+- **SWAP_WRAP_W / SWAP_WRAP_H** — fixed swap container dimensions; both cards `inset: 0` inside.
+  - Constraints: pick dimensions that fit both states' content; the wrap does not resize during the swap
+- **CARD_INNER_GAP** — gap between icon and title inside a card.
+  - Range: 16-32 px
+- **CARD_RADIUS / CARD_PADDING** — card corner radius and inner padding.
+  - Range: radius 24-40 px; padding 32-64 px
+- **ICON_SIZE / TITLE_SIZE / SUB_SIZE / BRAND_SIZE** — typographic sizes.
+  - Constraints: titles dominate (~80-120 px at 1080p); sub and brand are accent-sized
+- **TITLE_TRACKING / BRAND_TRACKING** — letter-spacing on uppercase labels.
+  - Range: 4-16 px (uppercase reads better with positive tracking)
+
+### Tokens
+
+- **{sceneBg}** — background gradient/color
+- **{font}** — typographic stack
+- **{textColor}** / **{accentColor}** / **{brandColor}** — semantic color tokens
+- **{outgoingBg}** / **{outgoingBorder}** — outgoing card surface + border (typically warm or pre-action hue)
+- **{incomingBg}** / **{incomingBorder}** — incoming card surface + border (typically cool or post-action hue)
+- **{outgoingIcon}** / **{incomingIcon}** — single glyph/emoji per state
+- **{outgoingLabel}** / **{incomingLabel}** — state labels
+- **{incomingSubline}** — supporting copy that fades in after the incoming settles
+- **{Brand}** — brand line shown beneath the swap
+
 ## Key Principles
 
 - **Incoming z-index ABOVE outgoing** — without this, the outgoing's fade-tail (opacity 0.3-0.5) bleeds through the incoming's lower opacity and creates a "double-exposed" muddy frame
 - **Both elements share `transform-origin: 50% 50%`** — different origins make the morph feel like one thing teleporting somewhere else
-- **Overlap 0.1-0.2s** — too much overlap (>0.3s) and both are clearly visible together (no morph); too little (<0.05s) and there's a visible empty gap
-- **Bouncy ease ONLY for the incoming** — outgoing uses `power2.in` (rushing away), incoming uses `back.out(1.6-2.0)` (arriving with weight). Reverse it and the swap feels mechanical
-- **Inner content reveals AFTER container settles** — 0.2-0.4s gap. Reveals during the morph compete for attention and lose
-- **❗ Climax dwell ≥1s after final state lands** — see SKILL universal constraints. After incoming + subline both settle, hold for ≥1s
+- **`OVERLAP` in the 0.1-0.2 s window** — too much overlap and both are clearly visible together (no morph); too little and there's a visible empty gap
+- **Bouncy ease ONLY for the incoming** — outgoing uses `power2.in` (rushing away), incoming uses `back.out(${BOUNCE_FACTOR})` (arriving with weight). Reverse it and the swap feels mechanical
+- **Inner content reveals AFTER container settles** — see `SUB_REVEAL_DELAY`. Reveals during the morph compete for attention and lose
+- **Climax dwell ≥1 s after final state lands** — see SKILL universal constraints. After incoming + subline both settle, hold for ≥1 s
 - **Brand reveal early, not at the swap** — context (brand, eyebrow) sets the stage; the swap is the headline. If brand reveals AT the swap, it competes
 
 ## Critical Constraints

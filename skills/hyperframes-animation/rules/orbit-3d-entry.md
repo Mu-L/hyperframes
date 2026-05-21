@@ -13,7 +13,7 @@ Elements flip in from 3D space (rotateX + rotateY + translateZ) then transition 
 
 Two phases per element:
 
-1. **Entry (0 → ~0.6s per element)**: GSAP tween from hidden 3D orientation (`rotateX: -90deg, rotateY: 90deg, z: -300`) to flat (`rotateX: 0, rotateY: 0, z: 0`). Spring-like ease for the flip-in.
+1. **Entry (per element)**: GSAP tween from hidden 3D orientation (`rotateX`, `rotateY`, negative `z`) to flat (`rotateX: 0, rotateY: 0, z: 0`). Spring-like ease (`back.out`) for the flip-in.
 2. **Orbit (after entry)**: Continuous trigonometric position around a center point. The element's `x` and `y` translate are driven by `cos(t)` and `sin(t)` at a slow angular speed.
 
 The orbit runs **inside the timeline** — not via `requestAnimationFrame` — so HF seek-by-frame stays deterministic.
@@ -30,13 +30,13 @@ The orbit runs **inside the timeline** — not via `requestAnimationFrame` — s
   data-track-index="0"
 >
   <div class="orbit-stage">
-    <div class="orbit-item" data-angle="0">★</div>
-    <div class="orbit-item" data-angle="60">●</div>
-    <div class="orbit-item" data-angle="120">◆</div>
-    <div class="orbit-item" data-angle="180">▲</div>
-    <div class="orbit-item" data-angle="240">■</div>
-    <div class="orbit-item" data-angle="300">✦</div>
-    <div class="orbit-center">HEYGEN</div>
+    <div class="orbit-item" data-angle="0">{glyph1}</div>
+    <div class="orbit-item" data-angle="60">{glyph2}</div>
+    <div class="orbit-item" data-angle="120">{glyph3}</div>
+    <div class="orbit-item" data-angle="180">{glyph4}</div>
+    <div class="orbit-item" data-angle="240">{glyph5}</div>
+    <div class="orbit-item" data-angle="300">{glyph6}</div>
+    <div class="orbit-center">{centerLabel}</div>
   </div>
 </div>
 ```
@@ -50,7 +50,7 @@ The orbit runs **inside the timeline** — not via `requestAnimationFrame` — s
   height: 100%;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at center, #161a3a 0%, #0b0d1f 70%);
+  background: {sceneBackground};
   perspective: 1800px; /* REQUIRED — without perspective, rotateX/Y flatten */
 }
 .orbit-stage {
@@ -70,24 +70,24 @@ The orbit runs **inside the timeline** — not via `requestAnimationFrame` — s
   height: 140px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #a78bfa 0%, #6366f1 100%);
+  background: {accentColor};
   border-radius: 50%;
-  font-family: "Inter", sans-serif;
+  font-family: {font};
   font-weight: 900;
   font-size: 64px;
-  color: #fff;
+  color: {itemTextColor};
   transform-style: preserve-3d;
   will-change: transform;
-  box-shadow: 0 12px 36px rgba(108, 99, 255, 0.4);
+  box-shadow: 0 12px 36px {accentShadowColor};
 }
 .orbit-center {
   position: relative;
   z-index: 5;
-  font-family: "Inter", sans-serif;
+  font-family: {font};
   font-weight: 900;
   font-size: 96px;
   letter-spacing: 8px;
-  color: #f5f6fb;
+  color: {centerTextColor};
   text-transform: uppercase;
 }
 ```
@@ -101,39 +101,45 @@ The orbit runs **inside the timeline** — not via `requestAnimationFrame` — s
   const tl = gsap.timeline({ paused: true });
 
   const items = document.querySelectorAll(".orbit-item");
-  const RADIUS_X = 380;
-  const RADIUS_Y = RADIUS_X * 0.5; // perspective-flattened
-  const ORBIT_DURATION = 5; // seconds for one full orbit revolution
+  // RADIUS_X, RADIUS_Y, ORBIT_DURATION, ENTRY_DUR, STAGGER, FLIP_BACK, CENTER_BACK
+  // — all named constants; values per "How to Choose Values" below.
+  const RADIUS_Y = RADIUS_X * Y_TO_X_RATIO; // perspective-flattened ellipse
 
   items.forEach((el, i) => {
     const initialAngleDeg = Number(el.dataset.angle);
     const initialAngleRad = (initialAngleDeg / 360) * Math.PI * 2;
+    const startX = Math.cos(initialAngleRad) * RADIUS_X;
+    const startY = Math.sin(initialAngleRad) * RADIUS_Y;
 
-    // Phase 1 — flip in from 3D
-    tl.fromTo(
+    // 1) Place at orbital position with opacity 0 — BEFORE any tween fires
+    gsap.set(el, {
+      xPercent: -50,
+      yPercent: -50,
+      x: startX,
+      y: startY,
+      rotateX: ROTATE_X_FROM,
+      rotateY: ROTATE_Y_FROM,
+      z: Z_FROM,
+      opacity: 0,
+      scale: SCALE_FROM,
+    });
+
+    // 2) Phase 1 — flip in IN PLACE at orbital position
+    tl.to(
       el,
-      {
-        xPercent: -50,
-        yPercent: -50,
-        rotateX: -90,
-        rotateY: 90,
-        z: -300,
-        opacity: 0,
-        scale: 0.4,
-      },
       {
         rotateX: 0,
         rotateY: 0,
         z: 0,
         opacity: 1,
         scale: 1,
-        duration: 0.6,
-        ease: "back.out(1.6)",
+        duration: ENTRY_DUR,
+        ease: `back.out(${FLIP_BACK})`,
       },
-      i * 0.08, // cascade entry
+      i * STAGGER,
     );
 
-    // Phase 2 — continuous orbit driven via a 0→1 progress tween
+    // 3) Phase 2 — continuous orbit driven via a 0→1 progress tween
     const orbitState = { p: 0 };
     tl.to(
       orbitState,
@@ -145,27 +151,86 @@ The orbit runs **inside the timeline** — not via `requestAnimationFrame` — s
           const angle = initialAngleRad + orbitState.p * Math.PI * 2;
           const x = Math.cos(angle) * RADIUS_X;
           const y = Math.sin(angle) * RADIUS_Y;
-          // z-index by orbit Y so bottom-of-orbit items render above center
+          // z-index by orbit Y — see "Center label clearance" in Key Principles
+          // for the capped-range form when a center label is present.
           el.style.zIndex = String(Math.round(y + RADIUS_Y));
           el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
         },
       },
-      i * 0.08 + 0.6,
-    ); // after this element's flip-in
+      i * STAGGER + ENTRY_DUR,
+    );
   });
 
   // Center label fades in once a few orbit items have landed
-  tl.from(".orbit-center", { opacity: 0, scale: 0.6, duration: 0.6, ease: "back.out(1.4)" }, 0.4);
+  tl.from(
+    ".orbit-center",
+    { opacity: 0, scale: 0.6, duration: ENTRY_DUR, ease: `back.out(${CENTER_BACK})` },
+    CENTER_FADE_AT,
+  );
 
   window.__timelines["orbit-scene"] = tl;
 </script>
 ```
 
+## How to Choose Values
+
+- **RADIUS_X** — horizontal radius of the orbit ellipse, in px
+  - Range: 300–900 px
+  - Effects: small radius reads as a tight cluster; large radius spreads the ring across the frame and lets a large center element breathe
+  - Constraints: must clear the center element horizontally at every angle — see Key Principles for the `RADIUS_X * min(|cos(θ)|) ≥ L_w + I_w + breathing_room` rule
+  - Reference: examples/cta-orbit-collapse.html uses 480
+
+- **Y_TO_X_RATIO** — `RADIUS_Y / RADIUS_X`, the orbit's perspective flattening
+  - Range: 0.4–0.7
+  - Effects: low values read as a near-horizontal disc seen from above; values approaching 1 read as a flat plane facing the camera
+  - Constraints: keep < 1 — the orbit should look like a tilted ring, not a frontal halo
+  - Reference: examples/cta-orbit-collapse.html uses ≈ 0.58
+
+- **ORBIT_DURATION** — seconds for one full revolution
+  - Range: 4–25 s (longer for ambient backdrop, shorter for active feature motion)
+  - Effects: short durations look frenetic; long durations read as drifting / calm
+  - Constraints: must be ≥ the time the orbit is on screen, otherwise the tween ends and items stop
+  - Reference: examples/cta-orbit-collapse.html uses ~25 s effective (orbit speed 0.25 rad/s)
+
+- **ENTRY_DUR** — per-element flip-in duration
+  - Range: 0.4–0.8 s
+  - Effects: short feels punchy; long feels stately
+  - Constraints: must be ≤ the gap between the first and last element's start so the cascade doesn't overlap to incoherence
+  - Reference: examples/cta-orbit-collapse.html uses 0.55 s
+
+- **STAGGER** — delay between consecutive element entries
+  - Range: 0.06–0.12 s
+  - Effects: below ~0.06 s reads as "popcorn"; above ~0.12 s reads as plodding
+  - Constraints: total cascade `(n - 1) * STAGGER` should still complete before the next scene phase begins
+  - Reference: examples/cta-orbit-collapse.html uses 0.10 s
+
+- **FLIP_BACK** — `back.out(<n>)` overshoot for the flip-in
+  - Range: 1.2–2.0
+  - Effects: low end is a soft arrive; high end snaps with visible overshoot
+  - Constraints: pair with a calmer `CENTER_BACK` if both fire close together — competing overshoots cancel each other
+  - Reference: examples/cta-orbit-collapse.html uses 1.4
+
+- **CENTER_BACK** — `back.out(<n>)` overshoot for the center label fade-in
+  - Range: 1.2–1.8
+  - Effects: low end keeps the label calm under the busy orbit; high end gives it a small "pop" of arrival
+  - Reference: examples/cta-orbit-collapse.html uses 1.4
+
+- **CENTER_FADE_AT** — when the center label fades in, in seconds
+  - Range: just after the first 2–4 elements have landed
+  - Effects: too early competes with the cascade; too late leaves a hole at the center of the orbit
+  - Reference: examples/cta-orbit-collapse.html starts the center brand near the front of the scene
+
+- **ROTATE_X_FROM / ROTATE_Y_FROM / Z_FROM / SCALE_FROM** — initial 3D orientation
+  - Range: rotateX ±60° to ±120°; rotateY ±45° to ±120°; z −200 to −400; scale 0.2–0.6
+  - Effects: higher absolute rotation + deeper negative z = more dramatic "card flipping out of depth"; lower = subtle reorientation
+  - Constraints: pick a direction consistent with the scene's perspective; mixing positive and negative rotateY across items reads as noise
+  - Reference: examples/cta-orbit-collapse.html uses rotateX 90, rotateY −45, z −100, scale 0
+
 ## Variations
 
 ### Collapse to center
 
-To reverse — orbit then collapse inward — interpolate `RADIUS_X` and `RADIUS_Y` to 0 in a final phase:
+To reverse — orbit then collapse inward — interpolate `RADIUS_X` and `RADIUS_Y` to 0 in a final phase by multiplying both radii by a 1→0 driver:
 
 ```js
 const collapse = { r: 1 };
@@ -173,15 +238,17 @@ tl.to(
   collapse,
   {
     r: 0,
-    duration: 0.8,
+    duration: COLLAPSE_DUR,
     ease: "power3.inOut",
     onUpdate: () =>
-      items.forEach((el, i) => {
+      items.forEach((el) => {
         const a = (Number(el.dataset.angle) / 360) * Math.PI * 2;
-        el.style.transform = `translate(-50%,-50%) translate(${Math.cos(a) * RADIUS_X * collapse.r}px,${Math.sin(a) * RADIUS_Y * collapse.r}px) scale(${collapse.r})`;
+        const x = Math.cos(a) * RADIUS_X * collapse.r;
+        const y = Math.sin(a) * RADIUS_Y * collapse.r;
+        el.style.transform = `translate(-50%,-50%) translate(${x}px,${y}px) scale(${collapse.r})`;
       }),
   },
-  ORBIT_DURATION + 0.6,
+  COLLAPSE_AT,
 );
 ```
 
@@ -201,13 +268,12 @@ Items rendered above/below the equator visually arc through the plane.
 
 - **`perspective` on scene root REQUIRED** — without it, rotateX/Y read as 2D scale and the flip-in looks flat
 - **`transform-style: preserve-3d`** on both the stage and each item — preserves the 3D context as items have their own transforms
-- **Stagger entries by 0.06-0.10s** — cascade reads as "swarm forming," simultaneous reads as "popcorn"
-- **Orbit duration 4-6s for one revolution** — too fast looks frenetic, too slow looks frozen; gentle ambient motion is the goal
+- **Stagger entries** — cascade reads as "swarm forming," simultaneous reads as "popcorn." See `STAGGER` in How to Choose Values
 - **Element count 4-12** — fewer feels empty, more crowds the center
 - **❗ Center label clearance — translateZ + capped item z-index** — `z-index` ALONE is unreliable inside a `transform-style: preserve-3d` stage (paint order follows Z position, not stacking-context z-index). For the orbit to NEVER occlude the headline:
   1. Push the center label forward: `transform: translateZ(220px); z-index: 9999;`
   2. Cap orbit-item dynamic z-index in `[1, 50]` so bottom-of-orbit items still read as "in front of" top-of-orbit items, but **never above the center label**. e.g.: `el.style.zIndex = String(1 + Math.round((y + RADIUS_Y) / (2 * RADIUS_Y) * 49));`
-  3. **Choose `RADIUS_X` so items also clear the center label HORIZONTALLY at all angles.** If the label's half-width is `L_w` and the item's half-width is `I_w`, then `RADIUS_X` must satisfy `RADIUS_X * min(|cos(θ_minimum)|) ≥ L_w + I_w + breathing_room`. For a 6-item orbit with 60° angular spacing, the worst case is `cos(30°) ≈ 0.866` between items. Empirically, **`RADIUS_X = 700+ for HEYGEN (120px font), 800+ for $5,000-class counter (160px font)`**.
+  3. **Choose `RADIUS_X` so items also clear the center label HORIZONTALLY at all angles.** If the label's half-width is `L_w` and the item's half-width is `I_w`, then `RADIUS_X` must satisfy `RADIUS_X * min(|cos(θ_minimum)|) ≥ L_w + I_w + breathing_room`. For a 6-item orbit with 60° angular spacing, the worst case is `cos(30°) ≈ 0.866` between items. Scale `RADIUS_X` with the center label's width — a heavier wordmark needs a wider ring.
 - **❗ Center element is the headline** — the orbit is ornamental motion around it. If the orbit dominates the eye, increase center element size or fade orbit items down
 
 ## Critical Constraints
@@ -220,51 +286,13 @@ Items rendered above/below the equator visually arc through the plane.
 - **Don't animate `left`/`top`** — use `translate()` (composes with `translate(-50%, -50%)` centering)
 - **❗ Entry must flip IN PLACE at orbital position, NOT at center** — a fromTo whose "from" and "to" both have `x: 0, y: 0` keeps the item at the stage center during phase 1, so it collides with the center label during flip-in (and then snaps to orbit on phase 2 start — a visible teleport).
 
-  The correct pattern is to `gsap.set()` each item at `(cos(initialAngle)*RADIUS_X, sin(initialAngle)*RADIUS_Y)` with `opacity: 0` BEFORE adding tweens, then have phase 1 animate only rotation/opacity/scale — NOT translate. The item fades in IN PLACE at its orbital starting point, and phase 2 picks up the orbit smoothly from there.
-
-  ```js
-  items.forEach((el, i) => {
-    const angle = (Number(el.dataset.angle) / 360) * Math.PI * 2;
-    const startX = Math.cos(angle) * RADIUS_X;
-    const startY = Math.sin(angle) * RADIUS_Y;
-
-    // 1) Place at orbital position with opacity 0 — BEFORE any tween fires
-    gsap.set(el, {
-      xPercent: -50,
-      yPercent: -50,
-      x: startX,
-      y: startY,
-      rotateX: -90,
-      rotateY: 90,
-      z: -300,
-      opacity: 0,
-      scale: 0.4,
-    });
-
-    // 2) Phase 1 — flip in IN PLACE (no x/y in the tween)
-    tl.to(
-      el,
-      {
-        rotateX: 0,
-        rotateY: 0,
-        z: 0,
-        opacity: 1,
-        scale: 1,
-        duration: 0.6,
-        ease: "back.out(1.6)",
-      },
-      i * 0.08,
-    );
-
-    // 3) Phase 2 — orbit (onUpdate writes transform with new x/y)
-    // ...
-  });
-  ```
+  The correct pattern (see GSAP Timeline above) is to `gsap.set()` each item at `(cos(initialAngle)*RADIUS_X, sin(initialAngle)*RADIUS_Y)` with `opacity: 0` BEFORE adding tweens, then have phase 1 animate only rotation/opacity/scale — NOT translate. The item fades in IN PLACE at its orbital starting point, and phase 2 picks up the orbit smoothly from there.
 
 ## Combinations
 
-- [center-outward-expansion.md](center-outward-expansion.md) — alternative entry pattern (burst, not orbit)
-- [counting-dynamic-scale.md](counting-dynamic-scale.md) — center counter with orbiting decorations
+- [center-outward-expansion.md](center-outward-expansion.md) — alternative entry pattern (burst, not orbit); also the reversed driver for an orbit-collapse finish
+- [cursor-click-ripple.md](cursor-click-ripple.md) — pairs naturally when the center element is a CTA the user "clicks" to trigger the collapse
+- [sine-wave-loop.md](sine-wave-loop.md) — per-item idle wobble layered on top of the orbit
 
 ## Pairs with HF skills
 

@@ -12,7 +12,7 @@ element_roles:
   demo: Product demo (video / image) that appears from the collapse point and floats
 when_to_use:
   - Show product versatility (works for many categories / use-cases)
-  - Icons represent different content types, genres or modes
+  - Icons represent different content types, genres, modes, or technology surfaces
   - User-click metaphor triggers transformation from categories → result
   - "Many options → one action → one result" narrative compression
 when_not_to_use:
@@ -26,32 +26,32 @@ triggers: [works for any genre, multiple categories, click to generate, versatil
 
 Category icons enter with a 3D flip → orbit a central CTA → cursor moves to CTA and clicks → icons collapse inward toward the click point → product demo springs out from the collapse point → demo floats on a breathing idle.
 
-Same five-phase arc; one paused GSAP timeline; constituent patterns map to [orbit-3d-entry](../rules/orbit-3d-entry.md), [cursor-click-ripple](../rules/cursor-click-ripple.md), [center-outward-expansion](../rules/center-outward-expansion.md) (reversed), and [sine-wave-loop](../rules/sine-wave-loop.md) Form 1.
+Same five-phase arc; one paused GSAP timeline; constituent patterns map to [orbit-3d-entry](../rules/orbit-3d-entry.md), [cursor-click-ripple](../rules/cursor-click-ripple.md), [center-outward-expansion](../rules/center-outward-expansion.md) (used as the reversed driver for the collapse), and [sine-wave-loop](../rules/sine-wave-loop.md) (single-yoyo idle form).
 
-> The original the source blueprint expressed the orbit as `effectiveFrame * orbitSpeed` and the collapse as a `spring(stiffness:150, damping:15)`. HyperFrames forbids per-frame conditionals on `frame`, so both motions are folded into a single master `onUpdate` that reads `tl.time()` and an eased collapse proxy. The visual result is identical.
+> The collapse and orbit cannot live on independent tweens — orbit angle must keep advancing while the radius shrinks. Both are folded into a single master `onUpdate` that reads `tl.time()` and an eased collapse proxy (built via `gsap.parseEase`). No per-frame conditionals on `frame`; HyperFrames forbids them.
 
 ## When to Use
 
 - Versatility / use-case scene showing the product handles many categories
 - The transformation from "options" to "result" should feel **physical** — a click pulls the icons inward
 - A cursor click drives the narrative pivot (versus a fade or zoom)
-- Total duration 5–8 seconds (any shorter and the orbit doesn't register as ambient motion)
+- Total duration sits in the 5–8 s range (any shorter and the orbit doesn't register as ambient motion)
 
 ## Phase Pipeline
 
-All boundaries are in **seconds** (at 30 fps; multiply by 30 to recover frames). The example below targets a 6.5 s scene.
+All boundaries are in **seconds**. Named constants live in the Constants block; concrete values for the golden sample are in How to Choose Values.
 
-| Phase | Time window (s) | What Happens                                                    | Skill Reference                                                             |
-| ----- | --------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 1     | `0 – 1.05`      | Icons enter with 3D flip, staggered; orbit motion runs from t=0 | [orbit-3d-entry](../rules/orbit-3d-entry.md)                                |
-| 2     | `1.50 – 2.20`   | Cursor enters off-screen, moves to CTA, clicks with ripple      | [cursor-click-ripple](../rules/cursor-click-ripple.md)                      |
-| 3     | `2.20 – 3.05`   | Icons collapse toward the click point; CTA pulses               | [center-outward-expansion](../rules/center-outward-expansion.md) (reversed) |
-| 4     | `2.95 – 3.75`   | Product demo springs out of the collapse point                  | inline                                                                      |
-| 5     | `3.95 – 6.50`   | Demo floats with a breathing yoyo                               | [sine-wave-loop](../rules/sine-wave-loop.md) Form 1                         |
+| Phase | Time window                          | What Happens                                                    | Skill Reference                                                                    |
+| ----- | ------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 1     | `0 → CURSOR_AT`                      | Icons enter with 3D flip, staggered; orbit motion runs from t=0 | [orbit-3d-entry](../rules/orbit-3d-entry.md)                                       |
+| 2     | `CURSOR_AT → CLICK_AT`               | Cursor enters off-screen, moves to CTA, clicks with ripple      | [cursor-click-ripple](../rules/cursor-click-ripple.md)                             |
+| 3     | `CLICK_AT → CLICK_AT + COLLAPSE_DUR` | Icons collapse toward the click point; CTA pulses               | [center-outward-expansion](../rules/center-outward-expansion.md) (reversed driver) |
+| 4     | `DEMO_AT → DEMO_AT + DEMO_DUR`       | Product demo springs out of the collapse point                  | inline                                                                             |
+| 5     | `IDLE_START → TOTAL`                 | Demo floats with a breathing yoyo                               | [sine-wave-loop](../rules/sine-wave-loop.md) (finite-yoyo form)                    |
 
-Phase 3 and Phase 4 **overlap by ~0.10 s** — the demo entry begins just before the collapse fully completes, so the click reads as energy transfer rather than two separate moments.
+Phase 3 and Phase 4 **overlap by `COLLAPSE_OVERLAP`** — the demo entry begins just before the collapse fully completes, so the click reads as energy transfer rather than two separate moments.
 
-## Layout
+## Initial Layout
 
 Each icon uses **three nested wrappers** so the orbit position, the collapse scale/opacity, and the 3D entry rotation each tween on their own element and never overwrite each other:
 
@@ -68,115 +68,97 @@ Each icon uses **three nested wrappers** so the orbit position, the collapse sca
 <div class="stage" style="position: absolute; inset: 0; overflow: hidden;">
   <div class="bg"></div>
 
-  <!-- Orbit ring — six icons spaced evenly around 2π -->
+  <!-- Orbit ring — N icons spaced evenly around 2π (typically 6) -->
   <div class="orbit-stage" style="position: absolute; inset: 0;">
-    <div class="icon-pos icon-music" style="perspective: 800px;">
+    <!-- Repeat .icon-pos for each category. The CSS class on the outer wrapper
+         (e.g. .icon-{categoryKey}) lets the master onUpdate target a single
+         icon's orbit position by selector. -->
+    <div class="icon-pos icon-{categoryKey}" style="perspective: 800px;">
       <div class="icon-collapse">
-        <div class="icon-entry"><svg class="icon-svg">…</svg></div>
+        <div class="icon-entry">
+          <svg class="icon-svg"><!-- {categoryGlyph} --></svg>
+          <span class="icon-label">{categoryLabel}</span>
+        </div>
       </div>
     </div>
-    <div class="icon-pos icon-gaming" style="perspective: 800px;">
-      <div class="icon-collapse">
-        <div class="icon-entry"><svg class="icon-svg">…</svg></div>
-      </div>
-    </div>
-    <div class="icon-pos icon-education" style="perspective: 800px;">
-      <div class="icon-collapse">
-        <div class="icon-entry"><svg class="icon-svg">…</svg></div>
-      </div>
-    </div>
-    <div class="icon-pos icon-sports" style="perspective: 800px;">
-      <div class="icon-collapse">
-        <div class="icon-entry"><svg class="icon-svg">…</svg></div>
-      </div>
-    </div>
-    <div class="icon-pos icon-vlog" style="perspective: 800px;">
-      <div class="icon-collapse">
-        <div class="icon-entry"><svg class="icon-svg">…</svg></div>
-      </div>
-    </div>
-    <div class="icon-pos icon-podcast" style="perspective: 800px;">
-      <div class="icon-collapse">
-        <div class="icon-entry"><svg class="icon-svg">…</svg></div>
-      </div>
-    </div>
+    <!-- … one .icon-pos per category, distributed at angle = i * 2π / N -->
   </div>
 
   <!-- Center CTA — fixed at viewport center; click target lives here -->
-  <div
-    class="cta"
-    style="position: absolute; left: 50%; top: 50%;
-       transform: translate(-50%, -50%); z-index: 5;"
-  >
-    <!-- CTA button / input bar -->
+  <div class="cta" style="position: absolute; left: 50%; top: 50%; z-index: 5;">
+    <span class="cta-placeholder">{ctaCopy}</span>
+    <div class="cta-button">{ctaButtonLabel}</div>
   </div>
 
-  <!-- Ripple ring(s) — render from CTA center on click -->
-  <div
-    class="ripple"
-    style="position: absolute; left: 50%; top: 50%;
-       width: 120px; height: 120px; margin: -60px 0 0 -60px;
-       border: 2px solid rgba(255,255,255,0.7); border-radius: 50%;
-       opacity: 0; pointer-events: none; z-index: 6;"
-  ></div>
+  <!-- Ripple ring(s) — render from CTA-button center on click -->
+  <div class="ripple"></div>
 
   <!-- Cursor — sits above everything during move + click -->
-  <div
-    class="cursor"
-    style="position: absolute; left: 0; top: 0;
-       z-index: 999; pointer-events: none; opacity: 0;"
-  >
+  <div class="cursor" style="z-index: 999; pointer-events: none; opacity: 0;">
     <svg width="28" height="28" viewBox="0 0 24 24">
-      <path d="M5 3L19 12L12 13L9 20L5 3Z" fill="#fff" stroke="#0A0A0F" stroke-width="1.5" />
+      <path
+        d="M5 3L19 12L12 13L9 20L5 3Z"
+        fill="{cursorFill}"
+        stroke="{cursorStroke}"
+        stroke-width="1.5"
+      />
     </svg>
   </div>
 
   <!-- Demo — sits at viewport center, scaled to 0 until Phase 4 -->
   <div
     class="demo"
-    style="position: absolute; left: 50%; top: 50%;
-       width: 720px; height: 405px; margin: -202.5px 0 0 -360px;
-       transform: scale(0); opacity: 0; z-index: 10;
-       border-radius: 16px; overflow: hidden; background: #111;"
+    style="position: absolute; left: 50%; top: 50%; z-index: 10;
+       transform: scale(0); opacity: 0;
+       border-radius: 16px; overflow: hidden; background: {demoBg};"
   >
-    <!-- video / image -->
+    <!-- {heroAsset} — video / image / play-card -->
   </div>
 </div>
 ```
 
-CSS sets the CTA, ripple and demo at viewport center via `left/top + margin` (or `transform: translate(-50%,-50%)` on the CTA). GSAP only ever tweens transform aliases (`x`, `y`, `scale`, `rotation`, `opacity`) — never `left/top/width/height`.
+CSS sets the CTA, ripple and demo at viewport center via `left/top + margin` (or GSAP `xPercent: -50, yPercent: -50` when the same element also receives a transform tween). GSAP only ever tweens transform aliases (`x`, `y`, `scale`, `rotation`, `opacity`) — never `left/top/width/height`. Fonts come from project tokens (`{font}` / `{monoFont}`); colors are `{accentColor}` / `{accentGlow}` / `{bgDark}` / `{textPrimary}` and resolve to real values in the example.
 
 ## Constants
 
+All constants are named only; concrete values are documented in How to Choose Values below. The example resolves them to concrete numbers.
+
 ```js
-const W = 1920,
-  H = 1080;
-const CENTER_X = W / 2; // 960
-const CENTER_Y = H / 2; // 540
+// Frame
+const W, H; // composition width/height in px
+const CENTER_X = W / 2;
+const CENTER_Y = H / 2;
 
-const RADIUS_X = 480; // elliptical horizontal radius
-const RADIUS_Y = 280; // elliptical vertical radius (≈ 0.58 × X for perspective flattening)
-const ORBIT_SPEED = 0.25; // radians per second — full revolution every ~25 s, slow ambient
+// Orbit geometry
+const RADIUS_X; // elliptical horizontal radius
+const RADIUS_Y; // elliptical vertical radius (perspective-flattened)
+const ORBIT_SPEED; // radians per second
 
-// 6 icons distributed evenly around 2π
+// Icons — N entries distributed evenly around 2π
 const ICONS = [
-  { sel: ".icon-music", initialAngle: (0 * Math.PI) / 3, entryDelay: 0.0 },
-  { sel: ".icon-gaming", initialAngle: (1 * Math.PI) / 3, entryDelay: 0.1 },
-  { sel: ".icon-education", initialAngle: (2 * Math.PI) / 3, entryDelay: 0.2 },
-  { sel: ".icon-sports", initialAngle: (3 * Math.PI) / 3, entryDelay: 0.3 },
-  { sel: ".icon-vlog", initialAngle: (4 * Math.PI) / 3, entryDelay: 0.4 },
-  { sel: ".icon-podcast", initialAngle: (5 * Math.PI) / 3, entryDelay: 0.5 },
+  // { sel: ".icon-<key>", initialAngle: (i * 2 * Math.PI) / N, entryDelay: i * ENTRY_STAGGER },
 ];
 
-const ENTRY_DUR = 0.55; // per-icon 3D flip
-const CURSOR_AT = 1.5; // cursor fades in and starts moving
-const CURSOR_MOVE = 0.5; // duration of the cursor move
-const CLICK_AT = 2.2; // click instant — collapse pivot
-const COLLAPSE_DUR = 0.85;
-const DEMO_AT = 2.95; // overlaps collapse by 0.10 s for energy transfer
-const DEMO_DUR = 0.8;
-const IDLE_START = 3.95; // after the demo spring tail dissipates
-const TOTAL = 6.5; // matches data-duration on the composition root
+// Phase durations / boundaries
+const ENTRY_DUR; // per-icon 3D flip
+const ENTRY_STAGGER; // delay between consecutive icon entries
+const CURSOR_AT; // cursor fades in and starts moving
+const CURSOR_MOVE; // duration of the cursor move
+const CLICK_AT; // click instant — collapse pivot
+const COLLAPSE_DUR; // icons converge to center
+const COLLAPSE_OVERLAP; // demo begins this many seconds before collapse finishes
+const DEMO_AT = CLICK_AT + COLLAPSE_DUR - COLLAPSE_OVERLAP;
+const DEMO_DUR; // demo spring-out
+const IDLE_TAIL; // gap between demo entry end and breath start
+const IDLE_START = DEMO_AT + DEMO_DUR + IDLE_TAIL;
+const TOTAL; // matches data-duration on the composition root
+
+// Ease coefficients
+const ENTRY_BACK; // icon flip-in back.out coefficient
+const CURSOR_BACK; // cursor move back.out coefficient
+const COLLAPSE_BACK; // collapse driver back.out coefficient
+const DEMO_BACK; // demo spring back.out coefficient
+const RECOVER_BACK; // press-recover back.out coefficient
 ```
 
 ## Phase 1: 3D Flip Entry + Orbit (Core Glue, Part A)
@@ -198,64 +180,76 @@ ICONS.forEach(({ sel, entryDelay }) => {
       scale: 1,
       opacity: 1,
       duration: ENTRY_DUR,
-      ease: "back.out(1.4)", // spring(stiffness:120, damping:14)
+      ease: `back.out(${ENTRY_BACK})`,
     },
     entryDelay,
   );
 });
 ```
 
-### Why `back.out(1.4)` and not a stiffer ease
+### Why a mild `back.out` and not a stiffer ease
 
-The source pattern uses `stiffness: 100–120, damping: 14` for icon entry — a mild overshoot. Per the SKILL.md mapping, that lands at `back.out(1.4)`. Keep it gentle here — the icons should _arrive_, not _snap into place_. The collapse spring in Phase 3 is the snappier one.
+The entry should feel like the icon _arriving_, not _snapping into place_. A milder overshoot coefficient (low end of `ENTRY_BACK`'s range) keeps the cascade calm enough that the eye treats it as ambient. The collapse spring in Phase 3 (`COLLAPSE_BACK`) is the snappier one — the contrast carries the narrative pivot.
 
 ### Internal SVG enrichment
 
-Each icon's internal motion (clock hand, music notes bouncing, controller buttons pulsing) runs on its own finite yoyo from t=0 via the [svg-icon-enrichment](../rules/svg-icon-enrichment.md) pattern. Do **not** gate the enrichment behind the entry delay — the user should see a living icon appear, not a static icon that starts moving on landing.
+Each icon's internal motion (any per-glyph living detail like a sway, a phase-shifted scale pulse, etc.) runs on its own finite yoyo from t=0. Do **not** gate the enrichment behind the entry delay — the user should see a living icon appear, not a static icon that starts moving on landing.
 
 ## Phase 2: Cursor + Click + Ripple
 
-The cursor enters off-screen-right, slides to the CTA centroid, depresses on click, and recovers. The CTA depresses concurrently for physical feedback. One ripple ring expands from the click point.
+The cursor enters off-screen, slides to the CTA's click centroid, depresses on click, and recovers. The CTA (or specifically the CTA button) depresses concurrently for physical feedback. One ripple ring expands from the click point.
 
 ```js
-const CURSOR_START_X = W + 100; // off-screen right
-const CURSOR_START_Y = H * 0.85; // bottom-right approach
-const CURSOR_TARGET_X = CENTER_X + 60; // slightly past CTA center so the click reads
-const CURSOR_TARGET_Y = CENTER_Y;
-
+// CURSOR_START_X / Y position the cursor at an off-screen entry point.
+// CURSOR_TARGET_X / Y align with the visual centroid of the click target
+// (typically the CTA button center, not the CTA card center).
 gsap.set(".cursor", { x: CURSOR_START_X, y: CURSOR_START_Y, opacity: 0 });
 
 // (a) Fade in
-tl.to(".cursor", { opacity: 1, duration: 0.1, ease: "none" }, CURSOR_AT);
+tl.to(".cursor", { opacity: 1, duration: CURSOR_FADE_DUR, ease: "none" }, CURSOR_AT);
 
-// (b) Move to CTA
+// (b) Move to CTA — calm settle, mild overshoot
 tl.to(
   ".cursor",
   {
     x: CURSOR_TARGET_X,
     y: CURSOR_TARGET_Y,
     duration: CURSOR_MOVE,
-    ease: "back.out(1.3)", // spring(stiffness:80, damping:18) — calm settle
+    ease: `back.out(${CURSOR_BACK})`,
   },
   CURSOR_AT,
 );
 
-// (c) Click depression — cursor + CTA both compress, then recover
-tl.to(".cursor", { scale: 0.85, duration: 0.08, ease: "power2.out" }, CLICK_AT);
-tl.to(".cursor", { scale: 1, duration: 0.18, ease: "back.out(1.6)" }, CLICK_AT + 0.08);
+// (c) Click depression — cursor + click target both compress, then recover
+tl.to(".cursor", { scale: CURSOR_PRESS_SCALE, duration: PRESS_DUR, ease: "power2.out" }, CLICK_AT);
+tl.to(
+  ".cursor",
+  { scale: 1, duration: RECOVER_DUR, ease: `back.out(${RECOVER_BACK})` },
+  CLICK_AT + PRESS_DUR,
+);
 
-tl.to(".cta", { scale: 0.95, duration: 0.08, ease: "power2.out" }, CLICK_AT);
-tl.to(".cta", { scale: 1, duration: 0.18, ease: "back.out(1.6)" }, CLICK_AT + 0.08);
+tl.to(
+  ".cta-button",
+  { scale: TARGET_PRESS_SCALE, duration: PRESS_DUR, ease: "power2.out" },
+  CLICK_AT,
+);
+tl.to(
+  ".cta-button",
+  { scale: 1, duration: RECOVER_DUR, ease: `back.out(${RECOVER_BACK})` },
+  CLICK_AT + PRESS_DUR,
+);
 
-// (d) Ripple — single ring expands and fades. Keyframes give the 0 → 0.7 → 0 opacity envelope.
+// (d) Ripple — single ring expands and fades. Keyframes give the
+// 0 → peak → 0 opacity envelope that reads as a pulse rather than a
+// linear fade.
 tl.to(
   ".ripple",
   {
-    duration: 0.7,
+    duration: RIPPLE_DUR,
     keyframes: {
-      "0%": { scale: 0.3, opacity: 0 },
-      "20%": { opacity: 0.7 },
-      "100%": { scale: 5.0, opacity: 0 },
+      "0%": { scale: RIPPLE_START_SCALE, opacity: 0 },
+      "20%": { opacity: RIPPLE_PEAK_OPACITY },
+      "100%": { scale: RIPPLE_END_SCALE, opacity: 0 },
       easeEach: "power2.out",
     },
   },
@@ -263,18 +257,20 @@ tl.to(
 );
 ```
 
-For multiple staggered rings, repeat the ripple tween at `CLICK_AT + 0.05` and `CLICK_AT + 0.10` on `.ripple-2` / `.ripple-3` elements. One ring usually reads enough.
+For multiple staggered rings, repeat the ripple tween at `CLICK_AT + RIPPLE_STAGGER`, `CLICK_AT + 2*RIPPLE_STAGGER`, … on `.ripple-2` / `.ripple-3` elements. One ring usually reads enough.
 
 ## Phase 3: Collapse (Core Glue, Part B)
 
 This is the single most important tween in the blueprint. **The orbit must keep advancing while the radius shrinks** — otherwise the icons "snap" inward in a way that doesn't read as collapse. So orbit angle and collapse radius are computed in the _same_ `onUpdate` that runs continuously from t=0 to the end of Phase 3.
 
 ```js
-// Pre-compute the spring-like ease curve so we can call it as a pure function inside onUpdate.
-const COLLAPSE_EASE = gsap.parseEase("back.out(1.6)"); // spring(stiffness:150, damping:15)
+// Pre-compute the spring-like ease curve so we can call it as a pure
+// function inside onUpdate.
+const COLLAPSE_EASE = gsap.parseEase(`back.out(${COLLAPSE_BACK})`);
 const ORBIT_END = DEMO_AT; // stop the engine once icons are gone
 
-// Master orbit + collapse engine — single onUpdate writes x/y/scale/opacity for all icons.
+// Master orbit + collapse engine — single onUpdate writes
+// x/y/scale/opacity for all icons.
 tl.to(
   { tick: 0 },
   {
@@ -286,14 +282,15 @@ tl.to(
       const collapseLinear = Math.max(0, Math.min(1, (t - CLICK_AT) / COLLAPSE_DUR));
       const collapseEased = COLLAPSE_EASE(collapseLinear);
       const radiusFactor = 1 - collapseEased; // 1 → 0 over Phase 3
-      const collapseScale = 1 - collapseEased * 0.5; // 1 → 0.5
+      const collapseScale = 1 - collapseEased * COLLAPSE_SCALE_DEPTH; // 1 → (1 - depth)
 
-      // Two-segment opacity envelope: 1 at 0, 0.5 at 0.8, 0 at 1 — matches
+      // Two-segment opacity envelope: 1 at 0, OPACITY_KNEE at OPACITY_KNEE_T, 0 at 1
+      // — gives the inward motion an "energy converging" feel instead of a pop-vanish.
       const o = collapseEased;
       const collapseOpacity =
-        o < 0.8
-          ? 1 - o * 0.625 // 1 → 0.5 over [0, 0.8]
-          : (0.5 * (1 - o)) / 0.2; // 0.5 → 0 over [0.8, 1]
+        o < OPACITY_KNEE_T
+          ? 1 - o * ((1 - OPACITY_KNEE) / OPACITY_KNEE_T)
+          : (OPACITY_KNEE * (1 - o)) / (1 - OPACITY_KNEE_T);
 
       ICONS.forEach(({ sel, initialAngle, entryDelay }) => {
         const localT = Math.max(0, t - entryDelay); // local time since this icon entered
@@ -312,15 +309,15 @@ tl.to(
 
 ### Why one `onUpdate` and not per-icon tweens
 
-[center-outward-expansion](../rules/center-outward-expansion.md) prefers per-element tweens for _static_ targets — GSAP batches them cheaply. Here the target itself is a function of two simultaneously evolving variables (orbit angle, collapse driver), so a single `onUpdate` that reads both and writes all icons is the simpler model. Six `gsap.set()` calls per frame are still very cheap; the compositor batches the resulting transform writes.
+[center-outward-expansion](../rules/center-outward-expansion.md) prefers per-element tweens for _static_ targets — GSAP batches them cheaply. Here the target itself is a function of two simultaneously evolving variables (orbit angle, collapse driver), so a single `onUpdate` that reads both and writes all icons is the simpler model. N `gsap.set()` calls per frame (for N icons in the 4–12 range) are cheap; the compositor batches the resulting transform writes.
 
 ### Why `gsap.parseEase` instead of a proxy tween
 
-A proxy tween (`tl.to(collapseProxy, { v: 1, ease: 'back.out(1.6)' })`) and `gsap.parseEase('back.out(1.6)')(progress)` produce _identical_ values for the same progress fraction. `parseEase` is preferred when the eased value is consumed inside another tween's `onUpdate` — one fewer engine tween, and the timing is anchored to `tl.time()` rather than to a sibling tween that could drift after seek.
+A proxy tween (`tl.to(collapseProxy, { v: 1, ease: 'back.out(...)' })`) and `gsap.parseEase('back.out(...)')(progress)` produce _identical_ values for the same progress fraction. `parseEase` is preferred when the eased value is consumed inside another tween's `onUpdate` — one fewer engine tween, and the timing is anchored to `tl.time()` rather than to a sibling tween that could drift after seek.
 
 ## Phase 4: Demo Appears
 
-The demo springs out of the collapse point with scale overshoot. It overlaps the tail of Phase 3 by ~0.10 s so the click reads as energy transferring into the demo.
+The demo springs out of the collapse point with scale overshoot. It overlaps the tail of Phase 3 by `COLLAPSE_OVERLAP` so the click reads as energy transferring into the demo.
 
 ```js
 tl.fromTo(
@@ -330,32 +327,31 @@ tl.fromTo(
     scale: 1,
     opacity: 1,
     duration: DEMO_DUR,
-    ease: "back.out(1.6)", // spring(stiffness:120, damping:14) — mild overshoot
+    ease: `back.out(${DEMO_BACK})`,
   },
   DEMO_AT,
 );
 
 // Optional: short opacity attack so the demo isn't visible at scale 0
-tl.fromTo(".demo", { opacity: 0 }, { opacity: 1, duration: 0.2, ease: "none" }, DEMO_AT);
+tl.fromTo(".demo", { opacity: 0 }, { opacity: 1, duration: DEMO_FADE_DUR, ease: "none" }, DEMO_AT);
 ```
 
-The demo's CSS `left: 50%; top: 50%; margin: …` anchors it to the same viewport-center point the icons collapsed toward. **This match must be exact** — the eye notices a 4 px misalignment between the collapse point and the demo entry point.
+The demo's CSS centering (`left: 50%; top: 50%; margin: …` or GSAP `xPercent/yPercent`) anchors it to the same viewport-center point the icons collapsed toward. **This match must be exact** — the eye notices a few-pixel misalignment between the collapse point and the demo entry point as a teleport.
 
 ## Phase 5: Demo Floats (Breathing)
 
-Form 1 from [sine-wave-loop](../rules/sine-wave-loop.md). Single yoyo tween with finite repeat — the simplest and cheapest idle.
+The single-yoyo idle form from [sine-wave-loop](../rules/sine-wave-loop.md) — finite repeat count, computed so the breath ends _before_ the composition ends. Simplest and cheapest idle.
 
 ```js
-const HALF_CYCLE = 1.1; // half a breath cycle in seconds
-const remaining = TOTAL - IDLE_START; // = 2.55 s
+const remaining = TOTAL - IDLE_START;
 const halfCycles = Math.max(0, Math.floor(remaining / HALF_CYCLE) - 1);
 
 tl.fromTo(
   ".demo",
   { y: 0, rotation: 0 },
   {
-    y: -8,
-    rotation: 1, // ±8 px float, ±1° tilt — subtle
+    y: FLOAT_Y,
+    rotation: FLOAT_ROT,
     duration: HALF_CYCLE,
     ease: "sine.inOut",
     yoyo: true,
@@ -365,9 +361,9 @@ tl.fromTo(
 );
 ```
 
-**Do not** add `repeat: -1` — HyperFrames forbids infinite repeats. The `Math.floor(remaining / HALF_CYCLE) - 1` formula guarantees the breath ends _before_ the composition ends, so the last visible frame doesn't catch the demo mid-cycle.
+**Do not** add `repeat: -1` — HyperFrames forbids infinite repeats. The `Math.floor(remaining / HALF_CYCLE) - 1` formula guarantees the breath ends before the composition ends, so the last visible frame doesn't catch the demo mid-cycle.
 
-If you want a multiplicative breath onto an already-scaled demo (e.g. the demo lands at scale 1.05 instead of 1 because of the spring overshoot you preserved), use Form 2 from sine-wave-loop instead. The simple yoyo above assumes the demo settled at scale 1.
+If the demo lands at a non-1 scale (e.g. the spring overshoot leaves it at 1.05), use the multiplicative idle form from sine-wave-loop instead. The simple yoyo above assumes the demo settled at scale 1.
 
 ## Final Setup
 
@@ -375,60 +371,163 @@ If you want a multiplicative breath onto an already-scaled demo (e.g. the demo l
 window.__timelines["main"] = tl;
 ```
 
-The composition root's `data-duration` must be ≥ `TOTAL` (here 6.5 s). Anything less and the breath repeats stop early.
+The composition root's `data-duration` must be ≥ `TOTAL`. Anything less and the breath repeats stop early.
 
 ## Inter-Phase State Handoff
 
 ```
 Phase 1 → Phase 2:
-  Last icon entry begins at entryDelay = 0.50 and finishes at 0.50 + ENTRY_DUR = 1.05.
-  CURSOR_AT (1.50) ≥ 1.05 + 0.30 — gives the eye time to see the orbit stabilize before
-  the cursor enters.
+  Last icon entry begins at (N-1) * ENTRY_STAGGER and finishes at
+  (N-1) * ENTRY_STAGGER + ENTRY_DUR.
+  CURSOR_AT must be ≥ that finish time + a "settle gap" so the eye
+  sees the orbit stabilize before the cursor enters.
 
 Phase 2 → Phase 3:
-  Cursor settles at CURSOR_AT + CURSOR_MOVE = 2.00.
-  CLICK_AT (2.20) = settle + 0.20 — the brief pause before the click reads as the
-  user "deciding" to click.
+  Cursor settles at CURSOR_AT + CURSOR_MOVE.
+  CLICK_AT = settle + a small "decision pause" — the brief hold reads
+  as the user deciding to click.
 
 Phase 3 → Phase 4:
-  Collapse completes at CLICK_AT + COLLAPSE_DUR = 3.05.
-  DEMO_AT (2.95) = collapse end − 0.10 — intentional overlap so the click's energy
-  visibly flows into the demo emerging. Any larger overlap and the icons appear to
-  pass through the demo; any smaller and the moment feels broken.
+  Collapse completes at CLICK_AT + COLLAPSE_DUR.
+  DEMO_AT = collapse end − COLLAPSE_OVERLAP — intentional overlap so the
+  click's energy visibly flows into the demo emerging. Larger overlaps
+  let icons appear to pass through the demo; smaller and the moment
+  feels broken.
 
 Phase 4 → Phase 5:
-  Demo entry ends at DEMO_AT + DEMO_DUR = 3.75.
-  IDLE_START (3.95) = entry end + 0.20 — the spring tail dissipates within ~6 frames
+  Demo entry ends at DEMO_AT + DEMO_DUR.
+  IDLE_START = entry end + IDLE_TAIL — the spring tail dissipates
   before the breath takes over.
 ```
+
+## How to Choose Values
+
+- **RADIUS_X / RADIUS_Y** — elliptical orbit radii, in px
+  - Range: `RADIUS_X` 300–900; `RADIUS_Y / RADIUS_X` ≈ 0.4–0.7 (perspective flattening)
+  - Effects: small radii read as a tight cluster; large radii spread the ring across the frame
+  - Constraints: must clear the CTA card horizontally at every angle (see orbit-3d-entry "Center label clearance")
+  - Reference: examples/cta-orbit-collapse.html uses 480 / 280
+
+- **ORBIT_SPEED** — angular velocity, in radians per second
+  - Range: 0.1–0.6 rad/s (one revolution in ~10–60 s)
+  - Effects: slow speeds read as ambient drift; fast speeds read as a "system spinning up"
+  - Constraints: collapse must dominate the eye in Phase 3 — keep ORBIT_SPEED low enough that the angular change during `COLLAPSE_DUR` is small relative to the radius shrink
+  - Reference: examples/cta-orbit-collapse.html uses 0.25
+
+- **N (icon count)** — number of orbit elements
+  - Range: 4–12; ICONS array is N entries with `initialAngle = i * 2π / N`
+  - Effects: fewer feels empty; more crowds the center CTA
+  - Constraints: choose N so the angular gap between adjacent icons (`2π / N`) leaves room for icon glyphs to be legible
+  - Reference: examples/cta-orbit-collapse.html uses 6
+
+- **ENTRY_DUR** — per-icon flip-in duration
+  - Range: 0.4–0.8 s
+  - Effects: short feels punchy; long feels stately
+  - Constraints: must satisfy `(N-1) * ENTRY_STAGGER + ENTRY_DUR ≤ CURSOR_AT − settle_gap`
+  - Reference: examples/cta-orbit-collapse.html uses 0.55
+
+- **ENTRY_STAGGER** — delay between consecutive icon entries
+  - Range: 0.06–0.15 s
+  - Effects: below ~0.06 s reads as popcorn; above ~0.15 s plodding
+  - Reference: examples/cta-orbit-collapse.html uses 0.10
+
+- **CURSOR_AT** — when cursor enters, in seconds
+  - Range: must exceed last-icon-entry-finish + a settle gap of ≥ 0.3 s
+  - Reference: examples/cta-orbit-collapse.html uses 1.50
+
+- **CURSOR_MOVE** — cursor travel time
+  - Range: 0.4–1.0 s
+  - Reference: examples/cta-orbit-collapse.html uses 0.50
+
+- **CLICK_AT** — click instant
+  - Range: `CURSOR_AT + CURSOR_MOVE + 0.0–0.3 s` decision pause
+  - Reference: examples/cta-orbit-collapse.html uses 2.20
+
+- **COLLAPSE_DUR** — collapse duration
+  - Range: 0.6–1.2 s
+  - Effects: short feels like a snap-in; long feels like a vacuum draw
+  - Reference: examples/cta-orbit-collapse.html uses 0.85
+
+- **COLLAPSE_OVERLAP** — seconds the demo entry starts before the collapse finishes
+  - Range: 0.05–0.20 s
+  - Effects: too small reads as two disconnected events; too large lets icons appear to pass through the demo
+  - Reference: examples/cta-orbit-collapse.html uses 0.10
+
+- **DEMO_DUR** — demo spring-out duration
+  - Range: 0.6–1.0 s
+  - Reference: examples/cta-orbit-collapse.html uses 0.80
+
+- **IDLE_TAIL** — gap between demo entry end and breath start
+  - Range: 0.15–0.30 s
+  - Reference: examples/cta-orbit-collapse.html uses 0.20
+
+- **TOTAL** — total composition duration; must equal `data-duration`
+  - Constraints: must be ≥ `IDLE_START + HALF_CYCLE` so at least one half-breath plays
+  - Reference: examples/cta-orbit-collapse.html uses 6.5
+
+- **ENTRY_BACK / CURSOR_BACK / COLLAPSE_BACK / DEMO_BACK / RECOVER_BACK** — `back.out(<n>)` overshoot coefficients
+  - Range: 1.2–2.0 (see Spring → Ease Cheatsheet below for the intended feel of each)
+  - Effects: low end is a calm arrive; high end snaps with visible overshoot
+  - Constraints: COLLAPSE_BACK > ENTRY_BACK (collapse must feel snappier than entry — otherwise the click feels uncaused)
+  - Reference: examples/cta-orbit-collapse.html uses 1.4 / 1.3 / 1.6 / 1.6 / 1.6
+
+- **COLLAPSE_SCALE_DEPTH** — how far icons shrink during collapse (`1 → 1 - depth`)
+  - Range: 0.3–0.7
+  - Effects: low values keep icons visible at the moment of impact; high values let them disappear into the click point
+  - Reference: examples/cta-orbit-collapse.html uses 0.5
+
+- **OPACITY_KNEE / OPACITY_KNEE_T** — break point in the two-segment opacity envelope `[1 → OPACITY_KNEE → 0]` at fractional time `[0, OPACITY_KNEE_T, 1]` of the collapse
+  - Range: knee 0.3–0.6; knee_t 0.7–0.9
+  - Effects: a high knee_t with a moderate knee keeps icons mostly opaque until the very end, then drops sharply — reads as "energy converging then released"
+  - Reference: examples/cta-orbit-collapse.html uses knee 0.5 / knee_t 0.8
+
+- **PRESS_DUR / RECOVER_DUR / CURSOR_PRESS_SCALE / TARGET_PRESS_SCALE** — click-depression timing & depth
+  - Per [cursor-click-ripple](../rules/cursor-click-ripple.md) "How to Choose Values"
+  - Reference: examples/cta-orbit-collapse.html uses 0.08 / 0.18 / 0.85 / 0.95
+
+- **RIPPLE_DUR / RIPPLE_START_SCALE / RIPPLE_END_SCALE / RIPPLE_PEAK_OPACITY** — ripple ring expand-fade envelope
+  - Per [cursor-click-ripple](../rules/cursor-click-ripple.md) "How to Choose Values"; for the keyframed envelope used here, peak opacity is the 20% keyframe value
+  - Reference: examples/cta-orbit-collapse.html uses 0.7 / 0.3 / 5.0 / 0.7
+
+- **HALF_CYCLE** — half a breath cycle in Phase 5
+  - Range: 0.8–1.6 s
+  - Effects: short reads as anxious breathing; long reads as relaxed
+  - Reference: examples/cta-orbit-collapse.html uses 1.10
+
+- **FLOAT_Y / FLOAT_ROT** — float amplitude per half-cycle
+  - Range: y ±4 to ±12 px; rot ±0.5° to ±2°
+  - Effects: subtle values keep the demo "alive"; large values make it look unstable
+  - Reference: examples/cta-orbit-collapse.html uses −8 px / +1°
 
 ## Critical Constraints
 
 - **Orbit speed is constant before and during collapse** — only the radius shrinks. Slowing the orbit during collapse breaks the "snappy contraction" feel; speeding it up looks like the icons spin into a drain.
-- **Collapse ease is snappier than entry ease** — `back.out(1.6)` for collapse vs `back.out(1.4)` for entry. The collapse should feel decisive, the entry should feel arriving.
-- **Demo origin matches the collapse center exactly** — CSS `left: 50%; top: 50%; margin: -H/2 0 0 -W/2` on the demo aligns with the icons' viewport-center collapse point. Mismatch reads as a teleport.
+- **Collapse ease is snappier than entry ease** — `COLLAPSE_BACK > ENTRY_BACK`. The collapse should feel decisive, the entry should feel arriving.
+- **Demo origin matches the collapse center exactly** — the demo's centering offsets must align with the icons' viewport-center collapse point. Mismatch reads as a teleport.
 - **Cursor `z-index: 999`** — above everything during move and click. The cursor must always be visible; it cannot be occluded by an icon passing in front during the orbit.
-- **Ripple `z-index: 6`** — above the CTA but below the cursor.
-- **CTA visibly depresses during the click** — the 0.95-scale tween on `.cta` is the causal trigger; without it, the collapse feels uncaused.
+- **Ripple `z-index` between CTA and cursor** — typically z-index ≈ 6: above the CTA card, below the cursor.
+- **Click target visibly depresses during the click** — the press-scale tween on `.cta-button` is the causal trigger; without it, the collapse feels uncaused.
 - **Three nested wrappers per icon** — `.icon-pos` (orbit x/y), `.icon-collapse` (collapse scale/opacity), `.icon-entry` (3D flip). Tweening the same property on the same element from two sources is undefined behavior in GSAP.
-- **Icons fade during collapse, not pop-vanish** — the two-segment opacity envelope `[1, 0.5, 0]` is what gives the inward motion its "energy converging" feel.
+- **Icons fade during collapse, not pop-vanish** — the two-segment opacity envelope `[1, OPACITY_KNEE, 0]` is what gives the inward motion its "energy converging" feel.
 - **One master onUpdate, gated by `tl.time()`** — both orbit angle and collapse driver are pure functions of `tl.time()`. No `Math.random()`, no `Date.now()`, no `performance.now()`.
 - **Single paused timeline** — all five phases on one `gsap.timeline({ paused: true })`, registered to `window.__timelines[data-composition-id]`.
 - **GSAP transform aliases only** — `x`, `y`, `scale`, `rotation`, `rotateX`, `rotateY`, `z`, `opacity`. Never `left`/`top`/`width`/`height`.
 - **No infinite repeats** — Phase 5's `repeat` is computed from `TOTAL - IDLE_START`.
 
-## Spring → GSAP Ease Cheatsheet (this blueprint)
+## Spring → Ease Cheatsheet
 
-| Source spring                                                      | This blueprint uses                                                       |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| `spring({ stiffness: 100–120, damping: 14 })` — icon 3D flip entry | `back.out(1.4)` over 0.55 s                                               |
-| `spring({ stiffness: 80, damping: 18 })` — cursor move             | `back.out(1.3)` over 0.50 s                                               |
-| `spring({ stiffness: 150, damping: 15 })` — collapse driver        | `back.out(1.6)` over 0.85 s (called via `gsap.parseEase` inside onUpdate) |
-| `spring({ stiffness: 120, damping: 14 })` — demo entry             | `back.out(1.6)` over 0.80 s                                               |
-| `Math.sin(t / period)` continuous float                            | `sine.inOut` yoyo with finite `repeat`                                    |
+The blueprint maps four spring-shaped motions to `back.out` eases. Coefficient values live in How to Choose Values.
+
+| Spring intent                             | Maps to                                                          |
+| ----------------------------------------- | ---------------------------------------------------------------- |
+| Calm-arrive — icon 3D flip entry          | `back.out(ENTRY_BACK)`                                           |
+| Calm-settle — cursor move                 | `back.out(CURSOR_BACK)`                                          |
+| Snappy-contract — collapse driver         | `back.out(COLLAPSE_BACK)` (via `gsap.parseEase` inside onUpdate) |
+| Snappy-arrive with overshoot — demo entry | `back.out(DEMO_BACK)`                                            |
+| Continuous float                          | `sine.inOut` yoyo with finite `repeat`                           |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 
 ## Golden Sample
 
-- [cta-orbit-collapse.html](../examples/cta-orbit-collapse.html) — Six genre icons (music, gaming, education, sports, vlog, podcast) orbit a "Drop a video link · Get free clips" CTA input; cursor enters and clicks the white button; one ripple expands; icons collapse inward; a video demo card springs out from the collapse point and floats. Single paused GSAP timeline drives all five phases over 6.5 seconds. Demonstrates the three-wrapper icon anatomy and the `gsap.parseEase` pattern for spring-shaped collapse driven from inside a master `onUpdate`.
+- [cta-orbit-collapse.html](../examples/cta-orbit-collapse.html) — runnable instance of this blueprint. Demonstrates the three-wrapper icon anatomy and the `gsap.parseEase` pattern for spring-shaped collapse driven from inside a master `onUpdate`.

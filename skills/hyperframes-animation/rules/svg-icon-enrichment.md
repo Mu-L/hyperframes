@@ -25,7 +25,6 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
 ```html
 <div
   class="scene"
-  id="enrichment-scene"
   data-composition-id="enrichment-scene"
   data-start="0"
   data-duration="4"
@@ -35,7 +34,7 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
     <div class="row">
       <!-- Clock icon — minute hand rotates -->
       <svg class="icon-svg" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="60" cy="60" r="50" fill="none" stroke="#a78bfa" stroke-width="6" />
+        <circle cx="60" cy="60" r="50" fill="none" stroke="{accentColor}" stroke-width="6" />
         <line
           class="clock-hand"
           id="hand-min"
@@ -43,7 +42,7 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
           y1="60"
           x2="60"
           y2="22"
-          stroke="#f5f6fb"
+          stroke="{textColor}"
           stroke-width="6"
           stroke-linecap="round"
         />
@@ -54,11 +53,11 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
           y1="60"
           x2="60"
           y2="30"
-          stroke="#ec4899"
+          stroke="{recordColor}"
           stroke-width="3"
           stroke-linecap="round"
         />
-        <circle cx="60" cy="60" r="6" fill="#f5f6fb" />
+        <circle cx="60" cy="60" r="6" fill="{textColor}" />
       </svg>
 
       <!-- Recording dot — pulses -->
@@ -69,10 +68,10 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
           cy="60"
           r="50"
           fill="none"
-          stroke="#ec4899"
+          stroke="{recordColor}"
           stroke-width="4"
         />
-        <circle id="rec-dot" cx="60" cy="60" r="22" fill="#ec4899" />
+        <circle id="rec-dot" cx="60" cy="60" r="22" fill="{recordColor}" />
       </svg>
 
       <!-- Data stream — dashes flow along the line -->
@@ -84,7 +83,7 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
           height="24"
           rx="12"
           fill="none"
-          stroke="#a78bfa"
+          stroke="{accentColor}"
           stroke-width="4"
         />
         <line
@@ -93,14 +92,14 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
           y1="60"
           x2="106"
           y2="60"
-          stroke="#a78bfa"
+          stroke="{accentColor}"
           stroke-width="6"
           stroke-linecap="round"
           stroke-dasharray="14 12"
         />
       </svg>
     </div>
-    <div class="brand">LIVE · ON · HEYGENVERSE</div>
+    <div class="brand">{brandPhrase}</div>
   </div>
 </div>
 ```
@@ -114,8 +113,8 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
   height: 100%;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at center, #161a3a 0%, #0b0d1f 70%);
-  font-family: "Inter", sans-serif;
+  background: {bgColor};
+  font-family: {font};
 }
 .stack {
   display: flex;
@@ -130,7 +129,7 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
 .icon-svg {
   width: 320px;
   height: 320px;
-  filter: drop-shadow(0 12px 32px rgba(167, 139, 250, 0.3));
+  filter: drop-shadow(0 12px 32px {shadowColor});
 }
 .clock-hand {
   /* transform-origin in SVG must be in viewBox units, not pixels */
@@ -142,7 +141,7 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
   font-weight: 900;
   letter-spacing: 14px;
   text-transform: uppercase;
-  color: #f5f6fb;
+  color: {textColor};
 }
 ```
 
@@ -155,13 +154,13 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
   const tl = gsap.timeline({ paused: true });
 
   // Pattern 1 — Rotation (clock hands)
-  // Minute hand: 1 full rotation over 4s = 360°
+  // Minute hand: MIN_REVOLUTIONS full rotations over TOTAL_DURATION
   const minState = { deg: 0 };
   tl.to(
     minState,
     {
-      deg: 360,
-      duration: 4.0,
+      deg: 360 * MIN_REVOLUTIONS,
+      duration: TOTAL_DURATION,
       ease: "none",
       onUpdate: () => {
         document.getElementById("hand-min").style.transform = `rotate(${minState.deg}deg)`;
@@ -170,13 +169,13 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
     0,
   );
 
-  // Second hand: 6 rotations over 4s = 2160° (faster)
+  // Second hand: SEC_REVOLUTIONS full rotations over TOTAL_DURATION (faster)
   const secState = { deg: 0 };
   tl.to(
     secState,
     {
-      deg: 2160,
-      duration: 4.0,
+      deg: 360 * SEC_REVOLUTIONS,
+      duration: TOTAL_DURATION,
       ease: "none",
       onUpdate: () => {
         document.getElementById("hand-sec").style.transform = `rotate(${secState.deg}deg)`;
@@ -190,13 +189,14 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
   tl.to(
     pulseState,
     {
-      p: Math.PI * 2 * 3, // 3 pulses over 4s
-      duration: 4.0,
+      p: Math.PI * 2 * PULSE_CYCLES,
+      duration: TOTAL_DURATION,
       ease: "none",
       onUpdate: () => {
-        const dotScale = 1 + Math.sin(pulseState.p) * 0.15;
-        const ringScale = 1 + Math.sin(pulseState.p + Math.PI / 2) * 0.08;
-        const ringOpacity = 0.5 + Math.sin(pulseState.p) * 0.4;
+        const dotScale = 1 + Math.sin(pulseState.p) * PULSE_DOT_AMP;
+        const ringScale = 1 + Math.sin(pulseState.p + Math.PI / 2) * PULSE_RING_AMP;
+        const ringOpacity =
+          PULSE_RING_OPACITY_BASE + Math.sin(pulseState.p) * PULSE_RING_OPACITY_AMP;
         const dot = document.getElementById("rec-dot");
         const ring = document.getElementById("rec-ring");
         dot.style.transform = `scale(${dotScale})`;
@@ -214,8 +214,8 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
   tl.to(
     flowState,
     {
-      offset: -260, // negative for left-to-right flow
-      duration: 4.0,
+      offset: DASH_FLOW_TOTAL_OFFSET, // negative for L→R flow, positive for R→L
+      duration: TOTAL_DURATION,
       ease: "none",
       onUpdate: () => {
         document.getElementById("data-flow").style.strokeDashoffset = String(flowState.offset);
@@ -225,11 +225,48 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
   );
 
   // Brand fades in early
-  tl.from(".brand", { opacity: 0, y: 16, duration: 0.6, ease: "power3.out" }, 0.4);
+  tl.from(".brand", { opacity: 0, y: 16, duration: 0.6, ease: "power3.out" }, BRAND_AT);
 
   window.__timelines["enrichment-scene"] = tl;
 </script>
 ```
+
+## How to Choose Values
+
+- **MIN_REVOLUTIONS** — minute-hand revolutions across TOTAL_DURATION
+  - Range: 0.5–2.0 (continuous; faster reads as time-lapse)
+  - Constraints: avoid integer revolutions if visible end frame matters (lands back at start)
+
+- **SEC_REVOLUTIONS** — second-hand revolutions across TOTAL_DURATION
+  - Range: 4–10 (should be visibly faster than the minute hand)
+  - Constraints: SEC_REVOLUTIONS > MIN_REVOLUTIONS × 3 for the speed difference to read
+
+- **PULSE_CYCLES** — number of pulse cycles across TOTAL_DURATION
+  - Range: 2–4 over a 3–5 s comp
+  - Effects: ≥ 5 reads as anxious flicker; ≤ 1 reads as forgotten
+
+- **PULSE_DOT_AMP** — dot scale amplitude
+  - Range: 0.05–0.20
+  - Effects: 0.05 = breathing; 0.20 = throbbing
+
+- **PULSE_RING_AMP** — ring scale amplitude (typically lower than DOT_AMP)
+  - Range: 0.04–0.12
+  - Constraints: must be < PULSE_DOT_AMP or ring overshadows dot
+
+- **PULSE_RING_OPACITY_BASE / PULSE_RING_OPACITY_AMP** — ring opacity baseline + sine amplitude
+  - Range: BASE 0.4–0.6; AMP 0.3–0.5
+  - Constraints: BASE − AMP ≥ 0 and BASE + AMP ≤ 1
+
+- **DASH_FLOW_TOTAL_OFFSET** — total stroke-dashoffset change across TOTAL_DURATION
+  - Range: −400 to −100 (negative for L→R) or +100 to +400 (R→L)
+  - Effects: |large| = fast flow; |small| = slow drift
+  - Constraints: must be an integer multiple of the dash period (dash + gap) or the loop end frame shows a phase jump
+
+- **BRAND_AT** — when the brand phrase fades in
+  - Range: 0.3–1.0 s
+  - Effects: too early competes with icon entries; too late feels appended
+
+- **Ease family choices**: rotation = `none` (linear motion is the point); pulse driver = `none` (sine handles the curve); reveal of brand = `power3.out`
 
 ## Signature Motion Patterns
 
@@ -247,28 +284,28 @@ All run inside the paused GSAP timeline so HF seeks deterministically.
 Draw the icon outline first (via [svg-path-draw](svg-path-draw.md)), THEN activate enrichment. The internal animation feels like "the icon woke up" after assembly.
 
 ```js
-// Phase 1: outline draws (0 → 1s)
+// Phase 1: outline draws (0 → OUTLINE_DUR)
 tl.fromTo(
   "#icon-outline",
   { strokeDashoffset: 360 },
-  { strokeDashoffset: 0, duration: 1, ease: "power2.inOut" },
+  { strokeDashoffset: 0, duration: OUTLINE_DUR, ease: "power2.inOut" },
   0,
 );
-// Phase 2: enrichment starts at 1.0s
+// Phase 2: enrichment starts at OUTLINE_DUR
 ```
 
 ### Per-icon entry stagger
 
-For a row of icons all animating, stagger their entries by 0.15s. Each icon's enrichment starts as it fades in, not synchronized — feels organic.
+For a row of icons all animating, stagger their entries. Each icon's enrichment starts as it fades in, not synchronized — feels organic.
 
 ## Key Principles
 
-- **❗ For rotation around an explicit point inside SVG, use the SVG `transform` attribute, NOT CSS transform** — `el.setAttribute('transform', `rotate(${deg} ${cx} ${cy})`)`. The CSS combination `transform: rotate(...)` + `transform-origin: 60px 60px` + `transform-box: fill-box` interprets the origin in the element's OWN bbox-local coordinates, NOT in viewBox coordinates. For a thin `<line>` (whose bbox is the line's narrow envelope), `60 60` in bbox-local refers to a point OUTSIDE the line, so the hand flies along an off-center arc instead of rotating in place. Same trap for small inner shapes (rec-dot circle whose bbox is the small circle, not the full 120×120 viewBox).
+- **❗ For rotation around an explicit point inside SVG, use the SVG `transform` attribute, NOT CSS transform** — `el.setAttribute('transform', `rotate(${deg} ${cx} ${cy})`)`. The CSS combination `transform: rotate(...)` + `transform-origin: 60px 60px` + `transform-box: fill-box` interprets the origin in the element's OWN bbox-local coordinates, NOT in viewBox coordinates. For a thin `<line>` (whose bbox is the line's narrow envelope), `60 60` in bbox-local refers to a point OUTSIDE the line, so the hand flies along an off-center arc instead of rotating in place. Same trap for small inner shapes (rec-dot circle whose bbox is the small circle, not the full viewBox).
 - **For scaling around a center point inside SVG**, use `el.setAttribute('transform', `translate(${cx} ${cy}) scale(${s}) translate(-${cx} -${cy})`)`. Same reason — avoids the CSS bbox-local origin trap.
 - **Run continuous animations inside the timeline** — never CSS `@keyframes` or `requestAnimationFrame`. Both desync from HF's frame-by-frame seek.
-- **Amplitudes subtle** — icons are decorative, not headlines. Pulse scale 0.05-0.15, rotation 360° over 2-4s for clocks, oscillation ±8-15°.
+- **Amplitudes subtle** — icons are decorative, not headlines. Pulse scale within the ranges above; rotation speeds calibrated against composition length, not absolute time.
 - **Multiple parts of the same icon at different phases** — clock minute vs second hand at different speeds, ring vs dot pulse offset by π/2. Pure-sync looks mechanical; phase-offset looks alive.
-- **❗ Climax dwell ≥1s** — if the enrichment is the headline beat, comp must continue ≥1s after the most dramatic moment.
+- **❗ Climax dwell ≥ 1 s** — if the enrichment is the headline beat, the composition must continue ≥ 1 s after the most dramatic moment.
 
 ## Critical Constraints
 
@@ -282,7 +319,7 @@ For a row of icons all animating, stagger their entries by 0.15s. Each icon's en
 ## Combinations
 
 - [svg-path-draw.md](svg-path-draw.md) — outline draws first, enrichment activates second
-- [orbit-3d-entry.md](orbit-3d-entry.md) — orbiting items are enriched icons (clock orbit a brand label)
+- [orbit-3d-entry.md](orbit-3d-entry.md) — orbiting items are enriched icons (clock orbits a brand label)
 - [sine-wave-loop.md](sine-wave-loop.md) — entire icon floats while internal parts animate
 
 ## Pairs with HF skills

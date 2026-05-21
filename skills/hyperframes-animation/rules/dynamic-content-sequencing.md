@@ -25,20 +25,22 @@ The "dynamic" part: items with longer text get more screen time (formula: `baseD
   id="seq-scene"
   data-composition-id="seq-scene"
   data-start="0"
-  data-duration="8"
+  data-duration="{DURATION}"
   data-track-index="0"
 >
   <div class="display">
-    <div class="eyebrow" id="eyebrow">CHAPTER</div>
+    <div class="eyebrow" id="eyebrow">{eyebrow}</div>
     <div class="title" id="title"></div>
     <div class="body" id="body"></div>
     <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
   </div>
-  <div class="brand">— HEYGENVERSE</div>
+  <div class="brand">— {Brand}</div>
 </div>
 ```
 
 ## CSS
+
+Placeholders: `{font}` is the project sans-serif stack; `{bgColor1}`/`{bgColor2}` make the dark backdrop gradient; `{accentColor}` highlights the eyebrow / brand / progress fill; `{textColor}` is the primary readable foreground.
 
 ```css
 .scene {
@@ -47,8 +49,8 @@ The "dynamic" part: items with longer text get more screen time (formula: `baseD
   height: 100%;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at center, #161a3a 0%, #0b0d1f 70%);
-  font-family: "Inter", sans-serif;
+  background: radial-gradient(ellipse at center, {bgColor1} 0%, {bgColor2} 70%);
+  font-family: {font};
 }
 .display {
   display: flex;
@@ -62,7 +64,7 @@ The "dynamic" part: items with longer text get more screen time (formula: `baseD
   font-size: 32px;
   font-weight: 800;
   letter-spacing: 14px;
-  color: #cdb8ff;
+  color: {accentColor};
   text-transform: uppercase;
 }
 .title {
@@ -70,27 +72,27 @@ The "dynamic" part: items with longer text get more screen time (formula: `baseD
   font-weight: 900;
   letter-spacing: -2px;
   line-height: 1;
-  color: #f5f6fb;
+  color: {textColor};
 }
 .body {
   font-size: 48px;
   font-weight: 500;
   line-height: 1.4;
-  color: #cdb8ff;
+  color: {accentColor};
   opacity: 0.9;
   min-height: 160px; /* reserve space so layout doesn't jump */
 }
 .progress-bar {
   width: 600px;
   height: 4px;
-  background: rgba(167, 139, 250, 0.15);
+  background: {accentColor}26; /* ~15% alpha */
   border-radius: 2px;
   margin-top: 16px;
   overflow: hidden;
 }
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #a78bfa 0%, #ec4899 100%);
+  background: linear-gradient(90deg, {accentColor} 0%, {accentColor2} 100%);
   width: 0%;
 }
 .brand {
@@ -101,7 +103,7 @@ The "dynamic" part: items with longer text get more screen time (formula: `baseD
   font-size: 32px;
   font-weight: 900;
   letter-spacing: 12px;
-  color: #a78bfa;
+  color: {accentColor};
 }
 ```
 
@@ -113,45 +115,40 @@ The "dynamic" part: items with longer text get more screen time (formula: `baseD
   window.__timelines = window.__timelines || {};
   const tl = gsap.timeline({ paused: true });
 
-  // Content array — each entry has its own pacing config
+  // Content array — N entries, each with its own pacing config.
+  // Shape: short eyebrow label, short title, longer body sentence, plus per-entry pacing.
+  // The final entry typically uses a larger `hold` (closing beat).
   const CONTENT = [
     {
-      eyebrow: "CHAPTER 1",
-      title: "IDEA",
-      body: "A spark. A direction.",
-      speedFactor: 1.0,
-      hold: 0.6,
+      eyebrow: "{eyebrow1}",
+      title: "{title1}",
+      body: "{body1}",
+      speedFactor: SPEED_FACTOR,
+      hold: HOLD_MID,
     },
     {
-      eyebrow: "CHAPTER 2",
-      title: "BUILD",
-      body: "Prototype. Iterate. Refine.",
-      speedFactor: 1.0,
-      hold: 0.6,
+      eyebrow: "{eyebrow2}",
+      title: "{title2}",
+      body: "{body2}",
+      speedFactor: SPEED_FACTOR,
+      hold: HOLD_MID,
     },
+    // …
     {
-      eyebrow: "CHAPTER 3",
-      title: "SHIP",
-      body: "Render. Publish. Share with the world via HEYGENVERSE.",
-      speedFactor: 1.0,
-      hold: 1.0,
-    },
-    {
-      eyebrow: "OUTRO",
-      title: "HEYGENVERSE",
-      body: "Video. In one prompt.",
-      speedFactor: 1.0,
-      hold: 1.5,
+      eyebrow: "{eyebrowN}",
+      title: "{titleN}",
+      body: "{bodyN}",
+      speedFactor: SPEED_FACTOR,
+      hold: HOLD_FINAL,
     },
   ];
 
-  // Pre-compute absolute start times
-  // Duration per entry: base 1.0s + 0.04s per character of body + hold seconds
-  const BASE_DURATION = 1.0;
-  const MS_PER_CHAR = 0.04;
+  // Pre-compute absolute start times.
+  // Duration per entry: BASE_DURATION + body.length * SEC_PER_CHAR + entry.hold seconds.
+  // BASE_DURATION, SEC_PER_CHAR documented in How to Choose Values.
   let cumulative = 0;
   const TIMELINE = CONTENT.map((entry) => {
-    const dur = BASE_DURATION + entry.body.length * MS_PER_CHAR + entry.hold;
+    const dur = BASE_DURATION + entry.body.length * SEC_PER_CHAR + entry.hold;
     const start = cumulative;
     cumulative += dur;
     return { ...entry, start, end: cumulative };
@@ -170,7 +167,7 @@ The "dynamic" part: items with longer text get more screen time (formula: `baseD
   const bodyEl = document.getElementById("body");
   const progressEl = document.getElementById("progress-fill");
 
-  const TOTAL_DURATION = cumulative + 0.5;
+  const TOTAL_DURATION = cumulative + TAIL_PAD;
   const driver = { t: 0 };
   let lastTitle = "";
 
@@ -237,12 +234,55 @@ document
 ## Key Principles
 
 - **Pre-compute timeline once, not per-frame** — building absolute start/end at script init means onUpdate is O(log n) reverse-search, not O(n²).
-- **Per-item duration formula: `base + length × msPerChar + hold`** — longer text needs more reading time. 0.03-0.06s per character is a comfortable read pace for video.
-- **Hold time between items 0.5-1.5s** — the "dwell" between content beats. Shorter feels rushed; longer feels lazy.
+- **Per-item duration formula: `BASE_DURATION + body.length × SEC_PER_CHAR + hold`** — longer text needs more reading time. The formula is the load-bearing teaching of this rule; ranges for each const are in How to Choose Values.
 - **Reserve `min-height` on body element** — content height varies per item; without reservation, layout jumps and downstream elements (progress bar, brand) jitter.
 - **DOM update on transition, not every frame** — track `lastTitle` (or whatever key) and only call `textContent =` when it changes. Per-frame textContent assignment causes flicker in HF render.
 - **Optional progress indicator** — a thin bar at the bottom showing 0-100% completes the "this is a sequence" framing.
-- **❗ Climax dwell ≥1s on final entry** — the outro should have hold ≥1.0 so the final brand/CTA reads.
+- **Climax dwell longer than mid-sequence dwell** — the outro's `hold` (HOLD_FINAL) should exceed the in-sequence `hold` (HOLD_MID) so the final brand/CTA lands.
+
+## How to Choose Values
+
+- **BASE_DURATION** — minimum visible time of an entry regardless of content length
+  - Range: 0.6-1.5 s
+  - Effects: low end snaps through short entries too fast for the eye; high end stalls on short titles
+  - Constraints: ensures even one-word entries have time to read
+  - Reference: see `examples/messaging-multi-phrase.html` (and any blueprint that uses this rule)
+
+- **SEC_PER_CHAR** — extra time added per body character
+  - Range: 0.03-0.06 s/char (≈ 17-33 chars/sec read pace for video)
+  - Effects: low end feels rushed for paragraph-style bodies; high end feels slow when bodies are short
+  - Constraints: should be uniform across the sequence so the pace reads as one engine; for languages with wider characters, lean to the high end
+  - Reference: see `examples/messaging-multi-phrase.html` (and any blueprint that uses this rule)
+
+- **HOLD_MID** — dwell after the typing of a non-final entry completes
+  - Range: 0.5-1.0 s
+  - Effects: low end feels rushed; high end feels lazy
+  - Constraints: `HOLD_MID < HOLD_FINAL`
+  - Reference: see `examples/messaging-multi-phrase.html` (and any blueprint that uses this rule)
+
+- **HOLD_FINAL** — dwell on the last entry (outro / climax)
+  - Range: 1.0-2.0 s
+  - Effects: low end truncates the closing beat; high end overstays
+  - Constraints: must exceed HOLD_MID by a clear margin so the close reads as a beat, not another mid-sequence pause
+  - Reference: see `examples/messaging-multi-phrase.html` (and any blueprint that uses this rule)
+
+- **SPEED_FACTOR** — per-entry pacing multiplier
+  - Range: 0.5-2.0 (default 1.0)
+  - Effects: <1 stretches an entry's body-driven duration (good for high-density passages); >1 compresses it
+  - Constraints: discrete choice — use 1.0 unless one entry needs special pacing; if every entry uses the same factor, fold it into SEC_PER_CHAR instead
+  - Reference: see `examples/messaging-multi-phrase.html` (and any blueprint that uses this rule)
+
+- **TAIL_PAD** — seconds added to `TOTAL_DURATION` after the last entry's `end`
+  - Range: 0.0-1.0 s
+  - Effects: 0 ends the driver exactly at the last `hold` completion; >0 leaves a quiet beat (useful before a transition to the next composition)
+  - Constraints: if downstream is another composition, prefer 0 and handle the breath at the composition seam
+  - Reference: see `examples/messaging-multi-phrase.html` (and any blueprint that uses this rule)
+
+- **CONTENT length (N)** — number of entries in the sequence
+  - Range: 3-6 entries
+  - Effects: <3 isn't a sequence (use a static scene); >6 drags
+  - Constraints: each entry's `title` must fit one line at the chosen `.title` fontSize; bodies should fit within `min-height` after wrapping
+  - Reference: see `examples/messaging-multi-phrase.html` (and any blueprint that uses this rule)
 
 ## Critical Constraints
 

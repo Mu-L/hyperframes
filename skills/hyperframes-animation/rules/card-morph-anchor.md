@@ -33,17 +33,17 @@ The persistent container provides visual continuity even as content and shape ch
   <!-- The persistent morph container -->
   <div class="morph-card">
     <div class="content-old">
-      <h2>Hedronverse — wide hero banner</h2>
-      <p>full-width feature card content</p>
+      <h2>{shotOneHeadline}</h2>
+      <p>{shotOneSubcopy}</p>
     </div>
     <div class="content-new">
-      <img src="hedronverse-logo.svg" alt="logo" />
+      <img src="{shotTwoIcon}" alt="logo" />
     </div>
   </div>
 
   <!-- Optional: actual next-shot element behind the morph -->
   <div class="next-shot-anchor">
-    <img src="hedronverse-avatar.png" alt="avatar" />
+    <img src="{nextShotAnchor}" alt="anchor" />
   </div>
 </div>
 ```
@@ -63,10 +63,10 @@ Card starts as a wide rectangle (shot 1 state). All properties present from the 
 
 .morph-card {
   position: relative;
-  width: 800px;
-  height: 540px;
-  border-radius: 28px;
-  background: #1a1a2e;
+  width: {SHOT_ONE_W}px;
+  height: {SHOT_ONE_H}px;
+  border-radius: {SHOT_ONE_RADIUS}px;
+  background: {surfaceShotOne};
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   display: grid;
@@ -109,55 +109,66 @@ Card starts as a wide rectangle (shot 1 state). All properties present from the 
   window.__timelines = window.__timelines || {};
   const tl = gsap.timeline({ paused: true });
 
-  // Hold shot 1 — let the viewer register the wide banner.
-  // (Implicit: nothing happens 0 → 1s)
+  // Named constants — assign in your example only. See "How to Choose Values".
+  const HOLD_BEAT; // s — pre-morph dwell on shot 1
+  const MORPH_START; // s — usually = HOLD_BEAT
+  const MORPH_DUR; // s — full container morph length
+  const SHOT_TWO_W; // px — final container width
+  const SHOT_TWO_H; // px — final container height
+  const SHOT_TWO_RADIUS; // px — ≤ min(SHOT_TWO_W, SHOT_TWO_H) / 2
+  const OLD_FADE_FRAC; // 0..0.5 — fraction of MORPH_DUR for old content fade
+  const NEW_FADE_FRAC; // 0..0.5 — fraction of MORPH_DUR for new content fade
+  const FINAL_FADE_FRAC; // 0..0.3 — optional tail fade for handoff
+  // {surfaceShotTwo} is a CSS background token (solid or gradient).
 
-  // Phase 1 (1.0 → 2.0s) — Morph container properties simultaneously
+  // Hold shot 1 — let the viewer register the wide banner before morphing.
+
+  // Phase 1 — Morph container properties simultaneously
   tl.to(
     ".morph-card",
     {
-      width: 160,
-      height: 160,
-      borderRadius: 80,
-      background: "linear-gradient(135deg, #6366f1 0%, #ec4899 100%)",
-      duration: 1.0,
+      width: SHOT_TWO_W,
+      height: SHOT_TWO_H,
+      borderRadius: SHOT_TWO_RADIUS,
+      background: "{surfaceShotTwo}",
+      duration: MORPH_DUR,
       ease: "power2.inOut",
     },
-    1.0,
+    MORPH_START,
   );
 
-  // Phase 2 — Old content fades during the FIRST 40% of the morph (1.0 → 1.4s)
+  // Phase 2 — Old content fades during the FIRST OLD_FADE_FRAC of the morph
   tl.to(
     ".content-old",
     {
       opacity: 0,
-      duration: 0.4,
+      duration: MORPH_DUR * OLD_FADE_FRAC,
       ease: "power1.in",
     },
-    1.0,
+    MORPH_START,
   );
 
-  // Phase 3 — New content fades in during the LAST 40% of the morph (1.6 → 2.0s)
+  // Phase 3 — New content fades in during the LAST NEW_FADE_FRAC of the morph
   tl.to(
     ".content-new",
     {
       opacity: 1,
-      duration: 0.4,
+      duration: MORPH_DUR * NEW_FADE_FRAC,
       ease: "power1.out",
     },
-    1.6,
+    MORPH_START + MORPH_DUR * (1 - NEW_FADE_FRAC),
   );
 
-  // Optional Phase 4 — Final fade: morph container disappears at 2.0 → 2.15s,
-  // revealing the actual next-shot element behind it
+  // Optional Phase 4 — Final fade: morph container disappears at the very end,
+  // revealing the actual next-shot element behind it.
   tl.to(
     ".morph-card",
     {
       opacity: 0,
-      duration: 0.15,
+      duration: MORPH_DUR * FINAL_FADE_FRAC,
       ease: "power1.in",
     },
-    2.0,
+    MORPH_START + MORPH_DUR * (1 - FINAL_FADE_FRAC),
   );
 
   window.__timelines["morph-scene"] = tl;
@@ -166,14 +177,50 @@ Card starts as a wide rectangle (shot 1 state). All properties present from the 
 
 ## Key Properties to Morph
 
-| Property           | Example                                                 | Visual effect                |
-| ------------------ | ------------------------------------------------------- | ---------------------------- |
-| `width` / `height` | 800×540 → 160×160                                       | wide card shrinks to an icon |
-| `borderRadius`     | 28px → 80px (half of new size)                          | rectangle becomes a circle   |
-| `background`       | `#1a1a2e` → `linear-gradient(135deg, #6366f1, #ec4899)` | container identity shifts    |
-| `boxShadow`        | subtle → colored glow                                   | emphasis changes             |
+| Property           | Shape of change                                                | Visual effect                |
+| ------------------ | -------------------------------------------------------------- | ---------------------------- |
+| `width` / `height` | `SHOT_ONE_W × SHOT_ONE_H` → `SHOT_TWO_W × SHOT_TWO_H`          | wide card shrinks to an icon |
+| `borderRadius`     | `SHOT_ONE_RADIUS` → `SHOT_TWO_RADIUS` (≤ half of smaller side) | rectangle becomes a circle   |
+| `background`       | `{surfaceShotOne}` → `{surfaceShotTwo}` (solid or gradient)    | container identity shifts    |
+| `boxShadow`        | base shadow → accent glow token                                | emphasis changes             |
 
 GSAP tweens all of these simultaneously when included in one `tl.to(...)` call.
+
+## How to Choose Values
+
+- **HOLD_BEAT** — pre-morph dwell so the viewer registers shot 1 before it changes
+  - Range: 0.6-1.5 s
+  - Effects: low end feels rushed / glitchy; high end stalls pacing
+  - Constraints: must be ≥ shot 1's content entry settle time
+- **MORPH_START** — when the container morph begins
+  - Range: equal to `HOLD_BEAT` in the canonical pattern
+  - Constraints: must be > any shot-1 entry tween end
+- **MORPH_DUR** — full length of the simultaneous container morph
+  - Range: 0.6-1.2 s
+  - Effects: low end reads as a snap; high end loses momentum
+  - Constraints: short morphs (<0.5s) cannot fit both old-fade and new-fade
+- **SHOT_TWO_W / SHOT_TWO_H** — final container dimensions
+  - Range: 80-400 px when handing off to an icon-sized anchor
+  - Constraints: if handing off (`.next-shot-anchor`), MUST match the anchor's dimensions exactly to avoid a visible pop
+- **SHOT_TWO_RADIUS** — final corner radius (use to read as circle / pill / soft-rect)
+  - Range: 0 to `min(SHOT_TWO_W, SHOT_TWO_H) / 2`
+  - Effects: half-of-smaller-side = perfect circle; smaller = soft rect
+  - Constraints: > half is visually clamped — wastes the tween
+- **OLD_FADE_FRAC** — fraction of `MORPH_DUR` over which shot-1 content fades out, starting at `MORPH_START`
+  - Range: 0.3-0.5
+  - Effects: low end clips shot 1 too early; high end overlaps with shot 2 content
+  - Constraints: `OLD_FADE_FRAC + NEW_FADE_FRAC ≤ 1` (gap between is the "shape-only" moment)
+- **NEW_FADE_FRAC** — fraction of `MORPH_DUR` over which shot-2 content fades in, ending at `MORPH_START + MORPH_DUR`
+  - Range: 0.3-0.5
+  - Effects: symmetric to OLD_FADE_FRAC
+- **FINAL_FADE_FRAC** — optional tail fraction during which the morph container itself fades to 0 for handoff
+  - Range: 0 (no handoff) or 0.1-0.2
+  - Constraints: only use when `.next-shot-anchor` matches the morph's final visual exactly
+- **Ease family** — discrete choice
+  - Options: `power2.inOut` (canonical, balanced), `power3.inOut` (snappier), `expo.inOut` (most cinematic but can feel sluggish at low durations)
+  - Avoid `back.out` / `elastic.out` on the morph itself — overshoot fights the dimensional change
+
+CSS-side placeholders (`SHOT_ONE_W`, `SHOT_ONE_H`, `SHOT_ONE_RADIUS`, `{surfaceShotOne}`, `{surfaceShotTwo}`) take real values in the example. Pick `{surfaceShotOne}` and `{surfaceShotTwo}` so the gradient/solid stops counts match (GSAP can interpolate background gradients only when stop counts agree).
 
 ## Key Principles
 

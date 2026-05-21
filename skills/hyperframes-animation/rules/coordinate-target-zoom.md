@@ -46,21 +46,21 @@ Note: the formula does NOT depend on S. The translate amount is the same whether
       <div class="content">
         <!-- Several layout elements; one is the "target" -->
         <div class="card other">
-          <div class="label">PLAN A</div>
-          <div class="price">$0</div>
+          <div class="label">{label1}</div>
+          <div class="price">{price1}</div>
         </div>
         <div class="card other">
-          <div class="label">PLAN B</div>
-          <div class="price">$19</div>
+          <div class="label">{label2}</div>
+          <div class="price">{price2}</div>
         </div>
         <div class="card target" id="target-card">
-          <div class="label">HEYGENVERSE PRO</div>
-          <div class="price">$49</div>
-          <div class="tag">SCALES WITH YOU</div>
+          <div class="label">{targetLabel}</div>
+          <div class="price">{targetPrice}</div>
+          <div class="tag">{targetTagline}</div>
         </div>
         <div class="card other">
-          <div class="label">PLAN D</div>
-          <div class="price">$199</div>
+          <div class="label">{label4}</div>
+          <div class="price">{price4}</div>
         </div>
       </div>
     </div>
@@ -75,8 +75,8 @@ Note: the formula does NOT depend on S. The translate amount is the same whether
   position: relative;
   width: 100%;
   height: 100%;
-  overflow: hidden;
-  background: radial-gradient(ellipse at center, #161a3a 0%, #0b0d1f 70%);
+  overflow: hidden;        /* REQUIRED — see Critical Constraints */
+  background: {bgGradient};
 }
 .zoom-outer {
   width: 100%;
@@ -93,41 +93,41 @@ Note: the formula does NOT depend on S. The translate amount is the same whether
 }
 .content {
   display: flex;
-  gap: 48px;
+  gap: CARD_GAP;
 }
 .card {
-  width: 360px;
-  padding: 48px 32px;
-  border-radius: 24px;
-  background: rgba(20, 24, 56, 0.75);
-  border: 1px solid rgba(167, 139, 250, 0.18);
+  width: CARD_WIDTH;
+  padding: CARD_PADDING;
+  border-radius: CARD_RADIUS;
+  background: {cardBg};
+  border: 1px solid {cardBorder};
   text-align: center;
-  font-family: "Inter", sans-serif;
+  font-family: {font};
 }
 .card.target {
-  background: linear-gradient(160deg, rgba(167, 139, 250, 0.4) 0%, rgba(20, 24, 56, 0.85) 70%);
-  border: 2px solid rgba(167, 139, 250, 0.6);
-  box-shadow: 0 24px 80px rgba(167, 139, 250, 0.3);
+  background: {targetCardBg};       /* slightly brighter than .card */
+  border: 2px solid {targetBorder};
+  box-shadow: {targetGlow};
 }
 .label {
-  font-size: 28px;
+  font-size: LABEL_FONT_SIZE;
   font-weight: 800;
   letter-spacing: 6px;
   text-transform: uppercase;
-  color: #cdb8ff;
+  color: {labelColor};
 }
 .price {
-  font-size: 96px;
+  font-size: PRICE_FONT_SIZE;
   font-weight: 900;
-  color: #f5f6fb;
+  color: {textColor};
   margin: 16px 0;
   font-variant-numeric: tabular-nums;
 }
 .tag {
-  font-size: 20px;
+  font-size: TAG_FONT_SIZE;
   font-weight: 700;
   letter-spacing: 4px;
-  color: #a78bfa;
+  color: {accentColor};
   opacity: 0;
 }
 ```
@@ -140,50 +140,54 @@ Note: the formula does NOT depend on S. The translate amount is the same whether
   window.__timelines = window.__timelines || {};
   const tl = gsap.timeline({ paused: true });
 
-  // Target is the 3rd card. Cards are 360px wide + 48px gap = 408px center-to-center.
-  // 4 cards span: total width 4*360 + 3*48 = 1584px, centered at viewport center.
-  // Card 3 (target) is at index 2 (0-indexed). Its center offset from layout center:
-  //   index_offset = 2 - (4 - 1) / 2 = 2 - 1.5 = +0.5
-  //   x_offset = 0.5 * 408 = 204px to the right of center
-  const TARGET_OFFSET_X = 204;
-  const TARGET_OFFSET_Y = 0;
-  const ZOOM_SCALE = 2.0;
+  // TARGET_OFFSET_X / TARGET_OFFSET_Y — baked at author time from the layout:
+  //   index_offset = targetIndex - (N - 1) / 2
+  //   TARGET_OFFSET_X = index_offset × (CARD_WIDTH + CARD_GAP)
+  // (for a horizontal row of N equal-width cards; for vertical / grid layouts derive analogously)
 
   // Counter-translation = -offset (inner translate cancels target offset BEFORE outer scales)
   const counterX = -TARGET_OFFSET_X;
   const counterY = -TARGET_OFFSET_Y;
 
-  // Phase 1 — cards reveal (0 → 0.8s)
-  tl.from(".card", { opacity: 0, y: 32, stagger: 0.1, duration: 0.6, ease: "power3.out" }, 0.2);
+  // Phase 1 — cards reveal
+  tl.from(
+    ".card",
+    { opacity: 0, y: REVEAL_Y, stagger: REVEAL_STAGGER, duration: REVEAL_DUR, ease: "power3.out" },
+    REVEAL_START,
+  );
 
-  // Phase 2 — pause to let viewer scan the layout (rest at 1.2s)
+  // Phase 2 — pause to let viewer scan the layout
 
-  // Phase 3 — zoom into target (1.5s → 3.0s)
+  // Phase 3 — zoom into target
   tl.to(
     "#zoom-outer",
     {
       scale: ZOOM_SCALE,
-      duration: 1.5,
+      duration: ZOOM_DUR,
       ease: "power3.inOut",
     },
-    1.5,
+    ZOOM_START,
   );
   tl.to(
     "#zoom-inner",
     {
       x: counterX,
       y: counterY,
-      duration: 1.5,
+      duration: ZOOM_DUR,
       ease: "power3.inOut",
     },
-    1.5,
+    ZOOM_START,
   );
 
-  // Phase 4 — target "tag" reveals inside the zoomed-in target (3.0s → 3.5s)
-  tl.to(".target .tag", { opacity: 1, duration: 0.5, ease: "power2.out" }, 3.0);
+  // Phase 4 — target "tag" reveals inside the zoomed-in target
+  tl.to(
+    ".target .tag",
+    { opacity: 1, duration: TAG_REVEAL_DUR, ease: "power2.out" },
+    TAG_REVEAL_START,
+  );
 
-  // Phase 5 — climax dwell (3.5 → 5.0s) — viewer reads $49 + SCALES WITH YOU
-  // (no additional motion; the zoomed-in state holds for ~1.5s)
+  // Phase 5 — climax dwell — viewer reads the target content
+  // (no additional motion; the zoomed-in state holds for DWELL_DUR seconds)
 
   window.__timelines["zoom-scene"] = tl;
 </script>
@@ -214,6 +218,54 @@ Reverse the phases — start at zoomed-in, then `scale: 1` + `x: 0, y: 0` to pul
 ### Multi-target zoom sequence
 
 Chain multiple zooms: target A (1.5-2.5s) → pause → target B (3-4s) → pull back (4.5-5s). Each segment needs its own counter-translation pair.
+
+## How to Choose Values
+
+### Layout
+
+- **CARD_WIDTH / CARD_GAP / CARD_PADDING / CARD_RADIUS** — geometric layout.
+  - Constraints: `N × CARD_WIDTH + (N-1) × CARD_GAP < viewportWidth` so all cards fit pre-zoom
+  - Effects: smaller cards → more siblings on screen → busier composition; larger cards → fewer siblings, more emphasis per card
+- **LABEL_FONT_SIZE / PRICE_FONT_SIZE / TAG_FONT_SIZE** — typographic hierarchy.
+  - Range: tag < label < price (price is the focal element after zoom; sizing it largest reinforces this)
+
+### Reveal phase
+
+- **REVEAL_START** — when the cards begin fading in.
+  - Constraints: typically a small offset (~0.2s) for a beat of black before content appears
+- **REVEAL_DUR** — per-card fade-up duration.
+  - Range: 0.4-0.8s
+- **REVEAL_Y** — initial vertical offset of each card before fade-up (in px).
+  - Range: 16-48 px; bigger feels "thrown in," smaller feels gentle
+- **REVEAL_STAGGER** — delay between consecutive card reveals.
+  - Range: 0.06-0.15s; calibrated so all cards finish before `ZOOM_START`
+
+### Zoom phase
+
+- **ZOOM_START** — when the zoom begins.
+  - Constraints: `≥ REVEAL_START + REVEAL_DUR + (N-1) × REVEAL_STAGGER + viewer-scan-time` (give viewer 0.5-1.5s to read the layout before zooming)
+- **ZOOM_DUR** — duration of the zoom tween.
+  - Range: 1.0-2.0s; under 0.8s feels like a teleport, over 2.5s drags
+  - Constraints: scale tween + counter-translate tween MUST share this duration AND ease
+- **ZOOM_SCALE** — final magnification.
+  - Range: 1.5× (modest emphasis) → 3× (dominant focus) → 5×+ (cinematic extreme)
+  - Constraints: card content must remain crisp at this scale; raster source media needs `sourceResolution ≥ rendered × ZOOM_SCALE`
+
+### Target reveal + dwell
+
+- **TAG_REVEAL_START** — when the target's hidden tag fades in.
+  - Constraints: `≥ ZOOM_START + ZOOM_DUR` (only reveal after the zoom settles, so viewer's eye is already on the target)
+- **TAG_REVEAL_DUR** — tag fade-in duration.
+  - Range: 0.3-0.6s
+- **DWELL_DUR** — post-zoom hold so the viewer reads the target.
+  - Range: ≥ 1.0s after tag reveals (see "Climax dwell" in Key Principles)
+
+### Color tokens
+
+- **{bgGradient}** — typically a dark radial gradient to vignette the cards
+- **{cardBg} / {cardBorder}** — non-target cards (subtle, recessive)
+- **{targetCardBg} / {targetBorder} / {targetGlow}** — target card visually brighter / haloed so the eye lands there before the zoom even fires
+- **{labelColor} / {textColor} / {accentColor}** — hierarchical text colors; `{accentColor}` reserved for the tag (pops on reveal)
 
 ## Key Principles
 

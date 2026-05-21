@@ -27,7 +27,7 @@ The trick to a "no jump" transition from entry to idle: at `phase = 0`, `sin(0) 
   data-track-index="0"
 >
   <div class="stack">
-    <div class="hero" id="hero">HEYGENVERSE</div>
+    <div class="hero" id="hero">{HeroLabel}</div>
     <div class="dot" id="dot"></div>
   </div>
 </div>
@@ -42,30 +42,30 @@ The trick to a "no jump" transition from entry to idle: at `phase = 0`, `sin(0) 
   height: 100%;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at center, #161a3a 0%, #0b0d1f 70%);
+  background: {bgGradient};
 }
 .stack {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 56px;
+  gap: STACK_GAP;
 }
 .hero {
-  font-family: "Inter", sans-serif;
+  font-family: {font};
   font-weight: 900;
-  font-size: 180px;
-  letter-spacing: 8px;
-  color: #f5f6fb;
+  font-size: HERO_FONT_SIZE;
+  letter-spacing: HERO_LETTER_SPACING;
+  color: {textColor};
   text-transform: uppercase;
   /* Element gets its post-entry resting transform; idle only ADDS to it */
   will-change: transform;
 }
 .dot {
-  width: 32px;
-  height: 32px;
+  width: DOT_SIZE;
+  height: DOT_SIZE;
   border-radius: 50%;
-  background: #a78bfa;
-  box-shadow: 0 0 32px rgba(167, 139, 250, 0.7);
+  background: {accentColor};
+  box-shadow: {accentGlow};
 }
 ```
 
@@ -83,42 +83,39 @@ The trick to a "no jump" transition from entry to idle: at `phase = 0`, `sin(0) 
   // Phase 1 — entry beat (e.g. headline fade-up)
   tl.fromTo(
     hero,
-    { opacity: 0, y: 24, scale: 0.96 },
-    { opacity: 1, y: 0, scale: 1, duration: 0.9, ease: "power3.out" },
+    { opacity: 0, y: ENTRY_Y, scale: ENTRY_SCALE },
+    { opacity: 1, y: 0, scale: 1, duration: ENTRY_DUR, ease: "power3.out" },
     0,
   );
   tl.fromTo(
     dot,
     { opacity: 0, scale: 0 },
-    { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.6)" },
-    0.4,
+    { opacity: 1, scale: 1, duration: DOT_ENTRY_DUR, ease: `back.out(${BOUNCE_FACTOR})` },
+    DOT_ENTRY_START,
   );
 
-  // Phase 2 — idle breathing. Starts at idleStartTime AFTER entry settles.
-  // Drive a phase 0 → 2π * cycles via a single tween, write sin() into transforms.
-  const idleStartTime = 1.0; // seconds — entry beat done by ~0.9s
-  const idleDurationSec = 5.0; // remaining composition time
-  const CYCLES = 2.5; // 2.5 full breathing cycles across idle duration
+  // Phase 2 — idle breathing. Starts at IDLE_START_TIME AFTER entry settles.
+  // Drive a phase 0 → 2π * CYCLES via a single tween, write sin() into transforms.
 
   const phase = { p: 0 };
   tl.to(
     phase,
     {
       p: Math.PI * 2 * CYCLES,
-      duration: idleDurationSec,
+      duration: IDLE_DUR,
       ease: "none",
       onUpdate: () => {
-        // Hero: scale breathes ±0.012, y bobs ±4px
-        const scale = 1 + Math.sin(phase.p) * 0.012;
-        const y = Math.sin(phase.p) * 4;
+        // Hero: scale breathes ±SCALE_AMP, y bobs ±Y_AMP_PX
+        const scale = 1 + Math.sin(phase.p) * SCALE_AMP;
+        const y = Math.sin(phase.p) * Y_AMP_PX;
         hero.style.transform = `translateY(${y}px) scale(${scale})`;
 
         // Dot: out-of-phase scale (offset by π/2) — feels alive vs synced
-        const dotScale = 1 + Math.sin(phase.p + Math.PI / 2) * 0.08;
+        const dotScale = 1 + Math.sin(phase.p + Math.PI / 2) * DOT_SCALE_AMP;
         dot.style.transform = `scale(${dotScale})`;
       },
     },
-    idleStartTime,
+    IDLE_START_TIME,
   );
 
   window.__timelines["idle-scene"] = tl;
@@ -132,8 +129,8 @@ The trick to a "no jump" transition from entry to idle: at `phase = 0`, `sin(0) 
 Combining frequencies feels more alive than pure sine:
 
 ```js
-const primary = Math.sin(phase.p) * 0.012; // slow main
-const secondary = Math.sin(phase.p * 3.0) * 0.004; // faster overlay
+const primary = Math.sin(phase.p) * SCALE_AMP_PRIMARY;
+const secondary = Math.sin(phase.p * OCTAVE_RATIO) * SCALE_AMP_SECONDARY; // higher-frequency overlay
 const scale = 1 + primary + secondary;
 ```
 
@@ -142,8 +139,8 @@ const scale = 1 + primary + secondary;
 If entry is interactive or skippable, gate the idle:
 
 ```js
-const idleActive = entryProgress >= 0.95;
-const scale = idleActive ? 1 + Math.sin((time - idleStart) / 0.5) * 0.012 : 1;
+const idleActive = entryProgress >= GATE_THRESHOLD;
+const scale = idleActive ? 1 + Math.sin((time - IDLE_START_TIME) / PERIOD) * SCALE_AMP : 1;
 ```
 
 ### Period vs cycle math
@@ -156,6 +153,63 @@ const value = Math.sin(frame / divisor) * amplitude;
 ```
 
 For HF (`onUpdate` doesn't expose frame directly), use the tween's `phase` value: drive `p: Math.PI * 2 * cyclesWanted` over `duration: idleDurationSec`.
+
+## How to Choose Values
+
+### Layout / typography
+
+- **STACK_GAP** — vertical gap between hero and dot.
+  - Range: 0.2-0.4× `HERO_FONT_SIZE`
+- **HERO_FONT_SIZE / HERO_LETTER_SPACING** — typographic emphasis.
+  - Range: 100-240 px for full-bleed compositions; spacing 0.04-0.06em
+- **DOT_SIZE** — accent indicator size.
+  - Range: ~0.15-0.25× `HERO_FONT_SIZE` so the dot reads as accent, not a peer
+- **{accentGlow}** — `box-shadow` halo on the dot; typically `0 0 (DOT_SIZE) rgba(accentColor, 0.5-0.7)`
+
+### Entry phase
+
+- **ENTRY_Y / ENTRY_SCALE** — initial state before fade-up.
+  - Range: `ENTRY_Y` 16-32 px (subtle rise), `ENTRY_SCALE` 0.94-0.98 (subtle inflation)
+- **ENTRY_DUR** — hero fade-up duration.
+  - Range: 0.6-1.2s; bigger heroes want a longer settle
+- **DOT_ENTRY_START** — when the dot pops in relative to hero.
+  - Constraints: typically `≈ 0.4-0.6× ENTRY_DUR` so the dot lands while the hero is still settling, not after
+- **DOT_ENTRY_DUR** — dot back-out pop duration.
+  - Range: 0.4-0.7s
+- **BOUNCE_FACTOR** — `back.out(BOUNCE_FACTOR)` overshoot strength on the dot pop.
+  - Range: 1.4 (soft) → 2.0 (firm) → 2.8 (cartoony)
+
+### Idle phase
+
+- **IDLE_START_TIME** — when breathing begins.
+  - Constraints: `≥ ENTRY_DUR + small buffer (~0.1s)` so the breath doesn't fight the entry tail. `sin(0) = 0` at this moment, so the offset is exactly the entry's resting state — no jump
+- **IDLE_DUR** — breath tween length.
+  - Constraints: must equal `TOTAL_DURATION − IDLE_START_TIME` to fill the composition with motion
+- **CYCLES** — number of full breath cycles across `IDLE_DUR`.
+  - Range: `IDLE_DUR / 3s ≤ CYCLES ≤ IDLE_DUR / 1.5s` (cycle period 1.5-3s reads as natural breathing)
+- **SCALE_AMP** — sine amplitude on scale (hero).
+  - Range: 0.012-0.04 — see Key Principles for the "alive but resting" sweet spot
+- **Y_AMP_PX** — sine amplitude on y translation (hero).
+  - Range: 2-6 px
+- **DOT_SCALE_AMP** — sine amplitude on dot scale (offset by π/2 for out-of-phase motion).
+  - Range: 0.04-0.12 — larger than hero amplitude is fine because the dot is a small accent
+- **PERIOD** (conditional-activation variation) — seconds per cycle when using the `(time - IDLE_START_TIME) / PERIOD` form.
+  - Range: 1.5-3s
+- **GATE_THRESHOLD** (conditional-activation variation) — entryProgress required to start idle.
+  - Range: 0.85-1.0; lower gates start idle slightly before entry completes for an overlap
+
+### Multi-octave variation
+
+- **SCALE_AMP_PRIMARY / SCALE_AMP_SECONDARY** — amplitudes of the two stacked sines.
+  - Constraints: `SCALE_AMP_PRIMARY > SCALE_AMP_SECONDARY` (secondary is a higher-frequency overlay, not a peer); combined max amplitude should stay within the SCALE_AMP range above
+- **OCTAVE_RATIO** — frequency multiplier of secondary relative to primary.
+  - Range: 2.0-4.0 (whole-number-ish ratios feel musical/coherent; non-integer ratios feel organic/unpredictable)
+
+### Color tokens
+
+- **{bgGradient}** — typically a dark radial gradient so the lit hero pops
+- **{textColor}** — high-contrast against `{bgGradient}`
+- **{accentColor}** — single accent reserved for the dot; the glow color in `{accentGlow}` is the same hue
 
 ## Key Principles
 

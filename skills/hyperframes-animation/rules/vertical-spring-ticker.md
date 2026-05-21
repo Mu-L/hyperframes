@@ -31,17 +31,20 @@ Each spring fires at a different time, settles, then the next fires. When summed
   data-track-index="0"
 >
   <div class="stack">
-    <div class="eyebrow">YOUR ROLE</div>
+    <div class="eyebrow">{eyebrow}</div>
     <div class="ticker" id="ticker">
       <div class="stack-inner" id="stack-inner">
-        <div class="item">CREATOR</div>
-        <div class="item">DESIGNER</div>
-        <div class="item">PM</div>
-        <div class="item">DEV</div>
-        <div class="item">FOUNDER</div>
+        <!-- One .item per state the ticker rolls through.
+             The example file lists concrete labels; for the rule, treat
+             these as positional slots ({item0} … {itemN}). -->
+        <div class="item">{item0}</div>
+        <div class="item">{item1}</div>
+        <div class="item">{item2}</div>
+        <div class="item">{item3}</div>
+        <div class="item">{itemN}</div>
       </div>
     </div>
-    <div class="brand">— BUILT WITH HEYGENVERSE</div>
+    <div class="brand">{footerLine}</div>
   </div>
 </div>
 ```
@@ -55,53 +58,53 @@ Each spring fires at a different time, settles, then the next fires. When summed
   height: 100%;
   display: grid;
   place-items: center;
-  background: radial-gradient(ellipse at center, #161a3a 0%, #0b0d1f 70%);
-  font-family: "Inter", sans-serif;
+  background: {bgColor};
+  font-family: {font};
 }
 .stack {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 32px;
+  gap: STACK_GAP;
 }
 .eyebrow {
-  font-size: 32px;
+  font-size: EYEBROW_FONT_SIZE;
   font-weight: 800;
   letter-spacing: 14px;
   text-transform: uppercase;
-  color: #cdb8ff;
+  color: {accentColor};
 }
 /* MANDATORY: container height matches the per-item height exactly */
 .ticker {
-  width: 1100px;
-  height: 200px;
+  width: TICKER_WIDTH;
+  height: ITEM_HEIGHT;       /* MUST match .item height */
   overflow: hidden;
-  border-top: 2px solid rgba(167, 139, 250, 0.3);
-  border-bottom: 2px solid rgba(167, 139, 250, 0.3);
+  border-top: 2px solid {dividerColor};
+  border-bottom: 2px solid {dividerColor};
   position: relative;
 }
 .stack-inner {
   display: flex;
-  flex-direction: column; /* MANDATORY for vertical ticker */
+  flex-direction: column;    /* MANDATORY for vertical ticker */
   will-change: transform;
 }
 .item {
-  height: 200px; /* MUST equal .ticker height */
+  height: ITEM_HEIGHT;       /* MUST equal .ticker height */
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 160px;
+  font-size: ITEM_FONT_SIZE;
   font-weight: 900;
   letter-spacing: 8px;
   text-transform: uppercase;
-  color: #f5f6fb;
+  color: {textColor};
   /* font-variant-numeric: tabular-nums; — for numeric tickers */
 }
 .brand {
-  font-size: 40px;
+  font-size: BRAND_FONT_SIZE;
   font-weight: 800;
   letter-spacing: 10px;
-  color: #a78bfa;
+  color: {accentColor};
   text-transform: uppercase;
 }
 ```
@@ -114,8 +117,6 @@ Each spring fires at a different time, settles, then the next fires. When summed
   window.__timelines = window.__timelines || {};
   const tl = gsap.timeline({ paused: true });
 
-  const ITEM_HEIGHT = 200;
-  const STEPS = 4; // jump from item 0 ("CREATOR") to item 4 ("FOUNDER") = 4 steps
   const innerEl = document.getElementById("stack-inner");
 
   // Each spring object holds a 0→1 progress; they accumulate to a step-counter.
@@ -134,30 +135,64 @@ Each spring fires at a different time, settles, then the next fires. When summed
       spring,
       {
         p: 1,
-        duration: 0.5,
-        ease: "back.out(1.8)", // spring with overshoot
+        duration: STEP_DUR,
+        ease: `back.out(${BOUNCE_FACTOR})`,
         onUpdate: applyTransform,
       },
-      0.4 + i * 0.4,
-    ); // 0.4s start + 0.4s between steps
+      STEP_START + i * STEP_SPACING,
+    );
   });
 
-  // Brand reveals after the ticker settles on FOUNDER
+  // Footer reveals after the ticker settles on the final item.
   tl.from(
     ".brand",
-    { opacity: 0, y: 12, duration: 0.5, ease: "power3.out" },
-    0.4 + STEPS * 0.4 + 0.3, // ~0.3s after final step lands
+    { opacity: 0, y: BRAND_Y, duration: BRAND_FADE_DUR, ease: "power3.out" },
+    STEP_START + STEPS * STEP_SPACING + BRAND_DELAY,
   );
 
   window.__timelines["ticker-scene"] = tl;
 </script>
 ```
 
+## How to Choose Values
+
+- **ITEM_HEIGHT** — px height of each ticker slot AND the masked window.
+  - Range: ~`ITEM_FONT_SIZE × 1.25`; the line must hold capital descenders without clipping
+  - Constraints: **`.ticker` height MUST equal `.item` height** exactly — mismatched values cause partial items to peek above/below the mask
+  - Reference: examples/proof-logo-chain.html uses `204px`
+- **TICKER_WIDTH** — px width of the masked window.
+  - Range: wide enough to hold the longest item without ellipsis; typically 30-60% of viewport width
+- **STEPS** — number of additive springs (number of state transitions, not number of items).
+  - Range: typically 1-4; each step = one "click" in the slot-machine cadence
+  - Constraints: `STEPS ≤ itemCount − 1` (you can only roll as far as there are items below the visible one)
+  - Reference: examples/proof-logo-chain.html uses `1` (single roll between two states)
+- **STEP_DUR** — duration of each spring tween.
+  - Range: 0.3-0.7s; under 0.3 the overshoot is invisible, over 0.7 the click reads as a slide
+  - Reference: examples/proof-logo-chain.html uses `0.45s`
+- **STEP_SPACING** — seconds between consecutive springs' start times.
+  - Range: 0.3-0.5s; closer and the steps blur together (looks like linear scroll), further and the ticker feels lazy
+  - Constraints: `STEP_SPACING ≤ STEP_DUR` so the previous step is still settling when the next fires (this is what makes them "additive")
+- **STEP_START** — when the first spring fires.
+  - Range: 0+; gate behind any preceding beat
+- **BOUNCE_FACTOR** — `back.out(BOUNCE_FACTOR)` overshoot strength per step.
+  - Range: 1.4 (gentle click) → 2.0 (firm click) → 2.5+ (cartoony spin-and-land for a climax step)
+  - Effects: low end reads as polished UI, high end reads as casino / game show
+- **BRAND_DELAY** — gap after the final step before the footer line reveals, in seconds.
+  - Range: 0.2-0.5s; lets the final overshoot settle before the next element competes for attention
+- **BRAND_FADE_DUR** — footer fade-in duration.
+  - Range: 0.4-0.7s
+- **BRAND_Y** — initial vertical offset of the footer before fade-up (in px).
+  - Range: 8-24 px; bigger feels "punched in," smaller feels gentle
+- **EYEBROW_FONT_SIZE / ITEM_FONT_SIZE / BRAND_FONT_SIZE / STACK_GAP** — typographic + layout scaling.
+  - Constraints: items are the focal beat, sized 4-8× larger than eyebrow/footer
+- **{bgColor} / {accentColor} / {textColor} / {dividerColor}** — semantic color tokens; accent reserved for the eyebrow and footer so the ticker items stay neutral.
+- **{font}** — base typography stack. For numeric tickers add `font-variant-numeric: tabular-nums` so digit widths stay constant.
+
 ## Variations
 
 ### Numeric ticker (price / counter rolling)
 
-For a $0 → $5,000 numeric ticker, replace text items with the digit sequence and use the same spring-step pattern per decimal position (units, tens, hundreds...). Add `font-variant-numeric: tabular-nums` for digit-width stability.
+Replace text items with the digit sequence and use the same spring-step pattern per decimal position (units, tens, hundreds...). Add `font-variant-numeric: tabular-nums` for digit-width stability.
 
 ### Reverse direction (counting down)
 
@@ -169,15 +204,15 @@ Loop forever (e.g. news ticker) — use linear ease on a single long tween, dupl
 
 ### Pause between groups
 
-For dramatic "spin then land" feel, group 3 fast spring steps (0.15s apart) + 0.8s pause + final dramatic step with bigger overshoot (`back.out(2.5)`). The pause is where the eye locks in.
+For dramatic "spin then land" feel, group several fast spring steps (`STEP_SPACING` small) + a long `BRAND_DELAY`-style pause + a final dramatic step with bigger `BOUNCE_FACTOR`. The pause is where the eye locks in.
 
 ## Key Principles
 
 - **Container height MUST equal item height** — otherwise items don't snap cleanly into the visible window. If container is 200px and items are 220px, every step shows a partial item edge above/below.
 - **`overflow: hidden` on container, NOT on inner stack** — the mask is the window; the stack inside is free to extend below.
 - **`flex-direction: column` on inner stack** — required for vertical stacking; row would make items horizontal.
-- **Springs spaced 0.3-0.5s apart** — closer and the steps blur together (looks like linear scroll); further and the ticker feels lazy.
-- **`back.out(1.6-2.0)` per step** — the overshoot is what makes each step feel like a "click." Linear ease or out-only ease loses the slot-machine feel.
+- **Step spacing tighter than step duration** — overlap is what makes the springs additive and gives the "click click" cadence; non-overlapping steps read as a linear scroll.
+- **`back.out` per step** — the overshoot is what makes each step feel like a "click." Linear ease or out-only ease loses the slot-machine feel.
 - **Sum the springs in onUpdate, don't tween the final position directly** — this is the "additive" trick; each spring contributes its OWN snap, which is the slot-machine pacing.
 - **❗ Don't update items via `innerHTML` between steps** — the ticker moves the SAME items via translate; replacing content makes the previous item visible AS the new one (broken illusion).
 - **❗ Climax dwell ≥1s after final step** — see SKILL universal constraints.

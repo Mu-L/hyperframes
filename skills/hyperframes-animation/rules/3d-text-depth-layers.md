@@ -29,7 +29,7 @@ Renders the same text N times at increasing offsets, with back layers translucen
   data-track-index="0"
 >
   <div class="depth-stack">
-    <!-- Layers injected by script — 6 copies of HEYGENVERSE -->
+    <!-- Layers injected by script — LAYER_COUNT copies of {label} -->
   </div>
 </div>
 ```
@@ -43,19 +43,19 @@ Renders the same text N times at increasing offsets, with back layers translucen
   height: 100%;
   display: grid;
   place-items: center;
-  background: #0b0d1f;
+  background: {bgColor};
 }
 .depth-stack {
   position: relative;
   /* Container size set by the front layer; back layers stack behind */
 }
 .depth-text {
-  font-family: "Inter", sans-serif;
+  font-family: {font};
   font-weight: 900;
-  font-size: 200px;
-  letter-spacing: -2px;
+  font-size: HERO_FONT_SIZE;
+  letter-spacing: HERO_LETTER_SPACING;
   line-height: 1;
-  color: #f5f6fb;
+  color: {frontColor};
   text-transform: uppercase;
 }
 /* Back layers — absolute, stacked behind */
@@ -79,13 +79,7 @@ Renders the same text N times at increasing offsets, with back layers translucen
 <script>
   window.__timelines = window.__timelines || {};
 
-  const LAYER_COUNT = 6;
-  const OFFSET_X = 2;
-  const OFFSET_Y = 3;
-  const FRONT_COLOR = "#f5f6fb";
-  const BACK_HUE = "167, 139, 250"; // RGB triplet matching the brand glow
-
-  const TEXT = "HEYGENVERSE";
+  const TEXT = "{label}";
   const stack = document.querySelector(".depth-stack");
 
   // Build layers — back-to-front so the FRONT (i=0) is the LAST appended
@@ -95,11 +89,11 @@ Renders the same text N times at increasing offsets, with back layers translucen
     el.className = "depth-text " + (i === 0 ? "is-front" : "is-back");
     el.textContent = TEXT;
     if (i > 0) {
-      const alpha = 0.85 - i * 0.13;
-      el.style.color = `rgba(${BACK_HUE}, ${Math.max(alpha, 0.1)})`;
+      const alpha = Math.max(BACK_ALPHA_MAX - i * BACK_ALPHA_STEP, BACK_ALPHA_MIN);
+      el.style.color = `rgba({backHueRGB}, ${alpha})`;
       el.style.transform = `translate(${i * OFFSET_X}px, ${i * OFFSET_Y}px)`;
     } else {
-      el.style.color = FRONT_COLOR;
+      el.style.color = "{frontColor}";
     }
     el.dataset.layer = String(i);
     stack.appendChild(el);
@@ -111,15 +105,18 @@ Renders the same text N times at increasing offsets, with back layers translucen
   const allLayers = stack.querySelectorAll(".depth-text");
   allLayers.forEach((el) => {
     const i = Number(el.dataset.layer);
+    const finalAlpha = el.classList.contains("is-front")
+      ? 1
+      : Math.max(BACK_ALPHA_MAX - i * BACK_ALPHA_STEP, BACK_ALPHA_MIN);
     tl.fromTo(
       el,
       { opacity: 0 },
       {
-        opacity: el.classList.contains("is-front") ? 1 : Math.max(0.85 - i * 0.13, 0.1),
-        duration: 0.4,
+        opacity: finalAlpha,
+        duration: LAYER_FADE_DUR,
         ease: "power2.out",
       },
-      0.1 + (LAYER_COUNT - 1 - i) * 0.06, // back-to-front cascade
+      LAYER_CASCADE_START + (LAYER_COUNT - 1 - i) * LAYER_CASCADE_STEP,
     );
   });
 
@@ -129,7 +126,7 @@ Renders the same text N times at increasing offsets, with back layers translucen
     depthState,
     {
       p: 1,
-      duration: 0.5,
+      duration: DEPTH_GROW_DUR,
       ease: "power2.out",
       onUpdate: () => {
         stack.querySelectorAll(".depth-text.is-back").forEach((el) => {
@@ -140,7 +137,7 @@ Renders the same text N times at increasing offsets, with back layers translucen
         });
       },
     },
-    0.1,
+    DEPTH_GROW_START,
   );
 
   window.__timelines["depth-scene"] = tl;
@@ -154,7 +151,11 @@ Renders the same text N times at increasing offsets, with back layers translucen
 Skip the cascade — render all layers in their final positions from t=0, optionally fade the entire stack in:
 
 ```js
-tl.from(stack, { opacity: 0, scale: 0.96, duration: 0.6, ease: "power3.out" }, 0);
+tl.from(
+  stack,
+  { opacity: 0, scale: STATIC_ENTRY_SCALE, duration: STATIC_ENTRY_DUR, ease: "power3.out" },
+  0,
+);
 ```
 
 ### Dynamic depth pulse
@@ -166,18 +167,18 @@ const beat = { p: 0 };
 tl.to(
   beat,
   {
-    p: Math.PI * 2 * 2, // 2 beats over the duration
-    duration: 2.0,
+    p: Math.PI * 2 * BEAT_CYCLES,
+    duration: BEAT_DUR,
     ease: "none",
     onUpdate: () => {
-      const mult = 1 + Math.sin(beat.p) * 0.4;
+      const mult = 1 + Math.sin(beat.p) * BEAT_AMP;
       stack.querySelectorAll(".is-back").forEach((el) => {
         const i = Number(el.dataset.layer);
         el.style.transform = `translate(${i * OFFSET_X * mult}px, ${i * OFFSET_Y * mult}px)`;
       });
     },
   },
-  0.6,
+  BEAT_START,
 );
 ```
 
@@ -186,18 +187,93 @@ tl.to(
 Instead of fading to translucent, shift to a different hue — depth reads as "casting a colored shadow":
 
 ```js
-el.style.color = `hsla(${250 - i * 8}, 80%, ${60 - i * 5}%, 1)`;
+el.style.color = `hsla(${HUE_BASE - i * HUE_STEP}, ${SAT_PCT}%, ${LIGHT_BASE - i * LIGHT_STEP}%, 1)`;
 ```
+
+## How to Choose Values
+
+### Layer geometry
+
+- **LAYER_COUNT** — number of stacked copies (back layers + 1 front).
+  - Range: 4-6. Below 4 the depth doesn't read as 3D; above 6 the stack visually clutters on tight kerning
+  - Effects: low end reads as subtle shadow; high end reads as chunky extrusion
+- **OFFSET_X / OFFSET_Y** — per-layer translation offset, in px.
+  - Range: 1-3 px each. Above 4 px reads as a glitch / chromatic aberration rather than depth
+  - Effects: offset direction implies light direction. `(+x, +y)` = light from upper-left; `(-x, +y)` = light from upper-right. Pick one and keep it consistent across the composition
+  - Constraints: same sign convention throughout the composition
+
+### Back-layer color falloff
+
+- **BACK_ALPHA_MAX** — alpha of the back layer nearest the front.
+  - Range: 0.6-0.85. Lower than 0.5 makes even the nearest back layer disappear; higher than 0.9 fights the front layer for dominance
+- **BACK_ALPHA_STEP** — alpha decrement per layer further back.
+  - Range: 0.08-0.15. Smaller steps read as a soft gradient; larger steps read as discrete plates
+  - Constraints: choose so `BACK_ALPHA_MAX − (LAYER_COUNT − 2) × BACK_ALPHA_STEP ≥ BACK_ALPHA_MIN`
+- **BACK_ALPHA_MIN** — floor below which back layers stop fading.
+  - Range: 0.1-0.2. Below 0.1 the deepest layer disappears entirely on dark backgrounds
+
+### Typography
+
+- **HERO_FONT_SIZE** — front-layer font size, in px.
+  - Range: 60 px minimum to read as layered; 200-340 px for full-bleed hero shots. Thin text loses the layered illusion
+- **HERO_LETTER_SPACING** — letter spacing.
+  - Range: −0.03em (tight) to 0 (normal). Negative spacing tightens the stack so the offsets read as depth instead of as repetition
+- **{font}** — typeface; pick a black/900 weight family with strong horizontal strokes
+- **{frontColor}** — front-layer color; the brand or accent color
+- **{backHueRGB}** — RGB triplet for back layers (e.g. matched to a brand glow). Used inside `rgba({backHueRGB}, ${alpha})`
+
+### Cascade entry (default form)
+
+- **LAYER_CASCADE_START** — timeline offset where the cascade begins.
+  - Constraints: ≥ 0; if another beat precedes, ≥ that beat's end
+- **LAYER_CASCADE_STEP** — delay between each layer's fade-in.
+  - Range: 0.04-0.10 s. Smaller feels almost-simultaneous; larger feels stepped and mechanical
+- **LAYER_FADE_DUR** — duration of each individual layer's fade-in.
+  - Range: 0.3-0.6 s
+
+### Depth-grow tween
+
+- **DEPTH_GROW_START** — when the offset growth begins.
+  - Constraints: typically `≈ LAYER_CASCADE_START`; align so the first layer's fade and the depth growth start together
+- **DEPTH_GROW_DUR** — duration over which offsets interpolate from 0 to full.
+  - Range: 0.4-0.8 s. Roughly match `LAYER_FADE_DUR × LAYER_COUNT / 2` so depth lands as the last layer fades in
+
+### Static-depth variation
+
+- **STATIC_ENTRY_SCALE** — initial scale before the whole stack fades in.
+  - Range: 0.94-0.98 — subtle inflation; larger reads as a separate "pop" effect
+- **STATIC_ENTRY_DUR** — fade-in duration for the whole stack.
+  - Range: 0.5-0.8 s
+
+### Dynamic-pulse variation
+
+- **BEAT_CYCLES** — number of full beat cycles across `BEAT_DUR`.
+  - Range: `BEAT_DUR / 1.5s ≤ BEAT_CYCLES ≤ BEAT_DUR / 0.7s` (one beat per 0.7-1.5 s reads as a heartbeat)
+- **BEAT_DUR** — pulse tween duration.
+  - Constraints: tied to the visible window of the depth stack
+- **BEAT_AMP** — fractional amplitude of the offset pulse.
+  - Range: 0.2-0.6. Smaller is a gentle breathing depth; larger reads as a kick-drum thump
+- **BEAT_START** — when the pulse begins.
+  - Constraints: `≥ DEPTH_GROW_START + DEPTH_GROW_DUR` so the pulse modulates a fully-grown stack
+
+### Color-shift variation
+
+- **HUE_BASE / HUE_STEP** — base hue (front layer) and per-layer hue rotation.
+  - Range: `HUE_STEP` 4-12°. Larger steps cycle further around the color wheel and read as glitch
+- **SAT_PCT** — fixed saturation for all layers.
+  - Range: 60-85%
+- **LIGHT_BASE / LIGHT_STEP** — base lightness and per-layer darkening.
+  - Range: `LIGHT_STEP` 3-8 percentage points so back layers darken into the background
 
 ## Key Principles
 
 - **Layer count 4-6** — fewer than 4 doesn't read as 3D, more than 6 visually clutters on tight kerning
 - **Offset 1-3 px per axis** — subtle is dramatic. `OFFSET = 6+` looks like a glitch rather than depth
 - **Offset direction implies light direction** — `(+x, +y)` = light from upper-left; `(-x, +y)` = light from upper-right. Pick one and be consistent across the composition
-- **Back layers translucent OR darker** — DON'T make them MORE saturated than the front (looks like a halo). Each back layer should be slightly more transparent (`alpha -= 0.13 per layer`) or slightly darker
+- **Back layers translucent OR darker** — DON'T make them MORE saturated than the front (looks like a halo). Each back layer should be slightly more transparent (`alpha -= BACK_ALPHA_STEP per layer`) or slightly darker
 - **Last (front) layer `position: relative`** to define container size; all others `position: absolute` stack behind
-- **Bold/black weight + large size** — 900 weight, 60px+ minimum. Thin text loses the layered illusion
-- **❗ Don't apply per-letter animation on top of layers** — character animations (hacker-flip, typewriter) on top of 6-layer depth = chaos. If you need both effects, drop depth to 2-3 layers OR apply layers only to the static post-reveal state
+- **Bold/black weight + large size** — 900 weight, 60 px+ minimum. Thin text loses the layered illusion
+- **Don't apply per-letter animation on top of layers** — character animations (hacker-flip, typewriter) on top of 6-layer depth = chaos. If you need both effects, drop depth to 2-3 layers OR apply layers only to the static post-reveal state
 
 ## Critical Constraints
 

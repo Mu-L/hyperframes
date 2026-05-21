@@ -25,19 +25,18 @@ When `progress = 0` all elements overlap at the center; when `progress = 1` they
 ```html
 <div
   class="scene"
-  id="burst-scene"
   data-composition-id="burst-scene"
   data-start="0"
   data-duration="3"
   data-track-index="0"
 >
   <div class="burst-wrap">
-    <div class="burst-item" data-target-x="-360" data-target-y="-180">A</div>
-    <div class="burst-item" data-target-x="360" data-target-y="-180">B</div>
-    <div class="burst-item" data-target-x="-360" data-target-y="180">C</div>
-    <div class="burst-item" data-target-x="360" data-target-y="180">D</div>
-    <div class="burst-item" data-target-x="0" data-target-y="-360">E</div>
-    <div class="burst-item" data-target-x="0" data-target-y="360">F</div>
+    <div class="burst-item" data-target-x="-360" data-target-y="-180">{itemA}</div>
+    <div class="burst-item" data-target-x="360" data-target-y="-180">{itemB}</div>
+    <div class="burst-item" data-target-x="-360" data-target-y="180">{itemC}</div>
+    <div class="burst-item" data-target-x="360" data-target-y="180">{itemD}</div>
+    <div class="burst-item" data-target-x="0" data-target-y="-360">{itemE}</div>
+    <div class="burst-item" data-target-x="0" data-target-y="360">{itemF}</div>
   </div>
 </div>
 ```
@@ -51,7 +50,7 @@ When `progress = 0` all elements overlap at the center; when `progress = 1` they
   height: 100%;
   display: grid;
   place-items: center;
-  background: #0b0d1f;
+  background: {bgColor};
 }
 .burst-wrap {
   position: relative;
@@ -68,16 +67,16 @@ When `progress = 0` all elements overlap at the center; when `progress = 1` they
   left: 50%;
   transform: translate(-50%, -50%);
 
-  width: 200px;
-  height: 200px;
+  width: {itemSize};
+  height: {itemSize};
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #a78bfa 0%, #6366f1 100%);
+  background: {itemBgColor};
   border-radius: 28px;
-  font-family: "Inter", sans-serif;
+  font-family: {font};
   font-weight: 900;
   font-size: 96px;
-  color: #fff;
+  color: {textColor};
   will-change: transform;
 }
 ```
@@ -93,8 +92,8 @@ When `progress = 0` all elements overlap at the center; when `progress = 1` they
   const items = document.querySelectorAll(".burst-item");
 
   // Each element gets its own from→to that lerps center (translate(-50%, -50%))
-  // → target offset. We use 'xPercent: -50, yPercent: -50' to bake the
-  // self-centering, then animate 'x' and 'y' to the target.
+  // → target offset. xPercent/yPercent bakes the self-centering; x/y animates
+  // toward the target.
   items.forEach((el, i) => {
     const targetX = Number(el.dataset.targetX);
     const targetY = Number(el.dataset.targetY);
@@ -106,16 +105,46 @@ When `progress = 0` all elements overlap at the center; when `progress = 1` they
         y: targetY,
         scale: 1,
         opacity: 1,
-        duration: 1.4,
-        ease: "power3.out",
+        duration: EXPAND_DUR,
+        ease: EXPAND_EASE,
       },
-      i * 0.04 + 0.2, // 0.04s stagger; offset by 0.2s entry beat
+      i * STAGGER + ENTRY_AT, // stagger; ENTRY_AT offsets the burst beat
     );
   });
 
   window.__timelines["burst-scene"] = tl;
 </script>
 ```
+
+## How to Choose Values
+
+- **ITEM_COUNT** — number of elements in the burst
+  - Range: 3–8
+  - Effects: 3 = sparse; 8 = busy. > 8 causes visual chaos where cards overlap mid-expansion
+  - Constraints: at low counts, prefer wider angular spread (target positions further apart)
+
+- **EXPAND_DUR** — duration of each item's center → target tween
+  - Range: 1.0–1.8 s
+  - Effects: shorter = snappy burst; longer = floats outward
+  - Constraints: if driven by a counter, must equal the counter's duration (chord)
+
+- **EXPAND_EASE** — shared ease across all items
+  - Discrete choice: `power2.out`, `power3.out`, `expo.out`
+  - Selection: `power3.out` is the default — fling out then settle. `power2.out` is gentler. `expo.out` makes them stop dramatically. Avoid `in` easings (they read as items being sucked back in mid-air).
+  - Constraint: if driven by another animation, must be identical to the driver's ease
+
+- **STAGGER** — gap between successive items' start times
+  - Range: 0.04–0.08 s
+  - Effects: < 0.04 = simultaneous chord; > 0.08 feels lazy / arpeggiated
+  - Constraints: ITEM_COUNT × STAGGER must be < EXPAND_DUR or the last items still moving when others have landed reads as ragged
+
+- **ENTRY_AT** — offset applied to the whole burst start
+  - Range: 0 – 0.5 s
+  - Effects: > 0 gives a beat of compositional quiet before the burst
+
+- **START_PROGRESS** — fraction of the center→target path where items begin (for partially-spread variant)
+  - Range: 0 (exact center) – 0.5
+  - Effects: 0 = full cluster, dramatic spread; 0.3 = avoids initial pile-up at center
 
 ## Variations
 
@@ -124,7 +153,7 @@ When `progress = 0` all elements overlap at the center; when `progress = 1` they
 If the burst should mirror a counting animation's progress:
 
 ```js
-// Counter tween defines a state.value 0 → 5000 over 2.0s
+// Counter tween defines a state.value 0 → TARGET over COUNT_DUR
 const counterState = { value: 0 };
 const burstState = { p: 0 };
 
@@ -132,9 +161,9 @@ const burstState = { p: 0 };
 tl.to(
   counterState,
   {
-    value: 5000,
-    duration: 2.0,
-    ease: "power3.out",
+    value: COUNT_TARGET,
+    duration: COUNT_DUR,
+    ease: COUNT_EASE,
     onUpdate: () => (counterEl.textContent = Math.round(counterState.value).toLocaleString()),
   },
   0,
@@ -144,10 +173,10 @@ tl.to(
   burstState,
   {
     p: 1,
-    duration: 2.0,
-    ease: "power3.out",
+    duration: COUNT_DUR,
+    ease: COUNT_EASE,
     onUpdate: () =>
-      items.forEach((el, i) => {
+      items.forEach((el) => {
         const tx = Number(el.dataset.targetX) * burstState.p;
         const ty = Number(el.dataset.targetY) * burstState.p;
         el.style.transform = `translate(-50%, -50%) translate(${tx}px, ${ty}px)`;
@@ -159,10 +188,10 @@ tl.to(
 
 ### Starting partially-spread
 
-To avoid the initial clustered mess (6+ elements stacked at center), start at 30% spread:
+To avoid the initial clustered mess (6+ elements stacked at center), start at `START_PROGRESS`:
 
 ```js
-{ x: targetX * 0.3, y: targetY * 0.3, scale: 0.4, opacity: 0 }
+{ x: targetX * START_PROGRESS, y: targetY * START_PROGRESS, scale: 0.4, opacity: 0 }
 ```
 
 ### Idle micro-float at final position
@@ -171,11 +200,11 @@ Pair with `sine-wave-loop` after expansion lands — keeps elements alive instea
 
 ## Key Principles
 
-- **Driver vs driven** — if the burst stands on its own, use a per-item stagger; if it shadows another animation (counter, audio beat, scroll), share the same eased progress so they read as one beat
-- **Stagger by 0.04-0.08s** — too tight and the cluster never separates visually, too loose and the burst feels lazy
-- **`power3.out` for the expansion** — out-easing makes them "fling" out then settle (in-easing looks like they're sucked back in mid-air)
-- **Element count: 3-8** — fewer feels empty, more causes visual chaos at the center where all the cards overlap mid-expansion
-- **❗ Don't put a label below the burst** as the "real headline" — if you do, the eye snaps to the label and ignores the burst. The burst IS the beat. If you must include a label, big block-caps, post-burst reveal, in the same stacked layout
+- **Driver vs driven** — if the burst stands on its own, use a per-item stagger; if it shadows another animation (counter, audio beat), share the same eased progress so they read as one beat
+- **Stagger inside the 0.04-0.08 s band** — too tight and the cluster never separates visually, too loose and the burst feels lazy
+- **Out-easing for the expansion** — out-easing makes items "fling" out then settle. In-easing looks like they're sucked back in mid-air
+- **Element count: 3-8** — fewer feels empty, more causes visual chaos at the center where cards overlap mid-expansion
+- **❗ Don't put a label below the burst as the "real headline"** — if you do, the eye snaps to the label and ignores the burst. The burst IS the beat. If a label is needed, use big block-caps and reveal it post-burst, in the same stacked layout.
 
 ## Critical Constraints
 

@@ -35,11 +35,12 @@ For multi-step scrolling (scroll → pause → scroll), use multiple `tl.to(".pa
 >
   <div class="tilt-card">
     <div class="page-content">
-      <!-- Full webpage recreation, taller than card.height so scrolling matters -->
-      <section class="page-hero">Hedronverse — hero section</section>
-      <section class="page-features">Features section</section>
-      <section class="page-pricing" id="target-section">Pricing section (scroll target)</section>
-      <section class="page-cta">CTA section</section>
+      <!-- Full {Brand} webpage recreation, taller than card height so
+           scrolling matters. Each section is real DOM, not a screenshot. -->
+      <section class="page-hero">{heroContents}</section>
+      <section class="page-features">{featuresContents}</section>
+      <section class="page-target" id="target-section">{targetContents}</section>
+      <section class="page-cta">{ctaContents}</section>
     </div>
 
     <div class="spotlight"></div>
@@ -60,14 +61,18 @@ For multi-step scrolling (scroll → pause → scroll), use multiple `tl.to(".pa
   position: absolute;
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) perspective(1500px) rotateY(-8deg) rotateX(3deg);
+  /* tilt + perspective set in CSS only if no other transform tween touches
+     this element. If GSAP also tweens scale on .tilt-card, set the tilt
+     via gsap.set() to avoid matrix overwrites. */
+  transform: translate(-50%, -50%) perspective({perspectivePx}) rotateY({tiltYDeg}) rotateX({tiltXDeg});
   transform-style: preserve-3d;
-  width: 1400px;
-  height: 800px;
+  width: {cardWidth};
+  height: {cardHeight};
   border-radius: 24px;
-  background: #0e1130;
+  background: {cardBackgroundColor};
   overflow: hidden; /* clip the scrolling content */
-  box-shadow: 40px 30px 80px rgba(0, 0, 0, 0.45); /* shadow falls toward right because card leans left */
+  /* shadow X-offset sign must match tiltY sign (negative tiltY ⇒ positive X) */
+  box-shadow: 40px 30px 80px rgba(0, 0, 0, 0.45);
 }
 
 .page-content {
@@ -79,7 +84,7 @@ For multi-step scrolling (scroll → pause → scroll), use multiple `tl.to(".pa
 }
 
 .page-content section {
-  height: 800px; /* example: each section is one card-height */
+  height: {sectionHeight}; /* sections sized so cumulative offset = target distance */
   padding: 64px;
   /* section-specific styling … */
 }
@@ -92,7 +97,7 @@ For multi-step scrolling (scroll → pause → scroll), use multiple `tl.to(".pa
   background: radial-gradient(
     ellipse 60% 35% at 50% 50%,
     transparent 50%,
-    rgba(0, 0, 0, 0.75) 100%
+    {spotlightDimColor} 100%
   );
 }
 ```
@@ -106,17 +111,18 @@ For multi-step scrolling (scroll → pause → scroll), use multiple `tl.to(".pa
   const tl = gsap.timeline({ paused: true });
 
   // Phase 1 — Card enters (optional, can skip if card is in from t=0)
-  // Phase 2 — Scroll to the target section
-  // Target section #target-section is offset 1600px down (sections 2 + 3).
-  // To bring it into view centered, scroll content up by 1600px.
+  // Phase 2 — Scroll to the target section.
+  // SCROLL_DISTANCE is measured at design time from the page layout
+  // (top of .page-content origin to vertical center of #target-section,
+  // accounting for card height).
   tl.to(
     ".page-content",
     {
-      y: -1600,
-      duration: 1.5,
+      y: -SCROLL_DISTANCE,
+      duration: SCROLL_DUR,
       ease: "power3.out",
     },
-    1.0,
+    SCROLL_AT,
   );
 
   // Phase 3 — Spotlight fades in on the target after scroll settles
@@ -124,10 +130,10 @@ For multi-step scrolling (scroll → pause → scroll), use multiple `tl.to(".pa
     ".spotlight",
     {
       opacity: 1,
-      duration: 0.6,
+      duration: SPOTLIGHT_FADE_DUR,
       ease: "power1.inOut",
     },
-    2.4,
+    SPOTLIGHT_AT,
   );
 
   window.__timelines["page-scroll-scene"] = tl;
@@ -137,17 +143,64 @@ For multi-step scrolling (scroll → pause → scroll), use multiple `tl.to(".pa
 ### Multi-phase scroll variant
 
 ```js
-// Scroll to section A → hold → scroll to section B
-tl.to(".page-content", { y: -800, duration: 1.0, ease: "power3.out" }, 0.5);
-tl.to(".page-content", { y: -2000, duration: 1.2, ease: "power3.out" }, 2.5);
+// Scroll to section A → hold → scroll to section B.
+// SCROLL_DISTANCE_A and SCROLL_DISTANCE_B are both measured from the
+// .page-content origin (NOT delta from previous step).
+tl.to(
+  ".page-content",
+  { y: -SCROLL_DISTANCE_A, duration: SCROLL_DUR, ease: "power3.out" },
+  SCROLL_AT_A,
+);
+tl.to(
+  ".page-content",
+  { y: -SCROLL_DISTANCE_B, duration: SCROLL_DUR, ease: "power3.out" },
+  SCROLL_AT_B,
+);
 ```
 
 GSAP composes successive `y:` tweens additively when targeting the same property — each tween starts from the value left by the previous tween.
 
+## How to Choose Values
+
+- **tiltYDeg** — static Y rotation in CSS (or via `gsap.set()`).
+  - Range: -12 to -4 (left-leaning) or 4 to 12 (right-leaning); 0 = no perspective rotation.
+  - Effects: bigger magnitude = more dramatic 3D; near 0 collapses to a flat panel.
+  - Constraints: shadow X-offset sign must match (negative tiltY ⇒ positive box-shadow X).
+- **tiltXDeg** — static X rotation.
+  - Range: 0-6
+  - Effects: positive tilts the top edge away from the viewer.
+- **perspectivePx** — perspective distance.
+  - Range: 800-2000 px
+  - Effects: smaller = more dramatic foreshortening; larger = nearly orthographic.
+- **cardWidth / cardHeight** — card frame size.
+  - Constraints: card height < total content height, otherwise scroll has nothing to reveal.
+- **sectionHeight** — height of each scrolled section.
+  - Constraints: sum of all section heights ≥ cardHeight + SCROLL_DISTANCE so the target section ends up within frame after scroll.
+- **SCROLL_AT** — timeline second at which the scroll tween begins.
+  - Constraints: must be ≥ end of any prior fade-in tweens on `.page-content`.
+- **SCROLL_DUR** — duration of one scroll tween.
+  - Range: 0.8-1.8 s
+  - Effects: shorter feels like a hard cut; longer feels programmatic.
+- **SCROLL_DISTANCE** — pixels to translate `.page-content` upward.
+  - Constraints: measured once at design time from the target section's offset; NOT a free tunable.
+- **SPOTLIGHT_AT** — timeline second at which the spotlight begins fading in.
+  - Constraints: should be ≥ SCROLL_AT + SCROLL_DUR (or slightly earlier for overlapping handoff) so the spotlight reveals the freshly-arrived section.
+- **SPOTLIGHT_FADE_DUR** — spotlight opacity fade-in duration.
+  - Range: 0.4-0.8 s
+- Multi-phase variant — **SCROLL_AT_A / SCROLL_AT_B**: must satisfy `SCROLL_AT_A + SCROLL_DUR ≤ SCROLL_AT_B` so the two scrolls don't fight for the y property.
+
+Ease family — discrete choice:
+
+- `power3.out` — heavy deceleration; reads as a programmatic scroll that "lands". Default.
+- `power4.out` — even heavier; reads as a momentum-driven scroll.
+- `power2.inOut` — symmetric; reads as a cinematic camera pan rather than UI scroll.
+
+Pick one and use it across all scrolls in the scene — mixing easings within one scene reads as jerky.
+
 ## Key Principles
 
 - **Tilt is static**, not animated. The card holds its angle the whole scene.
-- **Shadow direction matches tilt**: left-leaning card (`rotateY: -8deg`) casts shadow to the right (positive X shadow offset). Mismatch breaks the 3D illusion.
+- **Shadow direction matches tilt**: a left-leaning card casts shadow to the right (positive X shadow offset). Mismatch breaks the 3D illusion.
 - **Page content is real HTML**, not a screenshot. Screenshots can't be individually highlighted or scrolled-to with precision.
 - **Use real layout for distances**: scroll target distance comes from the actual cumulative section heights, not estimated pixel values.
 - **Spotlight as overlay**, not inside the page-content — overlay sits above scrolling content and stays fixed relative to the card.

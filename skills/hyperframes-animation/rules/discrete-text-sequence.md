@@ -45,36 +45,36 @@ For continuous per-char typewriter (no pauses, no edits), use the **smooth-slice
   height: 100%;
   display: grid;
   place-items: center;
-  background: #05060d;
-  font-family: "JetBrains Mono", monospace;
+  background: {bgColor};
+  font-family: {monoFont}; /* monospace is required — see Critical Constraints */
 }
 .terminal {
   display: flex;
   align-items: baseline;
-  gap: 24px;
+  gap: GUTTER;
   font-weight: 800;
-  font-size: 72px;
-  color: #f5f6fb;
+  font-size: TERMINAL_FONT_SIZE;
+  color: {textColor};
 }
 .prompt {
-  color: #a78bfa;
+  color: {accentColor};
 }
 .text-wrap {
   display: inline-flex;
   align-items: baseline;
   /* Fixed-width container prevents the right side from jittering as
      content changes length. Choose width ≥ longest state's width. */
-  min-width: 1100px;
+  min-width: TEXT_WRAP_MIN_WIDTH;
   white-space: nowrap;
 }
 .text {
-  color: #f5f6fb;
+  color: {textColor};
 }
 .cursor {
   display: inline-block;
-  width: 20px;
-  color: #a78bfa;
-  margin-left: 4px;
+  width: CURSOR_WIDTH;
+  color: {accentColor};
+  margin-left: CURSOR_GAP;
 }
 ```
 
@@ -85,25 +85,18 @@ For continuous per-char typewriter (no pauses, no edits), use the **smooth-slice
 <script>
   window.__timelines = window.__timelines || {};
 
-  // State sequence — each entry shows from t to the NEXT entry's t.
+  // SEQUENCE — each entry shows from t to the NEXT entry's t.
   // Non-linear: typos, corrections, bulk additions, pauses.
+  // Shape (one realization):
+  //   [warm-up keystrokes] → [typo] → [backspaces back to fork] →
+  //   [bulk-paste of the corrected continuation] → [completion mark]
   const SEQUENCE = [
     { t: 0.0, text: "" },
-    { t: 0.3, text: "b" },
-    { t: 0.5, text: "bu" },
-    { t: 0.7, text: "bun" }, // user starts typing
-    { t: 0.9, text: "bunx" },
-    { t: 1.1, text: "bunx h" },
-    { t: 1.3, text: "bunx hy" },
-    { t: 1.5, text: "bunx hyperfrim" }, // typo
-    { t: 1.9, text: "bunx hyperfri" }, // backspace
-    { t: 2.0, text: "bunx hyperfr" },
-    { t: 2.1, text: "bunx hyperf" },
-    { t: 2.4, text: "bunx hyperframes" }, // correction + bulk
-    { t: 2.7, text: "bunx hyperframes render" },
-    { t: 3.0, text: "bunx hyperframes render ." },
-    { t: 3.5, text: "bunx hyperframes render . --output heygenverse.mp4" }, // bulk paste
-    { t: 5.0, text: "bunx hyperframes render . --output heygenverse.mp4 ✓" }, // completion mark
+    { t: T_K1, text: "{p1}" }, // first keystrokes (~3-5 chars, 0.1-0.2s apart)
+    { t: T_K2, text: "{p1 + ' ' + p2_typo}" }, // continuation containing a typo
+    { t: T_BS, text: "{p1 + ' ' + p2_partial}" }, // backspace(s) — peel back to the fork
+    { t: T_BULK, text: "{fullCorrectedText}" }, // bulk paste — replaces several chars at once
+    { t: T_DONE, text: "{fullCorrectedText + ' ✓'}" }, // completion marker
   ];
 
   // Reverse-search for the latest entry whose t has passed.
@@ -118,14 +111,13 @@ For continuous per-char typewriter (no pauses, no edits), use the **smooth-slice
   const cursorEl = document.getElementById("cursor");
   const tl = gsap.timeline({ paused: true });
 
-  // Drive the discrete display via a 0→duration tween's onUpdate
-  const totalDuration = 6.0;
+  // Drive the discrete display via a 0→TOTAL_DURATION tween's onUpdate
   const driver = { t: 0 };
   tl.to(
     driver,
     {
-      t: totalDuration,
-      duration: totalDuration,
+      t: TOTAL_DURATION,
+      duration: TOTAL_DURATION,
       ease: "none",
       onUpdate: () => {
         textEl.textContent = textAt(driver.t);
@@ -139,8 +131,8 @@ For continuous per-char typewriter (no pauses, no edits), use the **smooth-slice
   tl.to(
     blinkDriver,
     {
-      p: Math.PI * 2 * 6, // 6 blinks across composition
-      duration: totalDuration,
+      p: Math.PI * 2 * BLINK_CYCLES, // BLINK_CYCLES = blinks across composition
+      duration: TOTAL_DURATION,
       ease: "none",
       onUpdate: () => {
         cursorEl.style.opacity = Math.sin(blinkDriver.p) > 0 ? "1" : "0";
@@ -160,13 +152,13 @@ For continuous per-char typewriter (no pauses, no edits), use the **smooth-slice
 For straight-forward typewriter without the non-linear chaos:
 
 ```js
-const fullText = "bunx hyperframes render . --output heygenverse.mp4";
+const fullText = "{fullPhrase}";
 const len = { v: 0 };
 tl.to(
   len,
   {
     v: fullText.length,
-    duration: 3.5,
+    duration: TYPE_DUR,
     ease: "power1.inOut",
     onUpdate: () => {
       textEl.textContent = fullText.substring(0, Math.floor(len.v));
@@ -180,12 +172,12 @@ This is faster to author but produces a uniform "machine-typed" feel — missing
 
 ### Thinking pause (extended hold on a key state)
 
-Insert a state that holds for 1-2s without changes — feels like the user paused to think:
+Insert a state that holds for `THINK_HOLD_DUR` seconds without changes — feels like the user paused to think:
 
 ```js
-{ t: 1.4, text: 'bunx hy' }, // start
-// ... no entries between 1.4 and 2.6 ...
-{ t: 2.6, text: 'bunx hyperframes' }, // resume after pause
+{ t: T_PRE_PAUSE, text: '{partialPhrase}' },        // last state before the pause
+// ... no entries for THINK_HOLD_DUR seconds ...
+{ t: T_PRE_PAUSE + THINK_HOLD_DUR, text: '{resumedPhrase}' },
 ```
 
 ### State pulse on completion
@@ -193,21 +185,62 @@ Insert a state that holds for 1-2s without changes — feels like the user pause
 When the final state lands (e.g. "✓"), pulse-scale the line briefly for emphasis:
 
 ```js
-tl.to(".text", { scale: 1.05, duration: 0.2, yoyo: true, repeat: 1 }, 4.8);
+tl.to(
+  ".text",
+  { scale: COMPLETION_PULSE_SCALE, duration: COMPLETION_PULSE_DUR, yoyo: true, repeat: 1 },
+  T_DONE,
+);
 ```
 
 ### Per-state color shift
 
-Color-code states (yellow during edit, green after success, red on typo):
+Color-code states by phase (e.g. dim during edit, success color after the completion marker, optional warning color on typo):
 
 ```js
 // In onUpdate after setting textContent:
-if (driver.t > 4.8)
-  textEl.style.color = "#34d399"; // success green
-else if (driver.t < 1.8)
-  textEl.style.color = "#f5f6fb"; // typing white
-else textEl.style.color = "#a7adc6"; // mid-edit dim
+if (driver.t > T_DONE) textEl.style.color = "{successColor}";
+else if (driver.t < T_K2)
+  textEl.style.color = "{textColor}"; // normal typing
+else textEl.style.color = "{mutedColor}"; // mid-edit dim
 ```
+
+## How to Choose Values
+
+### Layout
+
+- **TERMINAL_FONT_SIZE** — font size of the typing line.
+  - Range: 48-96 px for full-bleed compositions; smaller for terminal-style detail
+  - Constraints: combined with `TEXT_WRAP_MIN_WIDTH` must fit within viewport
+- **TEXT_WRAP_MIN_WIDTH** — fixed-width container holding the text.
+  - Constraints: must be `≥ widthOf(longest SEQUENCE state) at TERMINAL_FONT_SIZE`. Measure with a hidden probe after `document.fonts.ready` if unsure
+  - Effects: too small → right edge jitters as states change length; too large → unused horizontal whitespace pads the composition
+- **GUTTER** — flex gap between prompt glyph (`$`, `>`) and text.
+  - Range: ~0.3-0.5× `TERMINAL_FONT_SIZE`
+- **CURSOR_WIDTH / CURSOR_GAP** — block cursor dimensions.
+  - Range: width ~0.3× `TERMINAL_FONT_SIZE`; gap small (single-digit px) so the cursor feels attached to the text
+
+### Sequence timing
+
+- **TOTAL_DURATION** — composition length.
+  - Constraints: must be ≥ `T_DONE` + ~1s climax dwell so viewer sees the completion marker
+- **T_K1 / T_K2 / T_BS / T_BULK / T_DONE** — milestone timestamps within the SEQUENCE.
+  - Range: keystrokes 0.06-0.20s apart for "human typing"; pauses 0.3-0.6s at natural word breaks; bulk paste jumps multiple characters in a single entry
+  - Constraints: monotonically increasing; `T_DONE ≤ TOTAL_DURATION - dwell`
+- **TYPE_DUR** (smooth-slice variation) — total typing duration for continuous typewriter.
+  - Range: `chars × 0.06s` (fast) to `chars × 0.12s` (relaxed)
+- **THINK_HOLD_DUR** (thinking-pause variation) — hold time between two SEQUENCE states.
+  - Range: 0.8-2.0s; under 0.5s reads as a stutter rather than thought
+- **COMPLETION_PULSE_SCALE / COMPLETION_PULSE_DUR** (pulse variation).
+  - Range: scale 1.03-1.08 (subtle), duration 0.15-0.30s
+
+### Cursor
+
+- **BLINK_CYCLES** — number of full blink cycles across `TOTAL_DURATION`.
+  - Range: `TOTAL_DURATION / 0.8s ≤ BLINK_CYCLES ≤ TOTAL_DURATION / 0.5s` (cycle every 0.5-0.8s reads as a natural cursor)
+
+### Color tokens
+
+- **{bgColor} / {textColor} / {accentColor} / {successColor} / {mutedColor}** — discrete choices, not numeric ranges. Pick from the composition's palette; the prompt + cursor share `{accentColor}` so they read as the same "system" element.
 
 ## Key Principles
 

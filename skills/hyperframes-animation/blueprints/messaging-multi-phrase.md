@@ -29,7 +29,7 @@ Multiple phrases type sequentially. Each phrase has a main + accent segment. The
 
 Same hard-cut multi-phrase arc, restructured around one paused GSAP timeline and a single `onUpdate` that reads `tl.time()` and writes both text and cursor state. Constituent patterns map to [dynamic-content-sequencing](../rules/dynamic-content-sequencing.md) (for the timeline pre-calculation) and [context-sensitive-cursor](../rules/context-sensitive-cursor.md) (for the cursor color + blink).
 
-> the source drove this scene by re-running every component every frame and finding `currentPhrase` per render. HyperFrames runs a _single_ paused timeline; the same `currentPhrase = TIMELINE.find(...)` lookup moves inside one `onUpdate` callback that fires whenever GSAP advances the timeline. No conditional DOM — the phrase container exists from t=0 with empty text, and the `onUpdate` overwrites `textContent` in-place.
+> Per-frame-component variants of this scene re-run every component every frame and look up `currentPhrase` per render. HyperFrames runs a _single_ paused timeline; the same `currentPhrase = TIMELINE.find(...)` lookup moves inside one `onUpdate` callback that fires whenever GSAP advances the timeline. No conditional DOM — the phrase container exists from t=0 with empty text, and the `onUpdate` overwrites `textContent` in-place.
 
 ## When to Use
 
@@ -52,17 +52,38 @@ Each phase internally follows the same structure: main characters type at `charS
 
 ## Data Architecture
 
-Script is a flat array. Each entry defines its own text and timing parameters. No hardcoded offsets — every phase boundary is computed from the entry above it.
+Script is a flat array of N entries. Each entry defines its own text and timing parameters. No hardcoded offsets — every phase boundary is computed from the entry above it.
 
 ```js
 const SCRIPT = [
-  { textMain: "Build video with ", textAccent: "HTML", charSpeed: 0.083, hold: 1.0 },
-  { textMain: "Seek ", textAccent: "any frame", charSpeed: 0.083, hold: 1.0 },
-  { textMain: "Render to ", textAccent: "MP4", charSpeed: 0.083, hold: 2.0 },
+  {
+    textMain: "{phrase1Main}",
+    textAccent: "{phrase1Accent}",
+    charSpeed: CHAR_SPEED,
+    hold: HOLD_MID,
+  },
+  {
+    textMain: "{phrase2Main}",
+    textAccent: "{phrase2Accent}",
+    charSpeed: CHAR_SPEED,
+    hold: HOLD_MID,
+  },
+  // …
+  {
+    textMain: "{phraseNMain}",
+    textAccent: "{phraseNAccent}",
+    charSpeed: CHAR_SPEED,
+    hold: HOLD_FINAL,
+  },
 ];
 ```
 
-`charSpeed` is **seconds per character** (`2.5 frames / 30 fps = 0.083 s/char` matches the the source source). `hold` is the seconds to dwell on the completed phrase before cutting to the next.
+Shape rules for the array:
+
+- 2-5 entries; more and the scene drags
+- Every entry has a `textMain` (neutral lead-in) and `textAccent` (emphasis); either may be empty if the phrase is single-tone
+- `charSpeed` is **seconds per character** (frames / fps). Consistent across entries so typing rhythm reads as one engine
+- `hold` is the dwell after the last char is typed. The final entry uses a longer `HOLD_FINAL` to land the closing beat
 
 ## Dynamic Timeline Calculation (Setup, Not a Tween)
 
@@ -82,16 +103,16 @@ const TIMELINE = SCRIPT.map((item) => {
 const TOTAL = TIMELINE[TIMELINE.length - 1].endTime;
 ```
 
-The final `TOTAL` value drives the composition's `data-duration` and the master `onUpdate`'s tween length.
+The final `TOTAL` value is the natural full-script length. The composition's `data-duration` is typically set close to `TOTAL` — see the How to Choose Values entry for when to deliberately undercut `TOTAL` to trim a long final hold.
 
 ## Master Engine: One onUpdate Drives Everything
 
 Single GSAP "clock" tween spans the whole composition. Its `onUpdate` finds the current phrase, computes the visible main / accent text, and writes the cursor color + blink opacity. _Everything_ per-frame happens here.
 
 ```js
-const MAIN_COLOR = "#FFFFFF";
-const ACCENT_COLOR = "#FF1E7A";
-const BLINK_CYCLE = 1.0; // seconds — 0.5s on, 0.5s off
+const MAIN_COLOR = "{mainColor}";
+const ACCENT_COLOR = "{accentColor}";
+const BLINK_CYCLE; // seconds, full on-off period (cursor opacity = 1 for first half)
 
 const mainEl = document.querySelector(".phrase-main");
 const accentEl = document.querySelector(".phrase-accent");
@@ -176,25 +197,25 @@ Centered flex row. `white-space: pre` preserves intentional trailing spaces in `
   align-items: center;
   justify-content: center;
   white-space: pre;
-  font:
-    600 100px/1 "Inter",
-    system-ui,
-    sans-serif;
+  font-family: {font};
+  font-weight: {fontWeight};
+  font-size: {fontSize}px;
+  line-height: 1;
 }
 .phrase-main {
-  color: #ffffff;
+  color: {mainColor};
 }
 .phrase-accent {
-  color: #ff1e7a;
+  color: {accentColor};
 }
 .phrase-cursor {
   display: inline-block;
-  width: 6px;
-  height: 110px;
-  background: #ffffff; /* overridden by onUpdate per segment */
-  margin-left: 4px;
+  width: {cursorWidth}px;
+  height: {cursorHeight}px;
+  background: {mainColor}; /* overridden by onUpdate per segment */
+  margin-left: {cursorGap}px;
   vertical-align: middle;
-  transform: translateY(8px); /* fine-tune to align with text baseline */
+  transform: translateY({cursorBaselineFix}px); /* fine-tune to align with text baseline */
   will-change: opacity, background-color;
 }
 ```
@@ -206,15 +227,15 @@ No fixed-width container — each phrase replaces the previous entirely, so the 
 Pick the largest `fontSize` such that the _longest_ phrase fits within the canvas with comfortable margins. Run once at setup:
 
 ```js
-const CANVAS_W = 1920;
 const longestChars = Math.max(...SCRIPT.map((p) => p.textMain.length + p.textAccent.length));
-// Inter at 100px averages ~0.5 × fontSize per character → ~50px/char
-// safe upper bound: CANVAS_W * 0.85 / longestChars / 0.5
-const safeFontSize = Math.floor((CANVAS_W * 0.85) / (longestChars * 0.5));
-// e.g. 33 chars → ~99px → round to 100
+// Sans-serif average character advance ≈ CHAR_ADVANCE_RATIO × fontSize.
+// Safe upper bound: SAFE_WIDTH_RATIO × canvasWidth fits the longest phrase.
+const safeFontSize = Math.floor(
+  (canvasWidth * SAFE_WIDTH_RATIO) / (longestChars * CHAR_ADVANCE_RATIO),
+);
 ```
 
-For more accuracy, measure with a hidden canvas after `document.fonts.ready` (see [camera-cursor-tracking](../rules/camera-cursor-tracking.md) for the `ctx.measureText` pattern). For most decks a hand-tuned constant (100–120 px at 1920×1080) works fine — this is a statement scene, not body copy.
+For more accuracy, measure with a hidden canvas after `document.fonts.ready` (see [camera-cursor-tracking](../rules/camera-cursor-tracking.md) for the `ctx.measureText` pattern). For most decks a hand-tuned constant works fine — this is a statement scene, not body copy.
 
 ## Inter-Phase State Handoff
 
@@ -239,14 +260,78 @@ Cursor blink:
   state — it's a pure function of (t % BLINK_CYCLE).
 ```
 
+## How to Choose Values
+
+Every magic number lives in one of two places: a `SCRIPT` entry (per-phrase tuning) or a top-level constant (whole-scene tuning).
+
+- **CHAR_SPEED** — seconds per character of typing
+  - Range: 0.04-0.12 s/char (≈ 25-8 chars/sec)
+  - Effects: low end reads as urgent / mechanical typing; high end reads as deliberate / unhurried
+  - Constraints: should be consistent across all SCRIPT entries so the typing rhythm reads as one engine; convert from frames as `frames / fps`
+  - Reference: see `examples/messaging-multi-phrase.html`
+
+- **HOLD_MID** — dwell after a non-final phrase finishes typing, before hard-cut to next
+  - Range: 0.6-1.5 s
+  - Effects: low end feels rushed and the eye can't park on the accent; high end stalls momentum
+  - Constraints: `HOLD_MID < HOLD_FINAL` so the closing beat lands distinctly
+  - Reference: see `examples/messaging-multi-phrase.html`
+
+- **HOLD_FINAL** — dwell on the last phrase before the composition ends
+  - Range: 1.5-3.0 s
+  - Effects: low end feels truncated; high end overstays
+  - Constraints: only one phrase (the last) gets HOLD_FINAL; all others use HOLD_MID
+  - Reference: see `examples/messaging-multi-phrase.html`
+
+- **BLINK_CYCLE** — full on-off period of the cursor blink
+  - Range: 0.6-1.2 s (cursor is opaque for `BLINK_CYCLE / 2`)
+  - Effects: low end reads as glitchy / agitated; high end reads as terminal-idle
+  - Constraints: must be a pure function of `t % BLINK_CYCLE` — no separate animation. Independent of phrase boundaries by design
+  - Reference: see `examples/messaging-multi-phrase.html`
+
+- **MAIN_COLOR / ACCENT_COLOR** — text + cursor palette for the two segments
+  - Range: discrete choice; ACCENT_COLOR must have visibly higher chroma than MAIN_COLOR so the cursor color swap is legible
+  - Effects: equal-luminance pairs (e.g. two pastels) wash out the swap; high-contrast pairs (white ↔ saturated accent) read instantly
+  - Constraints: ACCENT_COLOR doubles as the `.phrase-accent` color and the active-segment cursor fill — must match
+  - Reference: see `examples/messaging-multi-phrase.html`
+
+- **fontSize / fontWeight / font** — typography of the phrase line
+  - Range: at 1920×1080 a fontSize of 100-180 px reads as statement copy; weight 600-900 for emphasis
+  - Effects: smaller looks like body copy; thinner reads as quote, not statement
+  - Constraints: must satisfy the longest-phrase-fits-on-one-line constraint below; pick via the Font Sizing formula
+  - Reference: see `examples/messaging-multi-phrase.html`
+
+- **SAFE_WIDTH_RATIO / CHAR_ADVANCE_RATIO** — font-sizing safety factors
+  - Range: SAFE_WIDTH_RATIO 0.80-0.90 (margin around the longest phrase); CHAR_ADVANCE_RATIO 0.45-0.6 for typical sans-serif at heavy weight
+  - Effects: SAFE_WIDTH_RATIO too high → phrase touches edges; CHAR_ADVANCE_RATIO too low → underestimates width and the phrase overflows
+  - Constraints: if the chosen font is monospace or condensed, re-measure with canvas `measureText`
+  - Reference: see `examples/messaging-multi-phrase.html`
+
+- **cursorWidth / cursorHeight / cursorGap / cursorBaselineFix** — cursor block geometry
+  - Range: cursorWidth 4-10 px; cursorHeight ≈ 1.0-1.1 × fontSize; cursorGap 4-16 px; cursorBaselineFix small positive integer
+  - Effects: thin cursor reads as terminal; thick reads as marker. Height shorter than the cap-height makes the cursor look detached
+  - Constraints: must use `display: inline-block` (a `width` set on `display: inline` is ignored)
+  - Reference: see `examples/messaging-multi-phrase.html`
+
+- **TOTAL vs `data-duration`** — content-driven duration vs render window
+  - Range: `data-duration` may be `≤ TOTAL` to deliberately trim a long final hold, or `≈ TOTAL` to play the whole script
+  - Effects: `data-duration` > TOTAL leaves an empty fallback tail; `data-duration` < TOTAL truncates the closing hold (acceptable if the accent word has been on-screen for ≥ HOLD_MID)
+  - Constraints: never set `data-duration` so low that the last phrase's typing is cut mid-character — the cap should fall inside the hold window
+  - Reference: see `examples/messaging-multi-phrase.html`
+
+- **SCRIPT length (N)** — number of phrases
+  - Range: 2-5 entries
+  - Effects: 1 entry is not a sequence (use the cursor rule alone); >5 drags and the viewer disengages
+  - Constraints: each entry's combined `textMain + textAccent` must fit one line at the chosen fontSize (the Font Sizing formula assumes this)
+  - Reference: see `examples/messaging-multi-phrase.html`
+
 ## Critical Constraints
 
 - **Single paused timeline** — all per-frame state derives from `tl.time()` in one `onUpdate`. No per-phrase GSAP tweens.
 - **`Math.floor` on charIndex** — `slice` with float indices produces fractional-character output (no error, but visibly wrong).
 - **`white-space: pre`** — required when `textMain` ends with a space. Without it the trailing space collapses and the accent joins the lead-in without a gap.
-- **`charSpeed` in seconds, not frames** — `frames / fps`. Source `2.5 frames @ 30 fps = 0.083 s`.
+- **`charSpeed` in seconds, not frames** — convert via `frames / fps`. Authoring in frames and dividing once at the boundary keeps math legible without mixing units in the timeline.
 - **DOM-write guard** — `if (mainEl.textContent !== visMain) ...` — even though `textContent` is cheap, skipping no-op writes prevents needless layout invalidations on phrases where char count is steady (e.g. during `hold`).
-- **`data-duration` ≥ `TOTAL`** — the composition root's data-duration must cover the full computed timeline. Less and the last phrase truncates; more and the fallback fires at the end.
+- **`data-duration` must cover at least up to the last phrase's accent fully typed + a readable beat** — setting `data-duration < TOTAL` is allowed and is how you trim an over-long closing hold; setting it so low the final accent is cut mid-character is the failure mode. Setting `data-duration > TOTAL` leaves the fallback branch firing at the tail.
 - **Longest phrase fits without wrap** — measure or hand-tune `fontSize` so `textMain + textAccent` of the longest entry stays on one line at the chosen canvas width.
 - **No infinite repeats** — the master tween has `duration: TOTAL`; the blink is computed via modulo inside the onUpdate (no `repeat: -1` anywhere).
 - **No `Math.random` / `Date.now`** — all state is a pure function of `tl.time()` and the immutable SCRIPT array.
@@ -273,4 +358,4 @@ But this departs from the source's "hard-cut" semantic — use sparingly.
 
 ## Golden Sample
 
-- [messaging-multi-phrase.html](../examples/messaging-multi-phrase.html) — "Build video with **HTML**" → "Seek **any frame**" → "Render to **MP4**" sequential typing on a dark gradient background. Single paused GSAP timeline, one master `onUpdate` drives text content, cursor color (white during main, cyan during accent) and cursor blink (1 s square wave). Typing rate 0.083 s/char ≈ 12 chars/sec. Holds: 1.0 s, 1.0 s, 2.0 s. Natural computed TOTAL ≈ 7.98 s; the composition's `data-duration="7.5"` caps the render window slightly under TOTAL (final phrase's hold is truncated by ~0.5 s but the accent word is fully typed and held well before the cap).
+- [messaging-multi-phrase.html](../examples/messaging-multi-phrase.html) — three-phrase statement scene on a dark gradient background. Demonstrates the single-paused-timeline + master `onUpdate` engine, the cursor color swap between main and accent segments, the square-wave blink via modulo, the seek-safe `lastIdx` cache, and a `data-duration` deliberately set under the computed `TOTAL` to trim a long closing hold. Refer to the example for concrete colors, font sizing, copy, and timings.

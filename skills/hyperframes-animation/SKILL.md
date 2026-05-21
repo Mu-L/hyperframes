@@ -91,7 +91,7 @@ Each blueprint describes a complete multi-phase choreography with phase pipeline
   duration="4-6s"
   phases="4"
   uses="press-release-spring"
-  triggers="review and approve, step-by-step workflow, user control, approve button, AI with you">
+  triggers="review and approve, step-by-step workflow, user control, approve button, with-you metaphor">
   Headline top + center video demo + 3D-tilted step indicators left + action button right that presses to confirm.
 </blueprint>
 <blueprint
@@ -232,14 +232,14 @@ Use when you need a specific effect detail, or when no blueprint matches your ta
   path="examples/concept-demo-decode-pan.html"
   blueprint="concept-demo-decode-pan"
   duration="7s">
-  'Spark your next campaign' hacker-flip decode in Shot 1 → horizontal pan with parallax exit → 'Tell me how to target parents' cursor-tracked typing in Shot 2 search bar. Demonstrates browser-native text measurement (no charWidthRatio) and piecewise Math.min camera tracking.
+  Shot 1 "HyperFrames renders" static rise + hacker-flip decode of the accent word ("video") → horizontal pan with parallax exit + scale-in → Shot 2 cursor-tracked typing "HTML, CSS and JS become MP4" inside a pre-allocated search-bar. Demonstrates browser-native text measurement (no charWidthRatio constant) and piecewise Math.min camera tracking.
 </example>
 <example
   id="brand-reveal-assemble-zoom"
   path="examples/brand-reveal-assemble-zoom.html"
   blueprint="brand-reveal-assemble-zoom"
   duration="5s">
-  'Just ask' discrete-assembly companion beside 'GWISpark' + pink star logo → companion slides out and container recenters → camera zooms 5.5× into the star → star breathes (sine onUpdate, multiplicative). Demonstrates three nested transform layers (scale → translate → recenter) and brandTextWidth measurement after fonts.ready.
+  'Just use' discrete-assembly companion beside 'Hyperframes' + logo image → companion slides out and container recenters → camera zooms 5.5× into the logo → logo breathes (sine onUpdate, multiplicative). Demonstrates three nested transform layers (scale → translate → recenter) and brandTextWidth measurement after fonts.ready.
 </example>
 <example
   id="takeover-ticker-displace"

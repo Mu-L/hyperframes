@@ -13,13 +13,13 @@ element_roles:
 when_to_use:
   - Two complementary features shown side-by-side
   - Comparison or A/B presentation of related capabilities
-  - Message is "X + Y together" (brand + team, speed + quality)
+  - Message is "X + Y together" (paired concepts of equal weight)
   - Need visual balance with 3D depth on both sides
 when_not_to_use:
   - More than 2 items to compare (use a different layout)
   - Items are sequential, not parallel (use step indicators)
   - Cards contain interactive elements (use workflow-approve-press)
-triggers: [two features, side by side, brand + team, comparison, dual capabilities, scale your]
+triggers: [two features, side by side, comparison, dual capabilities, paired concepts]
 ---
 
 # Comparison · Split Cards (HyperFrames)
@@ -39,11 +39,11 @@ Same three-phase "concept → dual proof" arc; one paused GSAP timeline; constit
 
 All boundaries are in **seconds**.
 
-| Phase | Time window (s) | What Happens                                                         | Skill Reference                                     |
-| ----- | --------------- | -------------------------------------------------------------------- | --------------------------------------------------- |
-| 1     | `0.17 – 0.83`   | Title slides down from top with accent keyword                       | inline `power3.out` entry                           |
-| 2     | `0.50 – 1.83`   | Left card enters from left, right from right; opposing 3D tilts      | [split-tilt-cards](../rules/split-tilt-cards.md)    |
-| 3     | `1.67 – end`    | Pill badges pop in near each card with bouncy spring + floating idle | [sine-wave-loop](../rules/sine-wave-loop.md) Form 2 |
+| Phase | Time window (s)        | What Happens                                                         | Skill Reference                                  |
+| ----- | ---------------------- | -------------------------------------------------------------------- | ------------------------------------------------ |
+| 1     | `TITLE_AT – TITLE_END` | Title slides down from top with accent keyword                       | inline `power3.out` entry                        |
+| 2     | `LEFT_AT – CARDS_END`  | Left card enters from left, right from right; opposing 3D tilts      | [split-tilt-cards](../rules/split-tilt-cards.md) |
+| 3     | `BADGE_LEFT_AT – end`  | Pill badges pop in near each card with bouncy spring + floating idle | [sine-wave-loop](../rules/sine-wave-loop.md)     |
 
 ## Layout
 
@@ -60,7 +60,7 @@ Title is absolutely positioned near the top. Cards row is absolutely centered wi
     style="position: absolute; top: 60px;
        left: 50%; transform: translateX(-50%);"
   >
-    Scale Your <span class="accent">Creative Output</span>
+    {titlePrefix} <span class="accent">{titleAccent}</span>
   </div>
 
   <!-- Cards row -->
@@ -76,8 +76,8 @@ Title is absolutely positioned near the top. Cards row is absolutely centered wi
       <div class="card-pos">
         <div class="card-tilt" style="transform-style: preserve-3d;">
           <div class="card-image"></div>
-          <div class="card-label">Brand Templates</div>
-          <div class="card-subtitle">Learn your brand's voice</div>
+          <div class="card-label">{leftLabel}</div>
+          <div class="card-subtitle">{leftSubtitle}</div>
         </div>
       </div>
     </div>
@@ -86,8 +86,8 @@ Title is absolutely positioned near the top. Cards row is absolutely centered wi
       <div class="card-pos">
         <div class="card-tilt" style="transform-style: preserve-3d;">
           <div class="card-image"></div>
-          <div class="card-label">Team Workspace</div>
-          <div class="card-subtitle">Collaboration on autopilot</div>
+          <div class="card-label">{rightLabel}</div>
+          <div class="card-subtitle">{rightSubtitle}</div>
         </div>
       </div>
     </div>
@@ -97,19 +97,19 @@ Title is absolutely positioned near the top. Cards row is absolutely centered wi
   <div
     class="badge badge-left"
     id="badge-left"
-    style="position: absolute; left: 230px; top: 378px;"
+    style="position: absolute; left: {badgeLeftX}; top: {badgeLeftY};"
   >
     <svg class="badge-icon">...</svg>
-    <span>Brand Voice</span>
+    <span>{leftBadge}</span>
   </div>
 
   <div
     class="badge badge-right"
     id="badge-right"
-    style="position: absolute; left: 1440px; top: 410px;"
+    style="position: absolute; left: {badgeRightX}; top: {badgeRightY};"
   >
     <svg class="badge-icon">...</svg>
-    <span>Team Autopilot</span>
+    <span>{rightBadge}</span>
   </div>
 
   <div class="ambient-glow"></div>
@@ -119,13 +119,10 @@ Title is absolutely positioned near the top. Cards row is absolutely centered wi
 
 ## Phase 1: Title Slides Down
 
-Standard entry: opacity 0 → 1, y rise from -40 to 0 (slide down from top). Use `power3.out` for a clean settle.
+Standard entry: opacity 0 → 1, y rise from `-TITLE_RISE` to 0 (slide down from top). Use `power3.out` for a clean settle.
 
 ```js
-const TITLE_AT = 0.17;
-const TITLE_DUR = 0.67;
-
-gsap.set("#title", { opacity: 0, y: -40 });
+gsap.set("#title", { opacity: 0, y: -TITLE_RISE });
 
 tl.to(
   "#title",
@@ -141,18 +138,12 @@ tl.to(
 
 ## Phase 2: Split Tilt Cards (Core Pattern)
 
-Two cards slide inward from their respective sides with `scale 0.8 → 1` + `opacity 0 → 1`. Static tilts: left `+18°`, right `-18°` rotationY. Continuous floating (y + tiny rotation) runs from t=0 with phase offset π between the two cards.
+Two cards slide inward from their respective sides with `scale ENTRY_SCALE → 1` + `opacity 0 → 1`. Static tilts: left `+BASE_TILT°`, right `-BASE_TILT°` rotationY. Continuous floating (y + tiny rotation) runs from t=0 with phase offset π between the two cards.
 
 ```js
-const LEFT_AT = 0.5;
-const RIGHT_AT = 0.83; // ~10-frame stagger
-const ENTRY_DUR = 0.7;
-const SLIDE_DIST = 100;
-const BASE_TILT = 18;
-
 /* Initial states */
-gsap.set(".card-left  .card-pos", { x: -SLIDE_DIST, scale: 0.8, opacity: 0, y: 0 });
-gsap.set(".card-right .card-pos", { x: SLIDE_DIST, scale: 0.8, opacity: 0, y: 0 });
+gsap.set(".card-left  .card-pos", { x: -SLIDE_DIST, scale: ENTRY_SCALE, opacity: 0, y: 0 });
+gsap.set(".card-right .card-pos", { x: SLIDE_DIST, scale: ENTRY_SCALE, opacity: 0, y: 0 });
 gsap.set(".card-left  .card-tilt", { rotationY: BASE_TILT });
 gsap.set(".card-right .card-tilt", { rotationY: -BASE_TILT });
 
@@ -173,24 +164,20 @@ See [split-tilt-cards](../rules/split-tilt-cards.md) for the floating onUpdate t
 
 ## Phase 3: Badge Attachment + Floating
 
-Badges pop in with a bouncy spring (`back.out(1.7)`) near each card's inner edge. After entry, both badges float gently with a slow sine y-offset.
+Badges pop in with a bouncy spring (`back.out(${BOUNCE_FACTOR})`) near each card's inner edge. After entry, both badges float gently with a slow sine y-offset.
 
 ```js
-const BADGE_LEFT_AT = 1.67;
-const BADGE_RIGHT_AT = 2.0; // stagger
-const BADGE_ENTRY_DUR = 0.5;
-
 gsap.set(["#badge-left", "#badge-right"], { scale: 0, opacity: 0, y: 0 });
 
 tl.to(
   "#badge-left",
-  { scale: 1, opacity: 1, duration: BADGE_ENTRY_DUR, ease: "back.out(1.7)" },
+  { scale: 1, opacity: 1, duration: BADGE_ENTRY_DUR, ease: `back.out(${BOUNCE_FACTOR})` },
   BADGE_LEFT_AT,
 );
 
 tl.to(
   "#badge-right",
-  { scale: 1, opacity: 1, duration: BADGE_ENTRY_DUR, ease: "back.out(1.7)" },
+  { scale: 1, opacity: 1, duration: BADGE_ENTRY_DUR, ease: `back.out(${BOUNCE_FACTOR})` },
   BADGE_RIGHT_AT,
 );
 
@@ -204,14 +191,6 @@ Badges should be **inside the cards' visual footprint**, not floating in empty v
 A single `onUpdate` over the whole composition handles all continuous sine motion: card y/rotation float + badge y float. Consolidating keeps DOM-mutation cost predictable.
 
 ```js
-const TOTAL_DUR = 5.0;
-const FLOAT_Y_SPEED = 0.02 * 30; // = 0.6 rad/sec
-const FLOAT_Y_AMP = 6;
-const FLOAT_R_SPEED = 0.015 * 30; // = 0.45 rad/sec
-const FLOAT_R_AMP = 1;
-const BADGE_Y_SPEED = 0.025 * 30; // = 0.75 rad/sec
-const BADGE_Y_AMP = 5;
-
 const leftPos = document.querySelector(".card-left .card-pos");
 const rightPos = document.querySelector(".card-right .card-pos");
 const leftTilt = document.querySelector(".card-left .card-tilt");
@@ -252,40 +231,143 @@ tl.to(
 
 ## Ambient Dual-Glow
 
-Two radial gradients in the background — one centered on each card's side, using different brand colors. Reinforces the left/right identity.
+Two radial gradients in the background — one centered on each card's side, using `{leftGlowColor}` and `{rightGlowColor}` (the two brand accents in the comparison). Reinforces the left/right identity.
 
 ```css
 .ambient-glow {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: 0.12;
+  opacity: GLOW_OPACITY;
   background:
-    radial-gradient(ellipse at 30% 50%, rgba(180, 80, 220, 1) 0%, transparent 35%),
-    radial-gradient(ellipse at 70% 50%, rgba(80, 220, 150, 1) 0%, transparent 35%);
+    radial-gradient(ellipse at 30% 50%, {leftGlowColor} 0%, transparent 35%),
+    radial-gradient(ellipse at 70% 50%, {rightGlowColor} 0%, transparent 35%);
 }
 ```
 
-The opacity (0.10–0.15) keeps the glow subtle — it tints the background without competing with the cards.
+`GLOW_OPACITY` keeps the glow subtle — it tints the background without competing with the cards.
 
 ## Inter-Phase State Handoff
 
 ```
 Phase 1 → Phase 2:
-  Title fade-in ends at ~0.83 s. LEFT_AT (0.50 s) starts BEFORE title fully
-  settles — slight overlap is intentional. The eye reads the title's tail
+  Title fade-in ends at TITLE_AT + TITLE_DUR. LEFT_AT starts BEFORE the title
+  fully settles — slight overlap is intentional. The eye reads the title's tail
   and the cards' beginnings as two simultaneous arrivals.
+  Constraint: LEFT_AT < TITLE_AT + TITLE_DUR (overlap), but
+              LEFT_AT > TITLE_AT + TITLE_DUR * 0.5 (title is past midpoint).
 
 Phase 2 → Phase 3:
-  Right card entry ends at RIGHT_AT + ENTRY_DUR = 1.53 s.
-  BADGE_LEFT_AT (1.67 s) is ~0.15 s later — gives the cards a beat to settle
-  visually before the badges punctuate them.
+  Right card entry ends at RIGHT_AT + ENTRY_DUR.
+  BADGE_LEFT_AT lands a short BADGE_GAP later — gives the cards a beat to
+  settle visually before the badges punctuate them.
+  Constraint: BADGE_LEFT_AT ≥ RIGHT_AT + ENTRY_DUR + BADGE_GAP.
 
 Continuous (Phase 1+):
-  Scene-ticker onUpdate runs from t=0 across the whole 5 s. Card and badge
-  floating values are 0 at t=0 (sin(0)=0), so the float is invisible during
-  entry and gradually becomes visible as elements fade in.
+  Scene-ticker onUpdate runs from t=0 across the whole TOTAL_DUR. Card and
+  badge floating values are 0 at t=0 (sin(0)=0), so the float is invisible
+  during entry and gradually becomes visible as elements fade in.
 ```
+
+## How to Choose Values
+
+### Phase 1 — Title
+
+- **TITLE_AT** — when the title begins sliding in.
+  - Range: 0.1-0.3 s
+  - Effects: lower starts the scene faster; higher gives a moment of empty stage tension first
+  - Constraints: must leave room for `TITLE_AT + TITLE_DUR < LEFT_AT + ENTRY_DUR` so the title isn't still moving when the cards finish settling
+  - Reference: examples/comparison-split-cards.html uses `0.17`
+- **TITLE_DUR** — title slide-down duration.
+  - Range: 0.5-1.0 s
+  - Effects: low end is snappy/urgent; high end is editorial/cinematic
+  - Reference: examples/comparison-split-cards.html uses `0.67`
+- **TITLE_RISE** — pixels above resting position that the title starts from.
+  - Range: 24-64 px
+  - Effects: low end barely registers as motion; high end reads as "dropped from offscreen"
+  - Reference: examples/comparison-split-cards.html uses `40`
+
+### Phase 2 — Cards
+
+- **LEFT_AT** — when the left card begins sliding in.
+  - Range: 0.4-0.7 s
+  - Constraints: see Inter-Phase State Handoff overlap with title
+  - Reference: examples/comparison-split-cards.html uses `0.5`
+- **RIGHT_AT** — when the right card begins. Stagger from `LEFT_AT`.
+  - Range: `LEFT_AT + 0.1` to `LEFT_AT + 0.4` s (≈3-12 frame stagger at 30 fps)
+  - Effects: small stagger makes the pair feel coordinated but lively; zero stagger looks mechanical; large stagger fragments the comparison
+  - Reference: examples/comparison-split-cards.html uses `0.83`
+- **ENTRY_DUR** — per-card slide-in duration.
+  - Range: 0.6-1.0 s
+  - Effects: short reads as snappy; long reads as luxurious / heavy
+  - Reference: examples/comparison-split-cards.html uses `0.7`
+- **SLIDE_DIST** — pixels each card slides from off-axis.
+  - Range: 60-200 px
+  - Effects: small reads as a subtle reveal; large reads as "thrown in from the wings"
+  - Reference: examples/comparison-split-cards.html uses `100`
+- **ENTRY_SCALE** — initial scale of each card before settling to 1.
+  - Range: 0.7-0.95
+  - Effects: lower combined with slide reads as "popping into focus"; higher is a near-flat slide
+  - Reference: examples/comparison-split-cards.html uses `0.8`
+- **BASE_TILT** — static `rotationY` magnitude in degrees (left `+`, right `−`).
+  - Range: 10-20° (see split-tilt-cards rule for the readability ceiling)
+  - Effects: low end is a slight perspective offset; high end folds the cards toward closed
+  - Reference: examples/comparison-split-cards.html uses `18`
+
+### Phase 3 — Badges
+
+- **BADGE_LEFT_AT** — when the left badge pops in.
+  - Constraints: `≥ RIGHT_AT + ENTRY_DUR + BADGE_GAP`
+  - Reference: examples/comparison-split-cards.html uses `1.67`
+- **BADGE_RIGHT_AT** — when the right badge pops in.
+  - Range: `BADGE_LEFT_AT + 0.2` to `BADGE_LEFT_AT + 0.4` s (matches card stagger feel)
+  - Reference: examples/comparison-split-cards.html uses `2.0`
+- **BADGE_GAP** — minimum settle beat between cards finishing entry and badges starting.
+  - Range: 0.1-0.3 s
+  - Effects: low end reads as one continuous gesture; high end gives the cards a clear "and… badges!" punctuation
+- **BADGE_ENTRY_DUR** — badge pop duration.
+  - Range: 0.4-0.7 s
+  - Reference: examples/comparison-split-cards.html uses `0.5`
+- **BOUNCE_FACTOR** — `back.out(BOUNCE_FACTOR)` overshoot strength on the badge pop.
+  - Range: 1.4 (soft) → 2.0 (firm) → 2.8 (cartoony)
+  - Reference: examples/comparison-split-cards.html uses `1.7`
+
+### Continuous floating
+
+- **TOTAL_DUR** — total composition length the scene-ticker tween covers.
+  - Constraints: equals `data-duration` on the composition root
+  - Reference: examples/comparison-split-cards.html uses `5.0`
+- **FLOAT_Y_SPEED** — angular speed of card y bob in rad/s (`Math.sin(t * FLOAT_Y_SPEED)`).
+  - Range: 0.4-0.9 rad/s (cycle period 7-16 s — slow enough to feel like breathing, not bobbing)
+  - Reference: examples/comparison-split-cards.html uses `0.6` (≈10.5 s period)
+- **FLOAT_Y_AMP** — card y bob amplitude in px.
+  - Range: 3-8 px (see sine-wave-loop rule — subtle is the point)
+  - Reference: examples/comparison-split-cards.html uses `6`
+- **FLOAT_R_SPEED** — angular speed of card rotation float.
+  - Range: 0.3-0.6 rad/s, slightly slower than `FLOAT_Y_SPEED` so y/rotation aren't visibly synced
+  - Reference: examples/comparison-split-cards.html uses `0.45`
+- **FLOAT_R_AMP** — card rotation float amplitude in degrees, added to `BASE_TILT`.
+  - Range: 0.5-2°
+  - Effects: above 2° the tilt visibly wobbles instead of "breathing"
+  - Reference: examples/comparison-split-cards.html uses `1`
+- **BADGE_Y_SPEED** — angular speed of badge y bob.
+  - Range: 0.5-1.0 rad/s; faster than card y so the badges feel like lighter satellites
+  - Reference: examples/comparison-split-cards.html uses `0.75`
+- **BADGE_Y_AMP** — badge y bob amplitude in px.
+  - Range: 3-7 px; should not exceed `FLOAT_Y_AMP` (the badge is a smaller element, should not out-bob the card)
+  - Reference: examples/comparison-split-cards.html uses `5`
+
+### Ambient + text tokens
+
+- **GLOW_OPACITY** — opacity of the ambient dual-glow overlay.
+  - Range: 0.08-0.18
+  - Effects: lower nearly invisible; higher competes with the cards
+  - Reference: examples/comparison-split-cards.html uses `0.13`
+- **{titlePrefix} / {titleAccent}** — non-accent and accent portions of the title (e.g. `"<setup phrase> <accent payoff>"`).
+- **{leftLabel} / {rightLabel}** — short feature names on each card (1-3 words each).
+- **{leftSubtitle} / {rightSubtitle}** — one-line elaboration under each label.
+- **{leftBadge} / {rightBadge}** — pill copy summarizing each card in 1-3 words.
+- **{leftGlowColor} / {rightGlowColor}** — full-opacity rgba/hex of each side's brand accent; the ambient overlay re-attenuates via `GLOW_OPACITY`.
 
 ## Critical Constraints
 
@@ -295,7 +377,7 @@ Continuous (Phase 1+):
 - **Two cards only**: This pattern doesn't extend to 3+ cards. Use a different layout for three.
 - **Badge position at inner edges**: Not floating in empty viewport space. The eye must read the badge as attached to its card.
 - **Phase opposition on cards (`Math.PI`)**: For both y and rotation. Synchronized phase makes cards rock together — looks mechanical.
-- **Single `perspective` parent** on the cards-row: Both cards share `perspective: 1200 px`. Per-card perspective produces inconsistent depth.
+- **Single `perspective` parent** on the cards-row: Both cards share one `perspective` value. Per-card perspective produces inconsistent depth.
 - **`transform-style: preserve-3d` on `.card-tilt`**: Required for the rotated card's children to render in 3D space.
 - **Floating onUpdate isolates aliases**: Only sets `y` on `.card-pos` and `rotationY` on `.card-tilt`. Don't include `x` / `scale` / `opacity` — those are owned by the entry tween.
 - **GSAP transform aliases only**: `x`, `y`, `scale`, `rotationY`. Never `width` / `height` / `left` / `top`.
@@ -305,16 +387,16 @@ Continuous (Phase 1+):
 
 ## Spring → GSAP Ease Cheatsheet (this blueprint)
 
-| Source spring                                                      | This blueprint uses              |
-| ------------------------------------------------------------------ | -------------------------------- |
-| `spring({ stiffness: 100, damping: 16 })` — title + cards entry    | `power3.out` over 0.67-0.7 s     |
-| `spring(...)` (entranceBouncy, ~stiffness:180 damping:14) — badges | `back.out(1.7)` over 0.5 s       |
-| `sin(frame * 0.02)` — card y float (~10 s period)                  | `Math.sin(t * 0.6)` in onUpdate  |
-| `sin(frame * 0.015)` — card rotation float (~14 s period)          | `Math.sin(t * 0.45)` in onUpdate |
-| `sin(frame * 0.025)` — badge y float (~8.4 s period)               | `Math.sin(t * 0.75)` in onUpdate |
+| Source spring                                                      | This blueprint uses                                 |
+| ------------------------------------------------------------------ | --------------------------------------------------- |
+| `spring({ stiffness: 100, damping: 16 })` — title + cards entry    | `power3.out` over `TITLE_DUR` / `ENTRY_DUR`         |
+| `spring(...)` (entranceBouncy, ~stiffness:180 damping:14) — badges | `back.out(${BOUNCE_FACTOR})` over `BADGE_ENTRY_DUR` |
+| `sin(frame * 0.02)` — card y float                                 | `Math.sin(t * FLOAT_Y_SPEED)` in onUpdate           |
+| `sin(frame * 0.015)` — card rotation float                         | `Math.sin(t * FLOAT_R_SPEED)` in onUpdate           |
+| `sin(frame * 0.025)` — badge y float                               | `Math.sin(t * BADGE_Y_SPEED)` in onUpdate           |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 
 ## Golden Sample
 
-- [comparison-split-cards.html](../examples/comparison-split-cards.html) — "Scale Your **Creative Output**" title, "Brand Templates" card (left, +18° tilt) and "Team Workspace" card (right, -18° tilt) with mock UI placeholders, "Brand Voice" and "Team Autopilot" pill badges at the cards' inner edges. Cards and badges float continuously with phase-opposed sines. Ambient dual-glow tints the background purple-left / green-right. Single paused GSAP timeline drives all three phases over 5 seconds.
+- [comparison-split-cards.html](../examples/comparison-split-cards.html) — paired-feature split-card scene with title, two opposed-tilt cards (left `+BASE_TILT°`, right `-BASE_TILT°`), and floating pill badges at the cards' inner edges. Cards and badges float continuously with phase-opposed sines. Ambient dual-glow tints the background with the two brand accents. Single paused GSAP timeline drives all three phases over `TOTAL_DUR` seconds.

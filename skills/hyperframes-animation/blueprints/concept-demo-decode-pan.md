@@ -22,11 +22,11 @@ when_not_to_use:
 triggers: [decode effect, decrypt, scene transition, search bar typing, horizontal pan, show then demonstrate]
 ---
 
-# Concept-Demo · Decode & Pan (HyperFrames)
+# Concept-Demo · Decode & Pan
 
 Shot 1 text decode → horizontal camera pan with parallax → Shot 2 cursor-tracked interaction.
 
-The visual arc is identical; the implementation uses a single paused GSAP timeline driven by HyperFrames' seek loop instead of frame-based rendering. The horizontal-pan "shot strip" architecture maps cleanly to a flex container with GSAP `x` transforms.
+A single paused GSAP timeline drives all four phases via the HyperFrames seek loop. The horizontal-pan "shot strip" architecture maps cleanly to a flex container with GSAP `x` transforms.
 
 ## When to Use
 
@@ -39,171 +39,193 @@ The visual arc is identical; the implementation uses a single paused GSAP timeli
 
 All phase boundaries are expressed in **seconds**.
 
-| Phase | Time window (s)           | What Happens                                                        | Skill Reference                                                                                                             |
-| ----- | ------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 1     | `0 – entryEnd`            | Shot 1 static text fades in + rises                                 | inline entry                                                                                                                |
-| 2     | `decodeDelay – decodeEnd` | Accent word decrypts via 3D flip                                    | [hacker-flip-3d](../rules/hacker-flip-3d.md)                                                                                |
-| 3     | `panStart – panEnd`       | Camera pans to Shot 2 + Shot 1 parallax exit + Shot 2 fade/scale in | See "Phase 3" below                                                                                                         |
-| 4     | `typingStart – typingEnd` | Search bar already in view + cursor-tracked typing                  | [camera-cursor-tracking](../rules/camera-cursor-tracking.md) + [discrete-text-sequence](../rules/discrete-text-sequence.md) |
+| Phase | Time window (s)             | What Happens                                                        | Skill Reference                                                                                                             |
+| ----- | --------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 1     | `ENTRY_START – ENTRY_END`   | Shot 1 static text fades in + rises                                 | inline entry                                                                                                                |
+| 2     | `FLIP_START – FLIP_END`     | Accent word decrypts via 3D flip                                    | [hacker-flip-3d](../rules/hacker-flip-3d.md)                                                                                |
+| 3     | `PAN_START – PAN_END`       | Camera pans to Shot 2 + Shot 1 parallax exit + Shot 2 fade/scale in | See "Phase 3" below                                                                                                         |
+| 4     | `TYPING_START – TYPING_END` | Search bar already in view + cursor-tracked typing                  | [camera-cursor-tracking](../rules/camera-cursor-tracking.md) + [discrete-text-sequence](../rules/discrete-text-sequence.md) |
 
-## Layout Architecture: Horizontal Shot Strip
+## Initial Layout: Horizontal Shot Strip
 
 This pattern places multiple complete shots **side by side** in a flex row. Camera movement = `x` translation on the strip container. Each shot is exactly one viewport wide so the pan distance equals `data-width`.
 
 ```html
-<div class="viewport" style="position: absolute; inset: 0; overflow: hidden;">
-  <div class="strip" style="display: flex; height: 100%;">
-    <div
-      class="shot shot1"
-      style="width: 1920px; height: 100%; position: relative; flex-shrink: 0;"
-    >
-      <!-- Shot 1 content (static text + hacker-flip accent) -->
-    </div>
+<div
+  id="root"
+  data-composition-id="main"
+  data-start="0"
+  data-duration="TOTAL_DURATION"
+  data-width="VIEWPORT_W"
+  data-height="VIEWPORT_H"
+>
+  <div
+    class="viewport"
+    data-layout-allow-overflow
+    style="position:absolute; inset:0; overflow:hidden;"
+  >
+    <div class="strip" data-layout-allow-overflow style="display:flex; height:100%;">
+      <!-- Shot 1: static phrase + hacker-flip accent word -->
+      <div
+        class="shot shot1"
+        style="width: VIEWPORT_W; height:100%; position:relative; flex-shrink:0;"
+      >
+        <div class="shot1-content">
+          <div class="shot1-row">
+            <span class="shot1-static">{phrase}</span>
+            <span class="shot1-accent" aria-label="{accentWord}">
+              <!-- one .flip-glyph span per character of {accentWord}, generated by JS -->
+            </span>
+          </div>
+        </div>
+      </div>
 
-    <div
-      class="shot shot2"
-      style="width: 1920px; height: 100%; position: relative; flex-shrink: 0;"
-    >
-      <!-- Shot 2 content (interactive search bar) -->
+      <!-- Shot 2: interactive search bar -->
+      <div
+        class="shot shot2"
+        style="width: VIEWPORT_W; height:100%; position:relative; flex-shrink:0;"
+      >
+        <div class="shot2-bar">
+          <span class="search-text"></span><span class="search-cursor">_</span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 ```
 
+```css
+.shot1-row {
+  display: flex;
+  align-items: baseline;
+  gap: SHOT1_GAP_EM;
+  font-size: SHOT1_FONT_SIZE;
+  font-family: {font};
+}
+.shot1-static {
+  font-weight: STATIC_WEIGHT;
+  color: {textColor};
+}
+.shot1-accent {
+  font-weight: ACCENT_WEIGHT;
+  display: flex;
+  perspective: PERSPECTIVE; /* required for the per-glyph rotateX */
+}
+.shot2-bar {
+  position: absolute;
+  top: 50%;
+  height: BAR_HEIGHT;
+  background: {barBgColor};
+  border: 1px solid {accentColor};
+  border-radius: BAR_RADIUS;
+  display: flex;
+  align-items: center;
+  padding-left: PADDING_LEFT;
+  padding-right: PADDING_RIGHT;
+  opacity: 0; /* GSAP fromTo fades in */
+  transform-origin: left center;
+}
+.search-text,
+.search-cursor {
+  font-size: BAR_FONT_SIZE;
+  font-family: {font};
+  color: {textColor};
+  line-height: 1;
+}
+.search-cursor {
+  color: {accentColor};
+}
+```
+
+Notes:
+
 - `overflow: hidden` on the viewport clips off-screen shots.
 - `flex-shrink: 0` prevents the second shot from being squeezed to make the strip fit.
-- The strip width is implicit: `shots × viewportWidth`. Flex with `flex-shrink: 0` honors that.
-- GSAP tweens `.strip` `x` from `0` to `-viewportWidth` to pan from Shot 1 to Shot 2.
+- The strip width is implicit: `shots × VIEWPORT_W`. Flex with `flex-shrink: 0` honors that.
+- The `ACCENT_WEIGHT > STATIC_WEIGHT` differential creates visual hierarchy — the decoded word reads as the focal element even before the transition.
 
 ## Phase 1: Shot 1 Text Entry
 
 Simple fade-in + vertical rise. Static text provides context before the accent word decrypts.
 
 ```js
-const ENTRY_DUR = 0.67; // ≈20 frames at 30fps
-const RISE_DIST = 30; // px the text rises into place
-
 tl.fromTo(
-  ".shot1-text",
+  ".shot1-content",
   { opacity: 0, y: RISE_DIST },
   { opacity: 1, y: 0, duration: ENTRY_DUR, ease: "power2.out" },
-  0,
+  ENTRY_START,
 );
 ```
 
 ## Phase 2: Hacker-Flip Decode
 
-The accent word (e.g. "campaign") splits into individual characters, each with a staggered `back.out` rotation + per-glyph onUpdate that derives the visible character from `tl.time()`. See [hacker-flip-3d](../rules/hacker-flip-3d.md) for the full pattern.
-
-Layout: static text and accent text sit side-by-side in a flex row. The `font-weight: 700` on the accent word creates visual hierarchy — the decoded word reads as the focal element even before the transition.
-
-```html
-<div
-  class="shot1-text"
-  style="display: flex; align-items: baseline; gap: 0.4em;
-     font-size: 130px;"
->
-  <span style="font-weight: 500; color: #111827;">Spark your next</span>
-  <span class="accent" style="font-weight: 700; display: flex; perspective: 800px;">
-    <!-- one .flip-glyph span per character of "campaign", generated by JS -->
-  </span>
-</div>
-```
+The accent word splits into individual characters, each with a staggered `back.out(${FLIP_BOUNCE})` rotation + per-glyph onUpdate that derives the visible character from `tl.time()`. See [hacker-flip-3d](../rules/hacker-flip-3d.md) for the full pattern. Phase 2's `FLIP_START`, `FLIP_STAGGER`, and `FLIP_DUR` flow through the rule's named constants.
 
 ## Phase 3: Horizontal Shot Pan (Core Glue)
 
-A single timeline position drives three concurrent tweens: camera pan, Shot 1 parallax exit, and Shot 2 entry. The source pattern used **one spring** read three times; the GSAP idiom is **three tweens started at the same timeline position**.
+A single timeline position drives three concurrent tweens: camera pan, Shot 1 parallax exit, and Shot 2 entry. Spring-driven sources collapse this to one spring read three times; the GSAP idiom is **three tweens started at the same timeline position**.
 
 ```js
-const PAN_START = 2.83; // seconds
-const PAN_DURATION = 0.67; // ≈20 frames at 30fps
-const VIEWPORT_W = 1920;
-const PARALLAX_DIST = 400; // Shot 1 content moves this much further than the camera
-
-// (1) Camera pan — strip slides one viewport left.
-tl.fromTo(
-  ".strip",
-  { x: 0 },
-  { x: -VIEWPORT_W, duration: PAN_DURATION, ease: "power3.inOut" },
-  // power3.inOut approximates spring(stiffness:60, damping:12, mass:1.2) — the
-  // cinematic slow-in-slow-out feel. Avoid back.out for a camera pan; the
-  // overshoot reads as a UI bounce, not a camera move.
-  PAN_START,
-);
+// (1) Camera pan — strip slides one full viewport left.
+tl.to(".strip", { x: -VIEWPORT_W, duration: PAN_DUR, ease: "power3.inOut" }, PAN_START);
 
 // (2) Shot 1 parallax exit — content moves an EXTRA -PARALLAX_DIST beyond the strip
 //     (near-plane appears to move faster than the camera).
-tl.fromTo(
-  ".shot1-text",
-  { x: 0 },
-  { x: -PARALLAX_DIST, duration: PAN_DURATION, ease: "power3.inOut" },
+tl.to(".shot1-content", { x: -PARALLAX_DIST, duration: PAN_DUR, ease: "power3.inOut" }, PAN_START);
+
+// Shot 1 also fades out during the pan so the eye lands on Shot 2.
+tl.to(
+  ".shot1-content",
+  { opacity: 0, duration: PAN_DUR * FADE_RATIO, ease: "power2.out" },
   PAN_START,
 );
-
-// Shot 1 also fades out early during the pan so the eye lands on Shot 2.
-tl.to(".shot1-text", { opacity: 0, duration: PAN_DURATION * 0.4, ease: "power2.out" }, PAN_START);
 
 // (3) Shot 2 entry — element fades in + scales with a soft overshoot for "landing" feel.
 tl.fromTo(
   ".shot2-bar",
-  { opacity: 0, scale: 0.8 },
-  { opacity: 1, scale: 1, duration: PAN_DURATION, ease: "back.out(1.2)" },
+  { opacity: 0, scale: ENTRY_SCALE_FROM },
+  { opacity: 1, scale: 1, duration: PAN_DUR, ease: `back.out(${ENTRY_BOUNCE})` },
   PAN_START,
 );
 ```
 
-### Parallax Tuning
-
-`PARALLAX_DIST` typically **300–500 px**. Larger creates a stronger depth illusion, but too much makes Shot 1 feel "thrown away." Around 400 px (a quarter of viewport width) is a balanced default for 1920×1080.
-
-### Pan Ease Choice
+### Pan Ease Choice (discrete)
 
 - `power3.inOut` — cinematic, slow start + slow finish. Feels like a camera.
 - `power2.out` — quick start, gentle landing. Feels more like a UI swipe.
-- `back.out(1.2)` — **avoid for the camera pan itself**. The overshoot at the end reads as a UI bounce. Reserve `back.out` for the _element entry_ inside Shot 2.
+- `back.out(${BOUNCE_FACTOR})` — **avoid for the camera pan itself**. The overshoot at the end reads as a UI bounce, not a camera move. Reserve `back.out` for the _element entry_ inside Shot 2.
 
 ## Phase 4: Cursor-Tracked Typing
 
-After the pan settles, typing begins in Shot 2. The search bar is **pre-positioned** in world space so its cursor lands at `CURSOR_TARGET` (typically 70% of viewport width). See [camera-cursor-tracking](../rules/camera-cursor-tracking.md) for the full pattern.
+After the pan settles, typing begins in Shot 2. The search bar is **pre-positioned** in world space so its cursor lands at `CURSOR_TARGET_FRACTION × VIEWPORT_W` once typing has filled the bar. See [camera-cursor-tracking](../rules/camera-cursor-tracking.md) for the full two-phase camera pattern.
 
 ### Interactive Element Sizing
 
-The search bar is a **hero element** in Shot 2 — it commands the screen, not floats as a small widget. Size all dimensions proportionally from `fontSize`, which should be **8–12% of viewport height** (96–130 px at 1080p).
+The search bar is a **hero element** in Shot 2 — it commands the screen, not floats as a small widget. Size all dimensions proportionally from `BAR_FONT_SIZE`. Too small a font reads as a UI component, not a cinematic element; the bar should feel like a zoomed-in product shot.
 
 ```
-fontSize:      120                                    /* anchor */
-pillHeight:    fontSize × 2  = 240                    /* generous vertical padding */
-paddingLeft:   fontSize × 1  = 120                    /* comfortable text inset */
-paddingRight:  fontSize × 1.5 = 180                   /* visual balance, room for cursor */
-pillWidth:     paddingLeft + fullTextWidth + cursorWidth + paddingRight
-```
-
-Too small a `fontSize` (< 80 px at 1080p) makes the bar look like a UI component, not a cinematic element. The bar should feel like a zoomed-in product shot.
-
-### Timing
-
-Typing start must be delayed until the pan is essentially complete.
-
-```js
-const TYPING_START = PAN_START + PAN_DURATION + 0.17; // ≈5 frames after pan ends
+BAR_FONT_SIZE      = anchor (target ~8-12% of viewport height)
+BAR_HEIGHT         = BAR_FONT_SIZE × HEIGHT_RATIO
+PADDING_LEFT       = BAR_FONT_SIZE × PAD_L_RATIO
+PADDING_RIGHT      = BAR_FONT_SIZE × PAD_R_RATIO   (PAD_R_RATIO > PAD_L_RATIO leaves room for the cursor)
+barWidth           = PADDING_LEFT + measuredTextWidth + cursorWidth + PADDING_RIGHT
 ```
 
 ### Cursor-Locked Positioning
 
-In the the source source, the search bar's `left` property was recalculated every frame from the typing progress. In HyperFrames, **`left` is a forbidden tween target** (layout property). Use one of:
+The natural source pattern recomputes the bar's `left` per frame from typing progress. In HyperFrames, **`left` is a forbidden tween target** (layout property). Two compatible options:
 
-1. **Pre-position the bar** at the world coordinate where the empty cursor sits at `CURSOR_TARGET`, then move the _camera_ (via the strip's `x`) to follow the cursor — see [camera-cursor-tracking](../rules/camera-cursor-tracking.md).
+1. **Pre-position the bar** at the world coordinate where its empty cursor sits at `CURSOR_TARGET_FRACTION × VIEWPORT_W`, then move the _camera_ (via the strip's `x`) to follow the cursor — see [camera-cursor-tracking](../rules/camera-cursor-tracking.md).
 2. **Pre-allocate the bar's full width** and move the bar with GSAP `x` (transform alias) — but the camera is already controlled by the strip, so this requires nested transforms and is harder to reason about. Prefer option 1.
 
 ```js
-// Pre-allocated bar width from real text measurement, not charWidthRatio.
-await document.fonts.ready;
-const fullTextWidth = measureNodeWidth(FULL_TEXT, "search-text");
-const barWidth = PADDING_LEFT + fullTextWidth + cursorWidth + PADDING_RIGHT;
+// Pre-allocated bar width from real text measurement.
+const fullTextWidth = measureNodeWidth(FULL_TEXT, barFontStack);
+const barWidth = PADDING_LEFT + fullTextWidth + CURSOR_VIS_W + PADDING_RIGHT;
 document.querySelector(".shot2-bar").style.width = barWidth + "px";
 ```
 
-Use `getBoundingClientRect()` or `ctx.measureText()` for text width — **never** estimate with `charWidthRatio`. Proportional fonts diverge by tens of pixels per 30-character string.
+Use `getBoundingClientRect()` or `ctx.measureText()` for text width — **never** estimate with `charWidthRatio`. Proportional fonts diverge by tens of pixels per long string.
 
 ## Inter-Phase State Handoff
 
@@ -214,44 +236,130 @@ Phase 1 → Phase 2:
 
 Phase 2 → Phase 3:
   Decode must visually settle before pan starts.
-  PAN_START ≥ flipStart + flipStagger × (N-1) + flipDuration + 0.2
+  PAN_START ≥ FLIP_START + FLIP_STAGGER × (N - 1) + FLIP_DUR + small buffer
+  where N = accentWord.length.
 
 Phase 3 → Phase 4:
   Pan must be near complete before typing starts.
-  TYPING_START = PAN_START + PAN_DURATION + ~0.17s buffer.
+  TYPING_START = PAN_START + PAN_DUR + small buffer
   Starting typing during the pan is disorienting — the eye can't read.
 
 Inside Phase 4:
-  Camera tracking is piecewise: hold initial offset until the typing cursor
-  would exceed CURSOR_TARGET (in screen space), then follow. See
-  camera-cursor-tracking.md for the Math.min(initial, tracking) formulation.
+  Camera tracking is piecewise:
+    finalStripX = Math.min(STRIP_BASE_X + INITIAL_OFFSET, trackingStripX)
+  Hold the initial offset until the typing cursor would exceed
+  CURSOR_TARGET_FRACTION × VIEWPORT_W in screen space, then follow.
+  See camera-cursor-tracking.md for the formulation.
   If typing ends before the root composition's data-duration, extend the scene
-  with a real visual hold (for example a finite cursor blink) through the root
-  duration so Studio's playhead and the GSAP timeline end at the same time.
+  with a real visual hold (e.g. a finite cursor blink) through the root duration
+  so Studio's playhead and the GSAP timeline end at the same time.
 ```
+
+## How to Choose Values
+
+### Layout constants
+
+- **VIEWPORT_W / VIEWPORT_H** — composition dimensions in CSS pixels.
+  - Constraints: must equal the scene root's `data-width` / `data-height`; the shot strip uses `VIEWPORT_W` as the per-shot width and as the camera pan distance — any mismatch over- or under-shoots the pan
+- **SHOT1_FONT_SIZE** — Shot 1 row font size.
+  - Range: ~10-14% of viewport height for a hero phrase; smaller for denser copy
+- **SHOT1_GAP_EM** — flex `gap` between static phrase and accent word.
+  - Range: 0.2-0.6em; large enough that the words don't visually fuse, small enough to read as one phrase
+- **STATIC_WEIGHT / ACCENT_WEIGHT** — font weights for static vs accent text.
+  - Constraints: `ACCENT_WEIGHT > STATIC_WEIGHT` so the decoded word reads as dominant
+- **PERSPECTIVE** — CSS `perspective` on the accent container, required by the 3D flip glyphs.
+  - Range: 400-1200px; smaller is more aggressive perspective, larger is flatter
+- **BAR_FONT_SIZE** — search-bar font size.
+  - Range: ~8-12% of viewport height; below ~6% reads as a UI widget
+- **BAR_HEIGHT / PADDING_LEFT / PADDING_RIGHT** — sized proportionally to `BAR_FONT_SIZE` via `HEIGHT_RATIO`, `PAD_L_RATIO`, `PAD_R_RATIO`.
+  - Range: HEIGHT_RATIO ~1.8-2.2 (generous vertical padding); PAD_L_RATIO ~0.8-1.2; PAD_R_RATIO ~1.2-1.6 (room for cursor)
+- **BAR_RADIUS** — corner radius of the search bar.
+  - Range: 0 (square) → `BAR_HEIGHT / 2` (full pill)
+
+### Phase 1 — Shot 1 text entry
+
+- **ENTRY_START** — phase begins.
+  - Constraints: typically 0
+- **ENTRY_DUR** — fade + rise duration.
+  - Range: 0.4-1.0s; under 0.3s reads as a pop, over 1s drags
+- **RISE_DIST** — pixels the text rises into place.
+  - Range: 20-60px; small enough that the motion reads as a settle, not an entrance from off-screen
+
+### Phase 2 — hacker-flip decode
+
+- **FLIP_START** — first glyph begins flipping.
+  - Constraints: `≥ ENTRY_START + ENTRY_DUR` (no overlap with the entry fade)
+- **FLIP_STAGGER** — seconds between successive glyph flip starts.
+  - Range: 0.04-0.1s; faster reads as one cascade, slower as discrete reveals
+- **FLIP_DUR** — duration of one glyph's flip.
+  - Range: 0.4-0.8s; should comfortably exceed `FLIP_STAGGER × (N - 1)` so multiple glyphs are mid-flip simultaneously
+- **FLIP_BOUNCE** — `back.out(${FLIP_BOUNCE})` overshoot strength on the character flip.
+  - Range: 1.2-2.0; pairs with the rule's character-flip ease
+
+### Phase 3 — pan + parallax + Shot 2 entry
+
+- **PAN_START** — strip begins to slide.
+  - Constraints: `≥ FLIP_START + FLIP_STAGGER × (N - 1) + FLIP_DUR + ~0.2s` so the decode visually settles
+- **PAN_DUR** — duration of the camera pan, parallax exit, and Shot 2 entry. All three tweens MUST share this duration.
+  - Range: 0.5-1.0s; under 0.4s reads as a whip-pan, over 1.2s drags
+- **PARALLAX_DIST** — extra pixels Shot 1 content moves beyond the strip (near-plane depth illusion).
+  - Range: 300-500px at 1920×1080 (~15-25% of viewport width). Larger creates a stronger depth illusion, but too much makes Shot 1 feel "thrown away"
+- **FADE_RATIO** — fraction of `PAN_DUR` over which Shot 1 fades out.
+  - Range: 0.3-0.5; fades early so the eye lands on Shot 2 before the pan completes
+- **ENTRY_SCALE_FROM** — Shot 2 bar initial scale.
+  - Range: 0.7-0.9; smaller exaggerates the "landing" feel
+- **ENTRY_BOUNCE** — `back.out(${ENTRY_BOUNCE})` overshoot on Shot 2 entry.
+  - Range: 1.0-1.6; pairs with the cinematic-pan feel without competing with it
+
+### Phase 4 — typing + camera tracking
+
+- **TYPING_START** — phase begins.
+  - Constraints: `= PAN_START + PAN_DUR + small buffer (~0.15-0.2s)` so the eye settles before reading
+- **CHAR_RATE** — seconds per character of the typed string.
+  - Range: 0.06-0.13s; under 0.05s reads as a paste, over 0.15s as hunt-and-peck
+- **CURSOR_TARGET_FRACTION** — fraction of viewport width where the cursor locks during tracking.
+  - Range: 0.5 (center) → 0.75 (right-leaning); matches the rule's value
+- **CURSOR_VIS_W** — visual cursor width approximation, used to size the bar's right-side allowance.
+  - Range: ~0.4-0.8 × `BAR_FONT_SIZE`; the bar's `PADDING_RIGHT` plus `CURSOR_VIS_W` must keep the cursor visible at full text width
+- **BAR_LEFT_MARGIN** — initial left offset of the bar inside Shot 2.
+  - Range: 40-120px; the camera math compensates for whatever this value is, so choose by where the empty bar should sit visually before tracking starts
+- **STRIP_BASE_X** — strip's x at the end of Phase 3 (Shot 2 fully on screen).
+  - Constraints: equals `-VIEWPORT_W` by construction; the Phase 4 tracking offset is added on top of this
+- **INITIAL_OFFSET** — Phase-4 strip offset before tracking kicks in.
+  - Range: 0 by default (bar already sits at `BAR_LEFT_MARGIN`); non-zero values pre-shift the bar in screen space
+
+### Ease choices (discrete)
+
+- Shot 1 entry rise: `power2.out` — soft landing
+- Camera pan / parallax: `power3.inOut` — cinematic slow-in-slow-out; **never** `back.out` (overshoot reads as UI)
+- Shot 1 fade during pan: `power2.out`
+- Shot 2 entry: `back.out(${ENTRY_BOUNCE})` — mild overshoot baked into the ease
+- Typing driver: `"none"` — linear keystrokes; any easing distorts cadence
+- Camera tracking in Phase 4: piecewise `Math.min`, no per-tween ease (the strip's `x` is set via `gsap.set` inside `onUpdate`)
 
 ## Critical Constraints
 
-- **Shot width = `data-width`**: Each shot div is exactly the composition's `data-width`. Mismatch causes the pan to over- or under-shoot.
+- **Shot width = `VIEWPORT_W` = composition's `data-width`**: Each shot div is exactly the composition's `data-width`. Mismatch causes the pan to over- or under-shoot.
 - **`flex-shrink: 0` on every shot**: Without it, flex compresses shots into one viewport and the pan distance is wrong.
 - **Parallax is additive**: Shot 1 content's `x` offset is **in addition** to the strip's `x`. Both tween at the same start time so the effect reads as a layered depth move, not two competing animations.
 - **Pan ease, not bounce ease**: `power3.inOut` or `power2.out` for the strip. Avoid `back.out` — overshoot reads as UI, not camera. Reserve `back.out` for element entries within shots.
-- **Typing delay**: `TYPING_START ≥ PAN_START + PAN_DURATION + buffer`. Buffer ~0.15–0.2s lets the eye settle.
-- **Measure text after fonts ready**: All `measureNodeWidth()` calls happen inside `document.fonts.ready.then(...)`. Otherwise the measurement uses fallback font metrics and the bar/cursor alignment is off.
+- **Typing delay**: `TYPING_START ≥ PAN_START + PAN_DUR + small buffer`. The buffer (typically ~0.15-0.2s) lets the eye settle before reading.
+- **Measure text with a DOM probe**: Use `getBoundingClientRect()` on a hidden node. Never estimate with `charWidthRatio`. See the rule's note on the worker-race tradeoff between `document.fonts.ready` and synchronous timeline registration.
 - **Pre-allocate the bar's width**: Compute from the full target string once, freeze the bar's `width` style. Don't tween width or rely on text-driven growth.
 - **GSAP transform aliases only**: `x`, `y`, `scale`, `rotation`. The composition has at least three transforms in flight at peak (camera strip, shot1 parallax, shot2 entry) — all must be transform-only to stay on the compositor.
 - **Single paused timeline**: All four phases live on one `gsap.timeline({ paused: true })`, registered to `window.__timelines[data-composition-id]`.
+- **Piecewise `Math.min` camera handoff**: Phase 4 must use `Math.min(STRIP_BASE_X + INITIAL_OFFSET, trackingStripX)` so the static→tracking handoff is mathematically continuous. A hard `if (charsTyped > threshold)` branch will visibly jump.
 
 ## Spring → GSAP Ease Cheatsheet (this blueprint)
 
-| Source spring                                                          | This blueprint uses                             |
-| ---------------------------------------------------------------------- | ----------------------------------------------- |
-| `spring({ stiffness: 60, damping: 12, mass: 1.2 })` — cinematic camera | `power3.inOut`                                  |
-| `spring({ stiffness: 150, damping: 14 })` — character flip             | `back.out(1.6)`                                 |
-| Shot 2 entry scale 0.8 → 1.02 → 1                                      | `back.out(1.2)` (overshoot baked into the ease) |
+| Source spring                                              | This blueprint uses         |
+| ---------------------------------------------------------- | --------------------------- |
+| Cinematic camera (low stiffness, high damping, heavy mass) | `power3.inOut`              |
+| Character flip (high stiffness, medium damping)            | `back.out(${FLIP_BOUNCE})`  |
+| Shot 2 entry with mild overshoot                           | `back.out(${ENTRY_BOUNCE})` |
 
 See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
 
 ## Golden Sample
 
-- [concept-demo-decode-pan.html](../examples/concept-demo-decode-pan.html) — "Spark your next campaign" hacker-flip decode → horizontal pan with parallax → "Tell me how to target parents" cursor-tracked search-bar typing. Single paused GSAP timeline drives all four phases.
+- [concept-demo-decode-pan.html](../examples/concept-demo-decode-pan.html) — runnable composition that realizes every named constant in this blueprint with concrete values. Single paused GSAP timeline drives all four phases: Shot 1 phrase + accent-word hacker-flip decode → horizontal pan with parallax → Shot 2 cursor-tracked search-bar typing with piecewise `Math.min` camera handoff.
