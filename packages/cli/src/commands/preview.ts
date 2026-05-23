@@ -262,6 +262,8 @@ async function runDevMode(
   // SIGINT to the foreground process group (covers the common case), but
   // `kill <pid>` only targets this process — the child tree (Vite + Chrome)
   // would survive without explicit cleanup.
+  // On Windows, killProcessTree is a no-op (pgrep/ps unavailable); Ctrl+C
+  // propagates via the console process group instead.
   const shutdown = () => {
     if (child.pid) killProcessTree(child.pid);
   };
@@ -366,6 +368,7 @@ async function runLocalStudioMode(
     });
   }
 
+  // Same tree-kill handler as dev mode. No-op on Windows (see comment above).
   const shutdown = () => {
     if (child.pid) killProcessTree(child.pid);
   };
@@ -504,25 +507,38 @@ async function runEmbeddedMode(
       console.log();
       console.log(`  ${c.dim("Shutting down studio...")}`);
 
-      // Kill all child processes (browsers, ffmpeg) before closing the server.
-      // This is the centralized cleanup path — studioServer no longer registers
-      // its own per-process signal handlers.
+      // Hard deadline: if cleanup hangs (e.g. dead Chrome never responds to
+      // browser.close()), force exit. Armed before awaiting cleanup so it
+      // can't be blocked by a stuck drainBrowserPool().
+      setTimeout(() => process.exit(0), 3000).unref();
+
+      // Kill ffmpeg first (sync, fast), then drain browsers (async, slower).
       const cleanup = async () => {
         const { closeThumbnailBrowser } = await import("../server/studioServer.js");
         const { drainBrowserPool, killTrackedProcesses } = await import("@hyperframes/engine");
+        killTrackedProcesses();
         await closeThumbnailBrowser().catch(() => {});
         await drainBrowserPool().catch(() => {});
-        killTrackedProcesses();
       };
 
       cleanup()
         .catch(() => {})
         .finally(() => {
           result.server.close(() => resolveRun());
-          setTimeout(() => process.exit(0), 3000).unref();
         });
     };
     process.once("SIGINT", shutdown);
     process.once("SIGTERM", shutdown);
+
+    // Last-resort cleanup for crash paths (unhandled exceptions/rejections)
+    // that bypass the signal handlers. Eagerly resolve the sync killer so
+    // the 'exit' handler (which is synchronous) can call it directly.
+    import("@hyperframes/engine")
+      .then(({ killTrackedProcesses }) => {
+        process.once("exit", () => {
+          if (!shuttingDown) killTrackedProcesses();
+        });
+      })
+      .catch(() => {});
   });
 }

@@ -10,6 +10,9 @@ import { execSync } from "node:child_process";
  * its parent died). We kill the orphan's entire subtree so child helper
  * processes (GPU, renderer, network, etc.) are also cleaned up.
  *
+ * Scoped to the current user via `pgrep -u` to avoid touching other
+ * users' processes on shared machines.
+ *
  * Returns the count of killed process trees.
  */
 export function killOrphanedProcesses(): number {
@@ -17,13 +20,10 @@ export function killOrphanedProcesses(): number {
 
   let killed = 0;
 
-  // chrome-headless-shell: used in production/CI via the engine's browser manager.
   for (const name of ["chrome-headless-shell", "chrome_headless_shell"]) {
     killed += killOrphansByName(name);
   }
 
-  // Puppeteer-launched Chrome (dev mode): identified by the temp profile dir
-  // that Puppeteer creates. This avoids killing the user's real Chrome.
   killed += killOrphansByName("puppeteer_dev_chrome_profile");
 
   return killed;
@@ -33,6 +33,9 @@ export function killOrphanedProcesses(): number {
  * Kill an entire process tree rooted at `pid`. Walks descendants
  * depth-first so children are killed before parents, preventing
  * re-adoption races.
+ *
+ * No-op on Windows — process groups are managed differently and
+ * the pgrep/ps utilities are not available.
  */
 export function killProcessTree(pid: number, signal: NodeJS.Signals = "SIGTERM"): void {
   if (process.platform === "win32") return;
@@ -73,9 +76,11 @@ function getDescendants(pid: number): number[] {
 }
 
 function killOrphansByName(processName: string): number {
+  const uid = getUid();
+  const userFlag = uid !== null ? `-u ${uid} ` : "";
   let pids: number[];
   try {
-    const raw = execSync(`pgrep -f ${processName}`, {
+    const raw = execSync(`pgrep ${userFlag}-f ${processName}`, {
       encoding: "utf-8",
       timeout: 3000,
     }).trim();
@@ -95,6 +100,18 @@ function killOrphansByName(processName: string): number {
     killed++;
   }
   return killed;
+}
+
+let _cachedUid: string | null | undefined;
+
+function getUid(): string | null {
+  if (_cachedUid !== undefined) return _cachedUid;
+  try {
+    _cachedUid = execSync("id -u", { encoding: "utf-8", timeout: 1000 }).trim();
+  } catch {
+    _cachedUid = null;
+  }
+  return _cachedUid;
 }
 
 function isOrphan(pid: number): boolean {
