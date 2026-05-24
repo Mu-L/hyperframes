@@ -25,9 +25,9 @@ triggers:
 
 # CTA · Morph & Press (HyperFrames)
 
-Hero enters with breathing idle → morphs into CTA via scale-swap → cursor approaches → physics-based click reaction.
+This is a "presence → action" arc: the hero establishes the brand for a beat or two — alive but resting, just a faint rotational breath on the logo — then condenses into a smaller, brighter CTA at the same screen center; a cursor arrives from off-stage and lands a physical click on it. The viewer's eye is moved from "this is who we are" to "and this is what you do."
 
-Same four-phase "presence → action" arc; one paused GSAP timeline; constituent patterns map to [sine-wave-loop](../rules/sine-wave-loop.md), [scale-swap-transition](../rules/scale-swap-transition.md), and [physics-press-reaction](../rules/physics-press-reaction.md).
+Four phases on a single paused GSAP timeline. The morph (Phase 2) and the click (Phase 4) are the headline beats; Phases 1 and 3 are the setup and approach that make those beats legible.
 
 ## When to Use
 
@@ -36,364 +36,148 @@ Same four-phase "presence → action" arc; one paused GSAP timeline; constituent
 - Final beat is a simulated click interaction with physical feedback
 - Hero needs subtle ambient motion before transformation
 
-## Phase Pipeline
+## Orchestration
 
-All boundaries are in **seconds**.
+Each phase maps to one rule (or an inline pattern) — pick the variation that fits this scene's specific constraints, not the rule's default:
 
-| Phase | Time window                                  | What Happens                                                              | Skill Reference                                                                 |
-| ----- | -------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 1     | `INTRO_START – MORPH_AT`                     | Hero enters (y rise + fade) + ambient rotation idle                       | [sine-wave-loop](../rules/sine-wave-loop.md) (onUpdate form, reads `tl.time()`) |
-| 2     | `MORPH_AT – CURSOR_ENTER_AT`                 | Hero shrinks/fades; CTA pops in with overshoot; text reveals after a beat | [scale-swap-transition](../rules/scale-swap-transition.md)                      |
-| 3     | `CURSOR_ENTER_AT – CLICK_DOWN_AT`            | Cursor enters from off-screen bottom-right via spring path                | inline spring tween                                                             |
-| 4     | `CLICK_DOWN_AT – CLICK_UP_AT + CLICK_UP_DUR` | Cursor and CTA scale-dip together, then recover                           | [physics-press-reaction](../rules/physics-press-reaction.md)                    |
+- **Phase 1 — hero entrance + breath**: inline `power3.out` fade-and-rise for the entrance, plus [sine-wave-loop](../rules/sine-wave-loop.md) in its **rotation-only, scope-restricted** variation. The rule's main form breathes scale + y on the entire focal element; here we deliberately apply it **only to `.hero-logo`**, not the whole hero. Reason: the hero's `scale` gets overwritten by the Phase 2 morph exit, and a scale-breath on the hero itself would fight that tween in the overlap. Rotation alone reads as alive, and scoping it to the logo keeps the title text rock-stable. Scale-breath below ~0.012 is under the perception threshold anyway — skip it without regret.
+- **Phase 2 — morph swap**: use [scale-swap-transition](../rules/scale-swap-transition.md), but **without the rule's `inset: 0` card-in-fixed-wrap container**. Hero and CTA are flex-centered siblings here, not stacked cards. They still share `transform-origin: 50% 50%` (which is what actually sells the morph), but their footprint is governed by flex and intrinsic content size, not a `SWAP_WRAP_W × SWAP_WRAP_H` box. The CTA's `position: absolute` keeps it from displacing the hero in the document flow during the brief overlap. See "Phase 2 seam" below.
+- **Phase 3 — cursor approach**: no rule — inline. [physics-press-reaction](../rules/physics-press-reaction.md) does include an APPROACH sub-phase, but its default lands the cursor dead-center on the button (`BUTTON_CENTER`) with `power2.inOut`. This scene wants a **`power2.out` deceleration from off-screen** (cursor "arrives" rather than "passes through"), and the landing point must be **a few px off the button's geometric center** so the click reads as human, not scripted. Cursor opacity also hard-cuts in via a near-zero-duration `fromTo` — see "Phase 3 seam."
+- **Phase 4 — press + release**: use [physics-press-reaction](../rules/physics-press-reaction.md), but **only the PRESS_DOWN + RELEASE portion** — Phase 3 has already handled the APPROACH inline. The press fires with the rule's signature `["#cta", "#cursor"]` single-target-array tween so both elements compress in perfect lockstep. See "Phase 4 seam" for why we lean on GSAP's auto-overwrite rather than composing scales manually.
 
-## Element Sizing
+## Phase Timing
 
-All dimensions derive from `data-height` (composition height). Proportional sizing keeps the morph illusion consistent across resolutions.
+All boundaries are in seconds.
 
-### Hero Element
+| Phase | Start ≥                             | Internal duration                  | Notes                                                        |
+| ----- | ----------------------------------- | ---------------------------------- | ------------------------------------------------------------ |
+| 1     | `0.1–0.4s` (`INTRO_START`)          | `INTRO_DUR` (0.35–0.7s)            | Breath rotation runs from `t=0`, invisible until entry fades |
+| 2     | `INTRO_START + INTRO_DUR + 1–2s`    | `MORPH_EXIT_DUR` / `MORPH_ENT_DUR` | The 1–2s presence-dwell is the most important gap here       |
+| 3     | `MORPH_AT + MORPH_ENT_DUR + ~0.1s`  | `CURSOR_PATH_DUR` (0.7–1.4s)       | CTA's back.out tail must settle before the cursor enters     |
+| 4     | `CURSOR_ENTER_AT + CURSOR_PATH_DUR` | `CLICK_DOWN_DUR + CLICK_UP_DUR`    | **Exactly equal**, not "greater than" — see Phase 3→4 seam   |
 
-The hero dominates Phase 1 — it must command the viewport. Text-based heroes use oversized typography. All sizes derive from `data-height`; see "How to Choose Values" for `HERO_FONT_RATIO`, `HERO_LETTER_SPACING_EM`, and `HERO_ICON_RATIO`.
+The 1–2s **presence-dwell** between Phase 1 and Phase 2 is the gap that almost everyone gets wrong by making it too short. Morphing the hero away half a second after it lands robs the brand of any actual presence — the viewer registers the morph as the headline and forgets the hero ever existed. Dwell long enough that the breath rotation completes most of a cycle (so the viewer's eye notices the aliveness) before transforming.
 
-Hero elements should fill ~60–80% of viewport width. Too small and the morph reads as a UI transition, not a cinematic beat.
+The `~0.1s` between Phase 2 and Phase 3 is the same idea as brand-reveal's `back.out` settling gap: the CTA's overshoot is still oscillating fractionally for a few frames after its nominal duration, and a cursor entering during those frames "shakes the camera." Wait for the spring tail.
 
-### CTA Button
+The `CLICK_DOWN_AT == CURSOR_ENTER_AT + CURSOR_PATH_DUR` constraint between Phase 3 and Phase 4 is **a strict equality, not a buffer**. The viewer perceives "cursor lands" and "button compresses" as a single causal event; any gap, even one frame, reads as the cursor pausing then clicking. Bind these two values to the same expression in code.
 
-CTA sizing derives from `data-height` via `CTA_FONT_RATIO`, with padding and border-radius derived from font size (see How to Choose Values for ratios).
+After the release, hold at least one full second of climax dwell (`TOTAL_DUR ≥ CLICK_UP_AT + CLICK_UP_DUR + 1s`) so the spring rebound is legible — otherwise the comp ends mid-overshoot and the press never quite "lands."
 
-CTA total width should be ~30–50% of viewport width. The **CTA must be smaller than the hero** — the morph reads as "condensing" into a focused action element. If `ctaTotalWidth > heroGroupWidth × CTA_MAX_REL_HERO`, the morph reads as expansion, which is wrong for this blueprint.
+## Initial DOM Nesting
 
-### Cursor
+The relevant fact is that hero and CTA are **siblings sharing the same flex-centered viewport position**, not stacked `inset:0` cards as in `scale-swap-transition`'s default. The cursor is a third sibling living at scene-root level, free to translate anywhere.
 
-Cursor sizing derives from `ctaFontSize` via `CURSOR_REL_CTA`. Use inline SVG with `viewBox` for resolution-independent rendering. Add a drop-shadow filter (`stdDeviation`, `floodOpacity` per How to Choose) for depth.
-
-## Layout
-
-Hero and CTA share the same screen center sequentially. Both are absolutely positioned and centered via flex. Cursor is positioned independently — its motion path lands offset from center (where a human would naturally aim).
-
-```html
-<div
-  class="stage"
-  style="position: absolute; inset: 0;
-     display: flex; align-items: center; justify-content: center;
-     background: {sceneBg};"
->
-  <!-- Phase 1+2: Hero (will exit during morph) -->
-  <div class="hero" id="hero">
-    <h1 class="hero-text">{Brand}</h1>
-    <div class="hero-logo">
-      <svg class="logo-svg">...</svg>
-    </div>
-  </div>
-
-  <!-- Phase 2+: CTA (initially scale 0, pops in during morph) -->
-  <div class="cta" id="cta" style="position: absolute; z-index: 10;">
-    <span class="cta-text">{ctaCopy}</span>
-  </div>
-
-  <!-- Phase 3+: Cursor (initially opacity 0, hard-cuts in) -->
-  <div class="cursor" id="cursor" style="position: absolute; z-index: 100; opacity: 0;">
-    <svg class="cursor-svg">...</svg>
-  </div>
-</div>
+```
+.stage  (flex; align/justify center; relative)
+├── #hero
+│     ├── .hero-text
+│     └── .hero-logo   ← Phase 1 breath target (rotation only)
+├── #cta  (position: absolute; z-index 10)
+│     └── .cta-text    ← reveals after container reaches recognizable scale
+└── #cursor (position: absolute; z-index 100)
 ```
 
-## Phase 1: Hero Entrance + Breathing Idle
+The CTA's `position: absolute` is essential — without it, the CTA would push the hero out of the flex layout the moment it materialises, and both elements would shift sideways instead of morphing in place. Hero stays in flow; CTA layers on top.
 
-Two layered animations on the hero:
+## Phase 1 Seam: Why Breath Lives on `.hero-logo`, Not `.hero`
 
-1. **Spring entrance** — `opacity` 0 → 1 and `y` from `+INTRO_Y_PX` to 0
-2. **Breathing rotation** on the logo only — onUpdate sine, ±`LOGO_ROT_AMP_DEG` amplitude
+The breath rotation uses the `onUpdate` form from [sine-wave-loop](../rules/sine-wave-loop.md) but written against `tl.time()` directly (not a phase-tween from 0 → 2π), and the target is **the logo sub-element only**. Three reasons stack here:
 
-The breathing rotation runs continuously from `t = 0`; it's invisible until the entrance fades the hero in.
+1. The Phase 2 morph exit tweens `#hero { scale: EXIT_SCALE }`. If the breath were also writing `scale` onto `#hero`, the two tweens would race and GSAP's auto-overwrite would silently drop one.
+2. Scoping breath to the logo lets the hero's title text stay rigid — moving text reads as instability, not life.
+3. Pure rotation at `±2–6°` is enough to communicate "alive but resting"; adding a sub-threshold scale-breath only complicates the morph exit math without adding perceptible motion.
 
-```js
-tl.fromTo(
-  ".hero",
-  { opacity: 0, y: INTRO_Y_PX },
-  { opacity: 1, y: 0, duration: INTRO_DUR, ease: "power3.out" },
-  INTRO_START,
-);
+This is a one-sentence variation of `sine-wave-loop` worth flagging: the rule's main example writes both scale and y; the rotation-only sub-element form is a real pattern but barely shown.
 
-// Subtle breathing rotation on the logo only (onUpdate form, reads tl.time()).
-// Sized so the comp shows just under one full cycle — alive but barely perceptible.
-const logoEl = document.querySelector(".hero-logo");
-tl.to(
-  { tick: 0 },
-  {
-    tick: 1,
-    duration: TOTAL_DUR,
-    ease: "none",
-    onUpdate: function () {
-      const t = tl.time();
-      gsap.set(logoEl, { rotation: Math.sin(t * LOGO_ROT_FREQ) * LOGO_ROT_AMP_DEG });
-    },
-  },
-  0,
-);
-```
+## Phase 2 Seam: Same Center, Different Container Topology
 
-Why not scale-breath too? Sub-`SCALE_BREATH_THRESHOLD` scale modulation is below the visual threshold for most viewers, and including it complicates the morph exit (the exit tween's `scale: EXIT_SCALE` has to overwrite the breath). Skip it; rotation alone reads as alive.
+[scale-swap-transition](../rules/scale-swap-transition.md) assumes both swap targets share an `inset: 0` parent inside a fixed `SWAP_WRAP_W × SWAP_WRAP_H` wrap. This scene breaks that assumption because the hero is a typographic group whose intrinsic width depends on `{Brand}` — pre-locking a wrap size would either crop the brand or pad the CTA with dead space.
 
-## Phase 2: Scale-Swap Morph (Core Transition)
+The substitute: both elements rely on the parent `.stage`'s `align-items: center; justify-content: center` for centering, and `#cta` is taken out of flow with `position: absolute` so its existence doesn't perturb the hero. Both still need `transform-origin: 50% 50%` (the rule's central principle), and `z-index: 10` on the CTA (above hero) so the hero's fade tail doesn't bleed through.
 
-Single trigger `MORPH_AT`. Three tween clusters fire concurrently:
+The morph reads as **condensation** only when `ctaTotalWidth < heroGroupWidth`. Inverted, the same scale-swap reads as expansion (small thing becoming big thing) which is the wrong narrative for "brand condenses into a focused action." `CTA_MAX_REL_HERO` (0.5–0.8) is the safety rail; values above 0.8 visibly invert the illusion. Measure both widths after `document.fonts.ready` if you want this guaranteed at render time.
 
-1. **Hero shrinks** (`scale 1 → EXIT_SCALE`)
-2. **Hero opacity** (`1 → 0`) — completes faster than the shrink (`MORPH_FADE_DUR` ≈ a small fraction of `MORPH_EXIT_DUR`) so the fade lands before the shrink finishes
-3. **CTA pops in** (`scale 0 → 1`, `opacity 0 → 1`) with `back.out(${BOUNCE_FACTOR})` overshoot
+Inside the CTA, the inner text reveals at `MORPH_AT + 0.17s` (or `~0.3 × MORPH_ENT_DUR`) **after** the container has scaled past the early micro-frames of the `back.out`. Revealing text during the early bounce makes it pop at micro-scale and look like a glitch.
+
+## Phase 3 Seam: Cursor Entry — Hard-Cut Opacity, Offset Landing
+
+Two scene-specific tricks the rule doesn't spell out:
+
+**Hard-cut opacity.** Real cursors don't fade in — they're either there or not. Implement with a near-zero-duration `fromTo`:
 
 ```js
-// CTA initial state — set before the timeline runs so it's invisible pre-morph.
-gsap.set("#cta", { scale: 0, opacity: 0 });
-gsap.set(".cta-text", { opacity: 0, y: TEXT_REVEAL_Y_PX });
-
-// (1) Hero shrinks
-tl.to("#hero", { scale: EXIT_SCALE, duration: MORPH_EXIT_DUR, ease: "power3.out" }, MORPH_AT);
-
-// (2) Hero fades fast (small fraction of MORPH_EXIT_DUR)
-tl.to("#hero", { opacity: 0, duration: MORPH_FADE_DUR, ease: "power2.out" }, MORPH_AT);
-
-// (3) CTA pops in with overshoot
-tl.to(
-  "#cta",
-  { scale: 1, opacity: 1, duration: MORPH_ENT_DUR, ease: `back.out(${BOUNCE_FACTOR})` },
-  MORPH_AT,
-);
-
-// (4) CTA text reveals slightly after the container reaches recognizable scale.
-tl.to(
-  ".cta-text",
-  { opacity: 1, y: 0, duration: TEXT_REVEAL_DUR, ease: "power2.out" },
-  TEXT_REVEAL_AT,
-);
-```
-
-See [scale-swap-transition](../rules/scale-swap-transition.md) for the full pattern and ease mapping.
-
-## Phase 3: Cursor Motion Path
-
-The cursor enters from beyond the viewport's bottom-right and follows a spring path toward a target slightly offset from center (where a human would naturally aim — not dead-center on the button, but a hair right and below).
-
-```js
-// W and H are the composition's data-width / data-height (real numbers in the example).
-const CURSOR_START_X = W + CURSOR_OFFSCREEN_X_PX;
-const CURSOR_START_Y = H + CURSOR_OFFSCREEN_Y_PX;
-const CURSOR_TARGET_X = W / 2 + CURSOR_TARGET_OFFSET_X_PX; // slightly right of center
-const CURSOR_TARGET_Y = H / 2 + CURSOR_TARGET_OFFSET_Y_PX; // slightly below center
-
-// Cursor initial position (off-screen) + scale 1 (no entrance scale).
-gsap.set("#cursor", {
-  x: CURSOR_START_X,
-  y: CURSOR_START_Y,
-  scale: 1,
-});
-
-// HARD-CUT opacity. Cursors appear instantly — they don't fade in.
-// A near-zero-duration tween creates a step change that scrubs correctly.
 tl.fromTo(
   "#cursor",
   { opacity: 0 },
   { opacity: 1, duration: HARD_CUT_DUR, ease: "none" },
   CURSOR_ENTER_AT,
 );
-
-// Spring-driven approach path.
-tl.to(
-  "#cursor",
-  { x: CURSOR_TARGET_X, y: CURSOR_TARGET_Y, duration: CURSOR_PATH_DUR, ease: "power2.out" },
-  CURSOR_ENTER_AT,
-);
 ```
 
-**Why hard-cut opacity, not a fade?** Real cursors don't fade in — they instantly appear at their last known position. A fade-in cursor looks like a ghost. Use a `fromTo` with a near-zero `HARD_CUT_DUR` to create a step change rather than a smooth transition.
+`HARD_CUT_DUR` lives in the 0.001–0.01s range — small enough to read as instant under HF's frame-stepped seek, but non-zero so it produces an actual step change in the seekable timeline rather than a `set()` that might be missed during a reverse seek.
 
-**Why offset target, not dead-center?** Click targets are typically off-center by a small handful of pixels when a user clicks — the cursor lands where the eye + hand coordinate to, which has a slight bias toward the visible center of mass of the button. Dead-center lands too perfectly and reads as scripted.
-
-## Phase 4: Physics-Based Press (Core Interaction)
-
-Two scale tweens applied to **both** the CTA and the cursor simultaneously. The synchronized deformation is what sells the contact — the cursor "pushes into" the button.
+**Offset landing, not dead-center.** The cursor's target is the button's center **plus** a small (`±30–150 px`) offset on both axes — typically a hair right and below. Real cursors land where eye + hand coordinate, which biases slightly toward the visible mass of the button rather than its geometric midpoint. Dead-center lands too perfectly and reads as scripted.
 
 ```js
-// Press DOWN — both elements compress to (1 - PRESS_INTENSITY).
+const CURSOR_TARGET_X = W / 2 + CURSOR_TARGET_OFFSET_X_PX;
+const CURSOR_TARGET_Y = H / 2 + CURSOR_TARGET_OFFSET_Y_PX;
+```
+
+`W` and `H` are the composition's `data-width` / `data-height`. The starting point lives `CURSOR_OFFSCREEN_X_PX / Y_PX` beyond `W` and `H` — far enough that the spring approach reads as inbound motion, not a teleport. Path duration sits at 0.7–1.4s; faster reads as urgent, slower as deliberate.
+
+## Phase 4 Seam: Synchronized Press via Single Target Array
+
+The press is the only place in this blueprint where two elements must move in literal lockstep. The mechanism that guarantees that is using a single GSAP target array:
+
+```js
 tl.to(
   ["#cta", "#cursor"],
-  {
-    scale: 1 - PRESS_INTENSITY,
-    duration: CLICK_DOWN_DUR,
-    ease: "power3.out",
-  },
+  { scale: 1 - PRESS_INTENSITY, duration: CLICK_DOWN_DUR, ease: "power3.out" },
   CLICK_DOWN_AT,
 );
-
-// RELEASE — back to 1.0.
-tl.to(
-  ["#cta", "#cursor"],
-  {
-    scale: 1.0,
-    duration: CLICK_UP_DUR,
-    ease: "power2.out",
-  },
-  CLICK_UP_AT,
-);
+tl.to(["#cta", "#cursor"], { scale: 1.0, duration: CLICK_UP_DUR, ease: "power2.out" }, CLICK_UP_AT);
 ```
 
-The single targets array `["#cta", "#cursor"]` is what makes this tactile. Don't split into separate per-element tweens with subtly different eases — the slightest desync breaks the "they're touching" illusion.
+The temptation is to split this into per-element tweens with subtly different eases ("the cursor should feel slightly heavier than the button"). Don't. Any desync, even a few frames, breaks the illusion that the two are touching — the cursor floats off the button surface. One array, one ease, one duration, one start time.
 
-See [physics-press-reaction](../rules/physics-press-reaction.md) for press intensity recommendations and the optional inner-glow variation.
+By the time `CLICK_DOWN_AT` fires, the CTA's `back.out` entrance has long since settled at `scale: 1`. The press tween's `scale: 1 - PRESS_INTENSITY` overwrites cleanly via GSAP's `overwrite: "auto"`, and `scale: 1.0` overwrites back on release. No manual scale composition needed — that's only required when two tweens overlap in time, and here they don't.
 
-### Press composes with entrance via GSAP overwrite
+## Key Values to Choose (Not Already in the Rules)
 
-By the time the click arrives at `CLICK_DOWN_AT`, the CTA's entrance tween settled long ago (at `MORPH_AT + MORPH_ENT_DUR`). The press tween's `scale: 1 - PRESS_INTENSITY` overwrites cleanly, then `scale: 1.0` overwrites back. No math composition needed — GSAP's `overwrite: "auto"` handles it.
+Only the parameters this blueprint introduces; for sizing ratios, eases, BOUNCE_FACTOR, PRESS_INTENSITY ranges, see the linked rules.
 
-## Inter-Phase State Handoff
+- **CTA_MAX_REL_HERO**: 0.5–0.8. Maximum ratio of CTA width to hero group width. Above 0.8 the morph inverts and reads as expansion — wrong narrative.
+- **CURSOR_TARGET_OFFSET_X_PX / Y_PX**: ±30–150 px. Small non-zero offsets from viewport center for the cursor's landing point. Zero reads as scripted; ±200+ misses the button.
+- **CURSOR_OFFSCREEN_X_PX / Y_PX**: 50–300 px beyond the composition edge. Cursor's starting position. Larger values make the approach more dramatic; too small and the cursor "pops in from the edge."
+- **HARD_CUT_DUR**: 0.001–0.01s. Near-zero duration that creates a step change in opacity rather than a fade. Must be non-zero to survive frame-stepped seeking.
+- **MORPH_FADE_DUR**: 25–40% of `MORPH_EXIT_DUR`. Hero's opacity fades faster than its scale shrinks, so it's gone before it lands at small scale (otherwise you see a tiny ghost-hero behind the CTA).
+- **LOGO_ROT_AMP_DEG**: 2–6°. Breath rotation amplitude on the logo only. Bigger reads as a wobble; smaller is below the perception threshold.
 
-```
-Phase 1 → Phase 2:
-  Hero entry spring settles at INTRO_START + INTRO_DUR. MORPH_AT is well later —
-  enough time for the breathing rotation to be visible and read as "alive."
+## Critical Constraints (ordered by failure frequency)
 
-Phase 2 → Phase 3:
-  CTA entrance settles at MORPH_AT + MORPH_ENT_DUR. CURSOR_ENTER_AT lands shortly
-  after, with TEXT_REVEAL_AT + TEXT_REVEAL_DUR completing before the cursor arrives.
+- **`CLICK_DOWN_AT === CURSOR_ENTER_AT + CURSOR_PATH_DUR`** — exact equality, not "approximately." Bind these in code via the same expression. Any gap breaks the cursor-lands-and-clicks single-event perception.
+- **Presence-dwell ≥ 1s before morph** — the most common mistake is making `MORPH_AT - (INTRO_START + INTRO_DUR)` too small. Without dwell, the hero never registers as the brand.
+- **Single target array for the press** (`["#cta", "#cursor"]`, not two tweens) — desynced press = floating cursor = no contact illusion.
+- **Cursor hard-cut, not fade** — a 0.4s fade-in cursor reads as a ghost; use `HARD_CUT_DUR` in the 0.001–0.01s range.
+- **Breath rotation on `.hero-logo` only**, never on `#hero` — Phase 2's morph exit overwrites the hero's scale; breath on the same element would race.
+- **CTA `position: absolute`** — without it, the appearing CTA shifts the hero out of flex flow at `MORPH_AT` and the morph "jumps sideways."
+- **CTA z-index above hero** (`z-index: 10`) — hero's fade tail at opacity 0.3–0.5 will bleed through the popping CTA otherwise.
+- **Cursor z-index above CTA** (`z-index: 100`) — during the press, the cursor must visibly sit on top of the button.
+- **CTA total width < hero group width** (enforced by `CTA_MAX_REL_HERO`) — inverted ratios make the morph read as expansion, breaking the narrative.
+- **Cursor landing offset from dead-center** — dead-center reads as scripted; ±30–150 px sells humanness.
+- **`CLICK_UP_AT > CLICK_DOWN_AT + CLICK_DOWN_DUR`** — reversed timing inverts the press into a "lift-then-press" misplay.
+- **Climax dwell ≥ 1s after release** — comps ending mid-spring rebound never feel like the press "landed."
 
-Phase 3 → Phase 4:
-  Cursor path ends at CURSOR_ENTER_AT + CURSOR_PATH_DUR.
-  CLICK_DOWN_AT MUST equal CURSOR_ENTER_AT + CURSOR_PATH_DUR — the press fires
-  at the exact moment the cursor lands. This synchronization is intentional:
-  the eye sees the cursor land AND the button compress as one event.
+## Spring → Ease Selection
 
-Phase 4 → end:
-  Release tween ends at CLICK_UP_AT + CLICK_UP_DUR.
-  Composition continues to TOTAL_DUR (≥ CLICK_UP_AT + CLICK_UP_DUR + climax-dwell)
-  to let the recoil read clearly.
-```
+Four distinct feels; the full mapping table lives in [hyperframes-animation/SKILL.md](../SKILL.md). This blueprint's defaults:
 
-## How to Choose Values
-
-### Sizing ratios (CSS, derived from `data-height`)
-
-- **HERO_FONT_RATIO** — hero text size as a fraction of `data-height`.
-  - Range: 0.24-0.34 (smaller = more headroom; larger = stronger morph contrast)
-  - Constraints: hero group width should fill 60-80% of viewport width
-  - Reference: examples/cta-morph-press.html uses ~0.20 (220 px at 1080)
-- **HERO_LETTER_SPACING_EM** — tracking on the hero text.
-  - Range: -0.05em to 0em (tighter at larger sizes)
-- **HERO_ICON_RATIO** — logo/icon size as a multiple of hero font size.
-  - Range: 1.0-2.5 (1.0 = icon-sized to lowercase x-height; 2.5 = oversized accent)
-- **CTA_FONT_RATIO** — CTA text size as a fraction of `data-height`.
-  - Range: 0.08-0.12
-  - Reference: examples/cta-morph-press.html uses ~0.10 (110 px at 1080)
-- **CTA_PADDING_V_RATIO / CTA_PADDING_H_RATIO** — padding multiples of `ctaFontSize`.
-  - Range: V 0.5-0.8, H 1.5-2.2 (wider ratios produce pill shape)
-- **CTA_MAX_REL_HERO** — max CTA width as a fraction of hero group width.
-  - Range: 0.5-0.8; values above 0.8 invert the morph illusion (expansion, not condensation)
-- **CURSOR_REL_CTA** — cursor SVG size as a multiple of CTA font size.
-  - Range: 1.0-1.3
-- **Cursor drop-shadow** — `stdDeviation` and `floodOpacity` on the `feDropShadow` filter.
-  - Range: stdDeviation 2-5; floodOpacity 0.25-0.5
-
-### Phase timing (seconds, on the timeline)
-
-- **INTRO_START** — when the hero entrance begins.
-  - Range: 0.1-0.4 s (small lead-in keeps the open frame clean)
-- **INTRO_DUR** — hero fade/rise spring settle.
-  - Range: 0.35-0.7 s
-- **MORPH_AT** — when the hero-to-CTA swap fires.
-  - Constraints: must be ≥ `INTRO_START + INTRO_DUR + presence-dwell` (presence-dwell 1-2 s so the hero "lands" before transforming)
-- **MORPH_EXIT_DUR** — hero shrink duration.
-  - Range: 0.35-0.7 s
-- **MORPH_FADE_DUR** — hero opacity fade duration.
-  - Constraints: ~25-40% of `MORPH_EXIT_DUR` — fade must complete well before the shrink ends so the hero is gone before it lands at small scale
-- **MORPH_ENT_DUR** — CTA pop-in duration.
-  - Range: 0.35-0.6 s; matched roughly to `MORPH_EXIT_DUR` for overlap symmetry
-- **TEXT_REVEAL_AT** — when CTA inner text fades in.
-  - Constraints: must be > `MORPH_AT + (MORPH_ENT_DUR × 0.3)` so the container is past micro-scale frames before text appears
-- **TEXT_REVEAL_DUR** — CTA text fade-in.
-  - Range: 0.2-0.45 s
-- **CURSOR_ENTER_AT** — when the cursor hard-cuts onto stage.
-  - Constraints: must be > `MORPH_AT + MORPH_ENT_DUR` so the CTA is fully present before the cursor arrives
-- **CURSOR_PATH_DUR** — cursor approach duration.
-  - Range: 0.7-1.4 s; faster reads as urgent, slower reads as deliberate
-- **CLICK_DOWN_AT** — when the press fires.
-  - Constraints: MUST equal `CURSOR_ENTER_AT + CURSOR_PATH_DUR` — the cursor must arrive exactly when the press begins, or the eye perceives the cursor "tapping air"
-- **CLICK_DOWN_DUR** — compression duration.
-  - Range: 0.08-0.2 s
-- **CLICK_UP_AT** — when the release fires.
-  - Constraints: must be > `CLICK_DOWN_AT + CLICK_DOWN_DUR`, with an optional brief hold (0.05-0.4 s) for "thinking" presses
-- **CLICK_UP_DUR** — release duration.
-  - Range: 0.2-0.4 s
-- **TOTAL_DUR** — composition length.
-  - Constraints: ≥ `CLICK_UP_AT + CLICK_UP_DUR + 1 s` (climax dwell after the release)
-
-### Physics
-
-- **EXIT_SCALE** — hero target scale during morph exit.
-  - Range: 0.5-0.75; smaller values condense more dramatically but risk reading as "shrink to nothing" before the fade catches up
-- **PRESS_INTENSITY** — how deep the press compression goes.
-  - Range: 0.05 (subtle) - 0.10 (standard) - 0.15 (heavy)
-  - Constraints: applied as `scale: 1 - PRESS_INTENSITY`
-- **BOUNCE_FACTOR** — `back.out(${BOUNCE_FACTOR})` overshoot on the CTA pop-in.
-  - Range: 1.4 (soft) - 2.0 (firm) - 2.8 (cartoony)
-
-### Entry / cursor positioning
-
-- **INTRO_Y_PX** — initial y offset for the hero rise (positive = comes from below).
-  - Range: 24-60 px
-- **TEXT_REVEAL_Y_PX** — initial y offset for the CTA text reveal.
-  - Range: 6-16 px
-- **CURSOR_OFFSCREEN_X_PX / CURSOR_OFFSCREEN_Y_PX** — how far beyond the viewport the cursor starts (added to `W` / `H`).
-  - Range: 50-300 px each; larger values make the approach path more dramatic
-- **CURSOR_TARGET_OFFSET_X_PX / CURSOR_TARGET_OFFSET_Y_PX** — how far the click lands off viewport center (positive X = right of center; positive Y = below).
-  - Range: ±30-150 px; small non-zero offsets avoid "scripted" dead-center landings
-- **HARD_CUT_DUR** — near-zero duration for cursor opacity step.
-  - Range: 0.001-0.01 s; must be small enough to read as instant under HF's frame-stepped seeking
-
-### Idle breathing
-
-- **LOGO_ROT_AMP_DEG** — peak rotation amplitude on the logo (degrees).
-  - Range: 2-6°; bigger reads as a "wobble", smaller below the perception threshold
-- **LOGO_ROT_FREQ** — sine argument coefficient (`Math.sin(t * LOGO_ROT_FREQ)`).
-  - Range: 0.5-1.5; lower = slower breath
-- **SCALE_BREATH_THRESHOLD** — minimum scale amplitude that's perceptible; used to justify omitting scale breath.
-  - Reference: ~0.012 (anything smaller is below the visual threshold for most viewers)
-
-### Tokens
-
-- **{Brand}** — brand text content for the hero
-- **{ctaCopy}** — CTA button copy
-- **{sceneBg}** — scene background (solid color or gradient)
-- **{font}** / **{monoFont}** — typographic stack(s) used across hero and CTA
-
-## Critical Constraints
-
-- **Z-index on CTA** above the hero (`z-index: 10`) — hides exit residue during the brief overlap window.
-- **Z-index on cursor** above everything (`z-index: 100`) — must visibly sit on top of the CTA during the click.
-- **Same transform origin**: Hero and CTA both centered at the viewport center via flex. Different origins reveal the swap as "shrink + pop somewhere else."
-- **Synchronized press**: `["#cta", "#cursor"]` as a single GSAP target array, not two separate tweens. Same ease, same duration, same start time.
-- **Cursor hard-cut opacity**: `fromTo(... duration: 0.001 ...)` — a near-zero tween creates a step change. Don't fade in cursors.
-- **Click timing order**: `CLICK_UP_AT > CLICK_DOWN_AT`, always. Reversed values invert the press (scale up first, then down) which reads as a misplay.
-- **GSAP `set()` for initial states**: `gsap.set("#cta", { scale: 0, opacity: 0 })` and `gsap.set("#cursor", { x: …, y: …, scale: 1, opacity: 0 })` before the timeline tweens. This makes pre-phase invisibility explicit and seek-safe.
-- **Text reveal after container**: CTA inner text fades in at `MORPH_AT + 0.17 s`, after the container reaches recognizable scale. Otherwise the text pops in at micro-scale during the spring's early frames.
-- **Breathing rotation on logo only**: Not on the whole hero — the hero's scale is later overwritten by the morph exit. Limiting breath to the logo prevents conflicts.
-- **GSAP transform aliases only**: `scale`, `x`, `y`, `rotation`. Never `width` / `height` / `left` / `top`.
-- **No `Math.random` / `Date.now`**: All timing is hard-coded; the breathing onUpdate reads only `tl.time()`.
-- **Single paused timeline**: All four phases on one `gsap.timeline({ paused: true })`, registered to `window.__timelines[data-composition-id]`.
-
-## Spring → GSAP Ease Cheatsheet (this blueprint)
-
-| Source spring                                    | This blueprint uses                                              |
-| ------------------------------------------------ | ---------------------------------------------------------------- |
-| Spring, low overshoot — hero entrance            | `power3.out` over `INTRO_DUR`                                    |
-| Spring, low overshoot — hero morph exit          | `power3.out` over `MORPH_EXIT_DUR`                               |
-| Spring, light mass with overshoot — CTA entrance | `back.out(${BOUNCE_FACTOR})` over `MORPH_ENT_DUR`                |
-| Spring, heavily damped — cursor approach path    | `power2.out` over `CURSOR_PATH_DUR`                              |
-| Spring, high stiffness short — click down        | `power3.out` over `CLICK_DOWN_DUR`                               |
-| Spring, medium stiffness — click up              | `power2.out` over `CLICK_UP_DUR`                                 |
-| Continuous sine — logo rotation breath           | `onUpdate` with `Math.sin(t * LOGO_ROT_FREQ) * LOGO_ROT_AMP_DEG` |
-
-See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
+- Phase 1 hero entrance → `power3.out`; breath rotation → `onUpdate Math.sin`
+- Phase 2 hero exit → `power3.out`; CTA pop-in → `back.out(BOUNCE_FACTOR)`
+- Phase 3 cursor approach → `power2.out` (deceleration into landing)
+- Phase 4 press down → `power3.out`; release → `power2.out`
 
 ## Golden Sample
 
-- [cta-morph-press.html](../examples/cta-morph-press.html) — concrete realization of this four-phase arc on a single paused GSAP timeline. See the file for the brand, copy, asset, color, font, and timing values it instantiates.
+- [cta-morph-press.html](../examples/cta-morph-press.html) — runnable four-phase composition on a single paused GSAP timeline. Run this before tuning values from scratch; most of the cursor-offset and dwell numbers are easier to dial in by changing constants than by deriving from text.

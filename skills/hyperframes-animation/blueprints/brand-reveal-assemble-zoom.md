@@ -22,243 +22,101 @@ triggers: [brand reveal, zoom into logo, text leads to, wide to close-up, hero f
 
 # Brand Reveal · Assemble & Zoom (HyperFrames)
 
-Multiple elements share screen → supporting element exits → layout recenters on hero → camera zooms into hero → idle breathing.
+This is a "context → focus → idle" emotional arc: the viewer first watches the companion text type itself out and understands what they're looking at; then the hero (logo / icon) pops in to declare where the focus lies; companion yields its space, the layout's center of gravity collapses toward the hero, and the camera pushes in for a close-up; finally the hero settles into a subtle breathing motion, saying "this is the brand, it lives here."
 
-Same five-phase narrative arc; single paused GSAP timeline; the coordinate-zoom and breathing patterns map directly to the corresponding HF rules.
+The whole thing runs on a single paused GSAP timeline. Five phases, no hard cuts — every adjacent pair gets a 0.06–0.3s breath of buffer to absorb the previous phase's spring tail.
 
 ## When to Use
 
-- Scene builds toward a single hero element (logo, icon, product)
-- Supporting text appears first to provide context, then yields focus
-- Final state is a close-up of the hero with subtle ambient motion
-- Need progressive narrowing from wide composition to tight focus
+- Need a progressive narrowing from wide composition to tight close-up on a hero
+- A supporting element (slogan, category word, tagline) appears first to give context, then exits
+- Final frame is a close-up of the hero with subtle ambient motion
+- Not for: all elements equally important, pure text scenes, or scenes requiring interaction (use cta-morph-press)
 
-## Phase Pipeline
+## Orchestration
 
-All boundaries are in **seconds**.
+This scene weaves four kinds of motion together; each maps to a rule or an inline pattern:
 
-| Phase | Time window (s)           | What Happens                                            | Skill Reference                                              |
-| ----- | ------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
-| 1     | `TEXT_START – TEXT_END`   | Companion text assembles (discrete sequence with holds) | [discrete-text-sequence](../rules/discrete-text-sequence.md) |
-| 2     | `POP_START – POP_END`     | Hero element pops in with elastic spring                | inline `back.out(${BOUNCE_FACTOR})` tween                    |
-| 3     | `SLIDE_START – SLIDE_END` | Companion exits, layout recenters around hero           | See "Phase 3" below                                          |
-| 4     | `ZOOM_START – ZOOM_END`   | Camera zooms into hero (scale + counter-translate)      | [coordinate-target-zoom](../rules/coordinate-target-zoom.md) |
-| 5     | `BREATH_START – end`      | Hero breathes (sine onUpdate, multiplicative)           | [sine-wave-loop](../rules/sine-wave-loop.md)                 |
+- **Phase 1 — companion typing**: use [discrete-text-sequence](../rules/discrete-text-sequence.md), but in its **monotonic simplified form** (a string of `tl.set` calls, not the reverse-search `onUpdate`). Brand-reveal companions usually don't have the dramatic stuff — no typos, no backspaces — they're just "one phrase that builds out quickly." The full SEQUENCE array machinery from the rule is overkill. Still, drop at least one pacing hold in the middle so the cadence doesn't read as machine-typed.
+- **Phase 2 — hero pop**: no rule needed, just inline a single `back.out(BOUNCE_FACTOR)` tween that springs the hero from `scale: 0` to `scale: 1`. One tween, no orchestration — making this a rule would be overengineering. For a rubberier feel, swap to `elastic.out(amp, period)`.
+- **Phase 3 — companion exit + layout recenter**: the "glue" unique to this blueprint, not covered by any rule. Three concurrent tweens at the same timeline position, sharing `duration` and `ease` (companion fade-slides, `.recenter-shift` pulls brand-group toward the viewport center). See "Phase 3 seam" below.
+- **Phase 4 — zoom into hero**: use [coordinate-target-zoom](../rules/coordinate-target-zoom.md), **but its default offset derivation doesn't fit here.** The rule's formula assumes a row of N equal-width cards; our layout is the three-piece "companion + brand text + hero icon" assembly, which needs its own offset derivation. See "Phase 4 seam" below.
+- **Phase 5 — hero breathing**: use [sine-wave-loop](../rules/sine-wave-loop.md) in its **multiplicative `onUpdate` form** (the one in the rule's GSAP Timeline section), **not** `fromTo` + yoyo. Phase 2 already set hero's scale to `1.0` and Phase 4 pushed an outer wrapper to `TARGET_SCALE` — the breath must multiply onto hero's existing scale, never overwrite it. See "Phase 5 seam" below.
 
-## Initial Layout
+## Phase Timing
 
-Two elements side-by-side in a flex row. Companion uses a fixed-width container to prevent jitter during text assembly (Phase 1) — the container width must be ≥ the maximum rendered text width. If the text overflows, `justify-content: flex-end` pushes the overflow off the _left_ edge of the container, past the viewport edge.
+All boundaries are in seconds. Design pass: pick each phase's internal duration first, then back-derive its start time from the constraints below.
 
-Hero text uses a heavier `font-weight` than the companion text — the brand name is the focal element and must read as dominant even before the companion exits.
+| Phase | Start ≥                           | Internal duration      | Notes                                                      |
+| ----- | --------------------------------- | ---------------------- | ---------------------------------------------------------- |
+| 1     | `0` (or end of previous scene)    | `TEXT_END - 0`         | Monotonic sequence. End must precede `POP_START`           |
+| 2     | `TEXT_END + ~0.06s`               | `POP_DUR`              | Tiny gap so companion settles before pop fires             |
+| 3     | `POP_START + POP_DUR + ~0.2s`     | `SLIDE_DUR`            | Let `back.out` spring tail settle                          |
+| 4     | `SLIDE_START + SLIDE_DUR + ~0.3s` | `ZOOM_DUR`             | Let recenter visually land before zooming                  |
+| 5     | `ZOOM_START + ZOOM_DUR + ~0.1s`   | `TOTAL - BREATH_START` | Zoom spring tail must finish; otherwise sine fights spring |
 
-```html
-<div class="zoom-scale">
-  <!-- outermost: Phase 4 scale -->
-  <div class="zoom-translate">
-    <!-- middle: Phase 4 counter-translation -->
-    <div class="recenter-shift">
-      <!-- inner: Phase 3 recenter offset -->
-      <div class="layout-row">
-        <div class="companion">
-          <!-- fixed width, right-aligned text -->
-          <span class="companion-text">{firstChar}</span>
-        </div>
-        <div class="brand-group">
-          <span class="brand-text">{Brand}</span>
-          <div class="hero">
-            <!-- the icon/logo — Phase 2 pop target -->
-            <img src="{heroAsset}" />
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-```
+The 0.06s gap between Phase 1 and 2 exists so "typing done → next beat" reads as two events, not one. The 0.2s gap between Phase 2 and 3 is the most critical: `back.out` overshoots past 1.0 and rebounds — pull the layout while that tail is still settling and the hero appears to jitter. The 0.1s gap between Phase 4 and 5 is the same idea: `power2.out` decays to near-zero velocity but never literally zero, and a sine wave starting on top of that produces visible chatter.
 
-```css
-.layout-row {
-  display: flex;
-  align-items: center;
-}
-.companion {
-  width: COMPANION_WIDTH; /* MUST be ≥ max rendered text width */
-  display: flex;
-  justify-content: flex-end;
-  margin-right: COMPANION_GAP;
-  font-weight: COMPANION_WEIGHT; /* lighter than brand */
-  white-space: nowrap;
-}
-.brand-group {
-  display: flex;
-  align-items: center;
-  gap: HERO_GAP;
-}
-.brand-text {
-  font-weight: BRAND_WEIGHT; /* heavier than companion */
-}
-.hero {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: scale(0);
-}
-```
+## Initial DOM Nesting (Critical)
 
-Validate at design time: `COMPANION_WIDTH + COMPANION_GAP + brandTextWidth + HERO_GAP + HERO_SIZE < viewportWidth`. Overflow doesn't error — it just clips, often invisibly until the zoom phase makes it obvious.
-
-## Phase 1: Companion Text Assembly
-
-Use [discrete-text-sequence](../rules/discrete-text-sequence.md) for text typing with intentional holds. Keep the companion in a fixed-width right-aligned container so the layout doesn't shift as characters arrive.
-
-This blueprint's sequence is monotonic (no typos, no backspaces), so a series of `tl.set` calls suffices — each entry registers a discrete state at its timestamp and GSAP applies the latest one when seeking. For sequences with edits or backspaces, use the onUpdate reverse-search form shown in the rule.
-
-Shape: a short monotonic build-out of the companion phrase across `TEXT_START → TEXT_END`. Typical cadence — fast keystrokes (~0.06-0.13s apart), at least one pacing hold around the natural mid-pause (e.g. after the first complete word), and a final landing on the full phrase. The example file shows one concrete realization.
-
-```js
-// SEQUENCE: [{ t, text }, ...] — t in seconds, monotonically increasing,
-// final entry's t === TEXT_END. See example for a concrete realization.
-const textEl = document.querySelector(".companion-text");
-for (const entry of SEQUENCE) {
-  tl.set(textEl, { textContent: entry.text }, entry.t);
-}
-```
-
-## Phase 2: Hero Pop-In
-
-Elastic spring. Scale from 0 → 1 with a perceptible overshoot. Use a `back.out` ease for a controlled bounce that settles cleanly; for a more pronounced rubbery feel switch to `elastic.out`. See the spring → ease cheatsheet below for the family-to-feel mapping.
-
-```js
-tl.fromTo(
-  ".hero",
-  { scale: 0 },
-  {
-    scale: 1,
-    duration: POP_DUR,
-    ease: `back.out(${BOUNCE_FACTOR})`,
-  },
-  POP_START,
-);
-```
-
-## Phase 3: Companion Exit & Recenter (Core Glue)
-
-Three concurrent tweens at the same timeline position. The source pattern used a single spring read three times; the GSAP idiom is three tweens started at the same position parameter.
-
-```js
-// FINAL_RECENTER_OFFSET is a PRE-CALCULATED constant baked at author time.
-// See "Recenter Offset Calculation" + How to Choose Values for derivation + range.
-
-// (1) Companion slides out + fades.
-tl.to(
-  ".companion",
-  {
-    opacity: 0,
-    x: COMPANION_EXIT_X,
-    duration: SLIDE_DUR,
-    ease: "power3.out",
-  },
-  SLIDE_START,
-);
-
-// (2) Container shifts to recenter the hero group.
-tl.to(
-  ".recenter-shift",
-  {
-    x: FINAL_RECENTER_OFFSET,
-    duration: SLIDE_DUR,
-    ease: "power3.out",
-  },
-  SLIDE_START,
-);
-```
-
-### Recenter Offset Calculation
-
-When the companion disappears, the brand group must land in the viewport center. The shift compensates for the (companion + gap) space the brand group occupied to the right of center:
+Phase 3 and Phase 4 each need their own wrapper to carry their transform, for the reason stated directly in [coordinate-target-zoom's "Transform order" principle](../rules/coordinate-target-zoom.md#key-principles): scale must wrap translate, never the other way around — otherwise the translation gets multiplied by the outer scale and the hero "drifts and accelerates." This blueprint adds one extra layer (`.recenter-shift`) beyond what the rule shows, because Phase 3's recenter shift and Phase 4's counter-translate are two different motions and cannot share an element.
 
 ```
-FINAL_RECENTER_OFFSET ≈ -(COMPANION_WIDTH + COMPANION_GAP) / 2     (theoretical baseline)
-                      → tune by eye for visual feel (typically smaller magnitude)
+.zoom-scale        ← Phase 4 scale
+  .zoom-translate  ← Phase 4 counter-translate
+    .recenter-shift ← Phase 3 layout recenter
+      .layout-row
+        .companion         ← fixed width, right-aligned, lighter font-weight
+          .companion-text  ← Phase 1 typing target
+        .brand-group
+          .brand-text      ← heavier font-weight; fades + slides out during Phase 4
+          .hero            ← Phase 2 pop target + Phase 5 breath target
 ```
 
-The tuned value often differs from the theoretical — small visual adjustments matter. Tune by eye, then **bake as a constant**. Do NOT compute dynamically per frame — sub-pixel drift accumulates across the zoom phase (which can be 5×+ magnification) and becomes a visible jitter.
+`.companion` is a fixed-width container with `justify-content: flex-end` and `white-space: nowrap`. The reason maps directly to [discrete-text-sequence's "fixed-width container" principle](../rules/discrete-text-sequence.md#key-principles): as characters appear, content length grows; without a fixed width, brand-group gets shoved around as the companion's edge moves. With a fixed width, overflow gets pushed off the container's left edge (not into the brand). The design-time obligation is therefore `COMPANION_WIDTH ≥ widthOf(longest SEQUENCE state)` — otherwise text leaks past the viewport.
 
-## Phase 4: Camera Zoom Into Hero
+Brand text uses a heavier `font-weight` than the companion. Even while companion is still on screen, the hero side must read as dominant — otherwise the Phase 3 "weight transfer" feels abrupt rather than inevitable.
 
-Three transforms nested outside → inside:
+## Phase 3 Seam: Companion Exit + Recenter
 
-1. **Outer (`.zoom-scale`)**: handles `scale` for the zoom magnification
-2. **Middle (`.zoom-translate`)**: handles `x` / `y` counter-translation so the off-center hero ends at screen center
-3. **Inner (`.recenter-shift`)**: already set by Phase 3, stays put during zoom
+This step has no existing rule — it's the blueprint's core glue. Three tweens fire at the same timeline position, sharing `SLIDE_DUR` and `power3.out`:
 
-See [coordinate-target-zoom](../rules/coordinate-target-zoom.md) for the full pattern. Scale **must** wrap translation, never the reverse.
+1. `.companion` fade-slides out (`opacity → 0, x → COMPANION_EXIT_X`)
+2. `.recenter-shift` pulls left by `FINAL_RECENTER_OFFSET`, bringing brand-group to the horizontal midline
+3. (Optional) brand text picks up a slight "dragged toward center" lateral slide
 
-```js
-// Hero's offset from viewport center AFTER Phase 3 recenter.
-// Computed ONCE at setup (after fonts.ready, see below), then baked as const
-// before any tween runs. The values feed directly into the counter-translate
-// tween — never recomputed per frame.
-//   baseHeroOffset = (COMPANION_WIDTH + COMPANION_GAP + brandTextWidth + HERO_GAP) / 2
-//   HERO_FINAL_OFFSET_X = baseHeroOffset + FINAL_RECENTER_OFFSET
-const baseHeroOffset = (COMPANION_WIDTH + COMPANION_GAP + brandTextWidth + HERO_GAP) / 2;
-const HERO_FINAL_OFFSET_X = baseHeroOffset + FINAL_RECENTER_OFFSET;
-// HERO_FINAL_OFFSET_Y is a baked const (companion and brand share a horizontal baseline,
-// so for the symmetric layout above this is 0; adjust if the hero sits off-axis vertically).
+**`FINAL_RECENTER_OFFSET` is the most common point of failure in this blueprint.** Theoretical baseline: shift left by half the (companion + gap) width:
 
-// Outer scale
-tl.to(
-  ".zoom-scale",
-  {
-    scale: TARGET_SCALE,
-    duration: ZOOM_DUR,
-    ease: "power2.out",
-  },
-  ZOOM_START,
-);
-
-// Middle counter-translation — pulls hero from its offset position to center
-tl.to(
-  ".zoom-translate",
-  {
-    x: -HERO_FINAL_OFFSET_X,
-    y: -HERO_FINAL_OFFSET_Y,
-    duration: ZOOM_DUR,
-    ease: "power2.out",
-  },
-  ZOOM_START,
-);
-
-// Brand text exits during the zoom — we don't want it filling the entire frame.
-tl.to(
-  ".brand-text",
-  {
-    opacity: 0,
-    x: BRAND_EXIT_X,
-    duration: ZOOM_DUR * BRAND_FADE_RATIO,
-    ease: "power2.out",
-  },
-  ZOOM_START,
-);
+```
+FINAL_RECENTER_OFFSET ≈ -(COMPANION_WIDTH + COMPANION_GAP) / 2
 ```
 
-### Why `baseHeroOffset` doesn't include `heroSize`
+But in practice you'll always find the hero ending up slightly off-center to the left. Reason: brand text's visual center of mass isn't its geometric midpoint (bold weights, serifs, letter-spacing all bias the perceived center). Tuned values are usually smaller in magnitude than the theoretical baseline. **Tune by eye, then bake the result as a `const` — never recompute per frame.** The Phase 4 zoom multiplies everything by 5×+, so any sub-pixel drift in this value becomes visible jitter.
+
+## Phase 4 Seam: Zoom into Hero (offset derivation)
+
+The default offset derivation in [coordinate-target-zoom](../rules/coordinate-target-zoom.md) assumes "N equal-width cards in a horizontal row" — that formula doesn't apply here. Our layout is `companion + gap + brandText + heroGap + hero`, with the hero not at center. The hero's distance from viewport center after Phase 3 has to be derived separately:
+
+```
+baseHeroOffset = (COMPANION_WIDTH + COMPANION_GAP + brandTextWidth + HERO_GAP) / 2
+HERO_FINAL_OFFSET_X = baseHeroOffset + FINAL_RECENTER_OFFSET
+counterTranslateX  = -HERO_FINAL_OFFSET_X     // feeds .zoom-translate's x tween
+```
+
+**`baseHeroOffset` does NOT include `HERO_SIZE`** — the `S` in "total flex width" cancels against the `S/2` in "icon center to row center distance":
 
 ```
 Total flex width  T = C + G + B + L + S
 Icon center         = C + G + B + L + S/2
 Layout center       = T / 2
-
 Offset = (C + G + B + L + S/2) − T/2
        = C/2 + G/2 + B/2 + L/2
        = (C + G + B + L) / 2
 ```
 
-Where C = companionWidth, G = gap, B = brandTextWidth, L = heroGap, S = heroSize. `S` cancels. Including `S` causes the counter-translation to overshoot, landing the icon left of center.
+Including `S` would make the counter-translation overshoot, leaving the icon center-left after zoom.
 
-### Measuring `brandTextWidth`
-
-After `document.fonts.ready`, measure the brand text with a hidden DOM probe:
+**`brandTextWidth` must be measured with a hidden DOM probe after `document.fonts.ready`, then baked.** Before fonts load, `getBoundingClientRect()` uses fallback metrics — easily off by 10–30 px, which becomes tens of visible pixels after a 5× zoom. The standard DOM probe (placed before timeline registration):
 
 ```js
 await document.fonts.ready;
@@ -266,184 +124,60 @@ const probe = document.createElement("span");
 probe.style.cssText =
   "position:absolute; left:-99999px; white-space:pre; " +
   `font: ${BRAND_WEIGHT} ${BRAND_FONT_SIZE}px ${BRAND_FONT_STACK};`;
-probe.textContent = BRAND_TEXT; // must match the EXACT casing of <span class="brand-text">
+probe.textContent = BRAND_TEXT;
 document.body.appendChild(probe);
 const brandTextWidth = probe.getBoundingClientRect().width;
 probe.remove();
+// Use brandTextWidth to compute HERO_FINAL_OFFSET_X, bake as const
 ```
 
-Then derive `HERO_FINAL_OFFSET_X` from `brandTextWidth`. Bake it as `const` before the timeline tweens are scheduled — never inside an `onUpdate`.
+The zoom itself (outer scale + inner counter-translate tweens) follows [coordinate-target-zoom's critical constraints](../rules/coordinate-target-zoom.md#critical-constraints) verbatim: shared `ZOOM_DUR` + ease, no recomputing offset in onUpdate, `transform-origin: 50% 50%`.
 
-## Phase 5: Breathing Idle
+During the zoom, brand text fades + slides out (duration `ZOOM_DUR * 0.3–0.5`, finishing well before the zoom climax) — otherwise at 5× scale it fills the frame and covers the hero.
 
-Use the onUpdate (multiplicative) form from [sine-wave-loop](../rules/sine-wave-loop.md) — the breath **multiplies** onto the hero's pop-in scale. A `fromTo` + yoyo would overwrite the pop scale instead of adding to it, undoing the pop.
+## Phase 5 Seam: Why Breath Must Be Multiplicative
 
-```js
-// HERO_FINAL_SCALE = the scale the hero landed at after Phase 2 pop (typically 1.0).
-// The breath multiplies onto this — never overwrites it.
+The multiplicative `onUpdate` form in [sine-wave-loop](../rules/sine-wave-loop.md) (`gsap.set(hero, { scale: HERO_FINAL_SCALE * (1 + sin(ω) * AMP) })`) isn't a recommendation here — it's a **hard requirement**:
 
-const heroEl = document.querySelector(".hero");
-const breathDur = TOTAL_DURATION - BREATH_START;
+- Phase 2 tweens hero's scale to `1.0` (or `HERO_FINAL_SCALE`) — this is hero's resting state
+- Phase 4 pushes `.zoom-scale` (outer wrapper) to `TARGET_SCALE` — but this is on the wrapper, **not** on hero itself
+- Phase 5 must let hero breathe **on top of its own resting scale** — so it has to multiply onto `HERO_FINAL_SCALE` as a baseline
 
-tl.to(
-  { tick: 0 },
-  {
-    tick: 1,
-    duration: breathDur,
-    ease: "none",
-    onUpdate: function () {
-      const idleTime = Math.max(0, tl.time() - BREATH_START);
-      const omega = (idleTime / SCALE_PERIOD) * Math.PI * 2;
-      gsap.set(heroEl, {
-        scale: HERO_FINAL_SCALE * (1 + Math.sin(omega) * SCALE_AMP),
-        rotation: Math.sin(omega) * ROTATE_AMP,
-      });
-    },
-  },
-  BREATH_START,
-);
-```
+Using the rule's alternative `fromTo` + yoyo form here would re-tween hero from 0 to 1, undoing Phase 2's final state (even if "0 to 1" looks identical on paper, GSAP's from-state gets re-applied on every yoyo cycle, killing the post-pop scale).
 
-## Inter-Phase State Handoff
+`SCALE_AMP` 0.02–0.04 (product photography → small; stylized logo → large), `ROTATE_AMP` 0–2°, `SCALE_PERIOD` ~1.5–2s reads as natural breathing — ranges live in the rule, pick by scene.
 
-```
-Phase 1 → Phase 2:
-  Companion sequence completes at TEXT_END.
-  POP_START ≥ TEXT_END + small breath (~0.06s) so the two beats don't collide.
+## Key Values to Choose (Not Already in the Rules)
 
-Phase 2 → Phase 3:
-  Hero pop ends at POP_START + POP_DUR.
-  SLIDE_START ≥ POP_START + POP_DUR + small buffer for the spring's tail to settle
-  (~0.2s; the back.out overshoot needs visible settling before the next beat starts).
+Only listing the parameters **unique to this blueprint** below; standard parameters (`POP_DUR`, `BOUNCE_FACTOR`, `SCALE_AMP`, etc.) — go to the referenced rule.
 
-Phase 3 → Phase 4:
-  FINAL_RECENTER_OFFSET (baked const) feeds HERO_FINAL_OFFSET_X.
-  Both are pre-calculated constants — this is the critical handoff.
-  ZOOM_START ≥ SLIDE_START + SLIDE_DUR + small buffer (~0.3s) so the recenter
-  has visually landed before the zoom begins.
+- **COMPANION_WIDTH**: theoretical floor = width of the longest SEQUENCE state in companion font (measure with a probe); 30–50% of viewport width is the practical range. Too small → text leaks past viewport; too large → `FINAL_RECENTER_OFFSET` grows with it and Phase 3 drags.
+- **FINAL_RECENTER_OFFSET**: theoretical `-(COMPANION_WIDTH + COMPANION_GAP) / 2`, but tuned value is typically smaller in magnitude. **Must be tuned by eye and baked as a const**, never per-frame (see Phase 3 seam).
+- **TARGET_SCALE**: 3× (modest) → 5.5× (cinematic) → 8× (extreme close-up). Constraint: hero source resolution ≥ `HERO_SIZE × TARGET_SCALE`, otherwise rasters go soft.
+- **BRAND_EXIT_X**: magnitude ≥ half viewport width — ensures brand text clears the frame before zoom climax.
+- **BRAND_FADE_RATIO**: 0.3–0.5; brand text disappears before zoom's halfway mark, leaving the climax framed on hero alone.
 
-Phase 4 → Phase 5:
-  Zoom ends at ZOOM_START + ZOOM_DUR.
-  BREATH_START ≥ ZOOM_END + small buffer (~0.1s) — gate the breath behind the
-  zoom settle so the sine doesn't fight the zoom spring's tail.
-```
+## Critical Constraints (ordered by failure frequency)
 
-## How to Choose Values
+- **Bake all pre-calculated offset constants**: `FINAL_RECENTER_OFFSET`, `HERO_FINAL_OFFSET_X`, `HERO_FINAL_OFFSET_Y` are all `const`. Per-frame recomputation → sub-pixel drift → visible jitter at 5× zoom.
+- **Scale wraps translate** (see DOM nesting): `.zoom-scale` outer, `.zoom-translate` inner. Reversed → translation gets multiplied by scale → hero drifts during zoom.
+- **Companion container width ≥ max text width**: overflow during assembly is invisible, but explodes at the final state.
+- **`baseHeroOffset` excludes heroSize**: see Phase 4 seam derivation.
+- **Breath must be multiplicative**: see Phase 5 seam.
+- **Breath gate: BREATH_START ≥ zoom end + 0.1s**: sine and spring tail cannot coexist.
+- **Measure brand text after `document.fonts.ready`**: otherwise hero offset is off by 10–30 px.
+- **Three nested wrappers only tween GSAP transform aliases** (`x` / `y` / `scale` / `rotation`) — never `width` / `height` / `left` / `top`.
+- **Single paused timeline**: `gsap.timeline({ paused: true })`, registered to `window.__timelines[data-composition-id]`.
 
-### Layout constants
+## Spring → Ease Selection
 
-- **COMPANION_WIDTH** — fixed width of the companion-text container.
-  - Range: must satisfy `COMPANION_WIDTH ≥ widthOf(longest SEQUENCE state)`; typically 30-50% of viewport width
-  - Effects: too small → text overflows past the left edge; too large → recenter offset balloons and Phase 3 feels sluggish
-  - Constraints: `COMPANION_WIDTH + COMPANION_GAP + brandTextWidth + HERO_GAP + HERO_SIZE < viewportWidth`
-  - Reference: examples/brand-reveal-assemble-zoom.html uses `600px` at 1920×1080
-- **COMPANION_GAP** — `margin-right` between companion and brand group.
-  - Range: 0.5-1× the companion's `font-size` reads as a comfortable visual gap
-  - Reference: examples uses `30px` against a 140px font size
-- **HERO_GAP** — flex `gap` between brand text and hero element.
-  - Range: typically smaller than `COMPANION_GAP` (the hero belongs with the brand text; the companion is a separate phrase)
-  - Reference: examples uses `20px`
-- **HERO_SIZE / BRAND_FONT_SIZE** — measured in viewport pixels; choose so brand text and hero read as the same weight.
-  - Reference: examples uses `140px` for both
-- **COMPANION_WEIGHT / BRAND_WEIGHT** — companion lighter than brand so the hero side reads as dominant even before companion exits.
-  - Reference: examples uses `400` / `700`
+Four phases, four spring feels, four ease choices. The complete spring → ease mapping table lives in [hyperframes-animation/SKILL.md](../SKILL.md); this blueprint's defaults are:
 
-### Phase 1 — companion assembly
-
-- **TEXT_START** — companion begins assembling.
-  - Constraints: typically 0; if you precede with another beat, ≥ that beat's end
-- **TEXT_END** — companion lands on its full phrase.
-  - Range: 0.4-1.0s for a ~5-10 character phrase; pick by character count × per-keystroke cadence (0.06-0.13s) + at least one pacing hold
-  - Constraints: `TEXT_END < POP_START`
-  - Reference: examples uses `0.67s`
-
-### Phase 2 — hero pop
-
-- **POP_START** — hero enters.
-  - Constraints: `≥ TEXT_END + ~0.06s` (small breath after companion lands)
-  - Reference: examples uses `0.73s`
-- **POP_DUR** — pop tween duration.
-  - Range: 0.4-0.7s; under 0.4s the bounce reads as a jolt, over 0.7s it feels lethargic
-  - Reference: examples uses `0.5s`
-- **BOUNCE_FACTOR** — `back.out(BOUNCE_FACTOR)` overshoot strength.
-  - Range: 1.4 (soft) → 2.0 (firm pop) → 2.8 (cartoony)
-  - Alternative: switch to `elastic.out(amplitude, period)` for a rubbery oscillation instead of a single overshoot
-  - Reference: examples uses `2`
-
-### Phase 3 — slide + recenter
-
-- **SLIDE_START** — companion begins to leave.
-  - Constraints: `≥ POP_START + POP_DUR + ~0.2s` (let pop spring settle before pulling the layout)
-  - Reference: examples uses `1.5s`
-- **SLIDE_DUR** — duration of both the companion fade and the recenter shift.
-  - Range: 0.5-1.0s; both tweens MUST share this duration + ease
-  - Reference: examples uses `0.7s`
-- **COMPANION_EXIT_X** — how far the companion slides left as it fades.
-  - Range: ~10-15% of viewport width — large enough to read as "out of frame," small enough that the motion feels intentional, not panicked
-  - Reference: examples uses `-80px`
-- **FINAL_RECENTER_OFFSET** — pre-calculated baked const that pulls the brand group to center.
-  - Range: theoretical baseline `≈ -(COMPANION_WIDTH + COMPANION_GAP) / 2`, then tune by eye (often smaller magnitude than the baseline because brand text isn't truly point-mass at its center)
-  - Constraints: must be a **constant**, not computed per frame — see Critical Constraints
-  - Reference: examples uses `-180` against a `-315` theoretical baseline
-
-### Phase 4 — zoom
-
-- **ZOOM_START** — zoom begins.
-  - Constraints: `≥ SLIDE_START + SLIDE_DUR + ~0.3s` (let recenter visually land)
-  - Reference: examples uses `2.67s`
-- **ZOOM_DUR** — zoom tween duration.
-  - Range: 0.7-1.2s for a cinematic push; under 0.5s feels like a hard cut, over 1.5s drags
-  - Reference: examples uses `0.9s`
-- **TARGET_SCALE** — final zoom magnification.
-  - Range: 3× (modest emphasis) → 8× (extreme close-up); hero must remain crisp at this scale (raster source: ensure source resolution ≥ `HERO_SIZE × TARGET_SCALE`)
-  - Reference: examples uses `5.5×`
-- **BRAND_EXIT_X** — how far the brand text slides off-screen during the zoom.
-  - Range: ≥ half viewport width in magnitude so the text fully clears before zoom climaxes
-  - Reference: examples uses `-600px`
-- **BRAND_FADE_RATIO** — fraction of `ZOOM_DUR` over which the brand text fades.
-  - Range: 0.3-0.5; fades early so the zoom climax frames only the hero
-  - Reference: examples uses `0.4`
-
-### Phase 5 — breathing idle
-
-- **BREATH_START** — breath activates.
-  - Constraints: `≥ ZOOM_START + ZOOM_DUR + ~0.1s` (avoid fighting the zoom spring's tail)
-  - Reference: examples uses `3.67s`
-- **HERO_FINAL_SCALE** — the scale the hero landed at after Phase 2.
-  - Constraints: must match Phase 2's final scale value (typically `1.0`); the breath multiplies onto this
-- **SCALE_PERIOD** — seconds per full breath cycle.
-  - Range: 1.0-3.0s; ~1.5-2.0s reads as natural breathing, under 1s feels jittery, over 3s lifeless
-  - Reference: examples uses `1.5s`
-- **SCALE_AMP** — sine amplitude on scale (multiplicative).
-  - Range: 0.02-0.06; smaller for product photography, larger for stylized logos
-  - Reference: examples uses `0.04`
-- **ROTATE_AMP** — sine amplitude on rotation, in degrees.
-  - Range: 0-3°; pair with the scale amplitude for a subtle organic wobble (set to 0 for icons that shouldn't tilt)
-  - Reference: examples uses `2`
-
-## Critical Constraints
-
-- **Pre-calculated offset constants**: `FINAL_RECENTER_OFFSET`, `HERO_FINAL_OFFSET_X`, `HERO_FINAL_OFFSET_Y` are constants. Computing them per frame causes sub-pixel drift that becomes a visible jitter when multiplied by the 5×+ zoom scale.
-- **Scale wraps translation**: `.zoom-scale` (outer) handles `scale`; `.zoom-translate` (inner) handles `x` / `y`. Reversed nesting causes accelerated movement (translations scale with the outer scale).
-- **Companion width ≥ max text width**: The fixed-width container must hold the fully-assembled companion text. Overflow is invisible during assembly but spills past the viewport edge.
-- **`baseHeroOffset = (C + G + B + L) / 2`**: `heroSize` cancels out — including it makes the icon land left of center.
-- **Breathing form**: Use the onUpdate (multiplicative) form so the breath layers on top of the hero's existing scale. A `fromTo` + yoyo overwrites the pop scale.
-- **Breathing activation gate**: `BREATH_START ≥ zoom end + 0.1s`. Activating too early makes the breath fight the zoom spring's tail.
-- **Measure text after `document.fonts.ready`**: Otherwise `getBoundingClientRect()` uses fallback font metrics and the hero offset is off by ~10–30 px.
-- **GSAP transform aliases only**: `x`, `y`, `scale`, `rotation` on the three nested wrappers. Never tween `width` / `height` / `left` / `top`.
-- **Single paused timeline**: All five phases live on one `gsap.timeline({ paused: true })`, registered to `window.__timelines[data-composition-id]`.
-
-## Spring → GSAP Ease Cheatsheet (this blueprint)
-
-| Spring feel (low damping → high damping)        | Ease family used here                                   |
-| ----------------------------------------------- | ------------------------------------------------------- |
-| Bouncy overshoot — elastic pop                  | `back.out(${BOUNCE_FACTOR})` or `elastic.out(amp, per)` |
-| Tight, no overshoot — companion exit + recenter | `power3.out`                                            |
-| Cinematic, slow settle — zoom                   | `power2.out`                                            |
-| Continuous oscillation — breath                 | `sine.inOut` finite-yoyo, or onUpdate `Math.sin`        |
-
-See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
+- Phase 2 elastic pop → `back.out(BOUNCE_FACTOR)` (swap to `elastic.out` for rubberier feel)
+- Phase 3 tight exit → `power3.out`
+- Phase 4 cinematic push → `power2.out`
+- Phase 5 continuous oscillation → `onUpdate Math.sin`
 
 ## Golden Sample
 
-- [brand-reveal-assemble-zoom.html](../examples/brand-reveal-assemble-zoom.html) — runnable 5-second composition that realizes every named constant in this blueprint with concrete values. Single paused GSAP timeline drives all five phases.
+- [brand-reveal-assemble-zoom.html](../examples/brand-reveal-assemble-zoom.html) — runnable 5-second composition with concrete values for every named constant above; single paused GSAP timeline drives all five phases. Run this first, then change values — much faster than building from scratch.

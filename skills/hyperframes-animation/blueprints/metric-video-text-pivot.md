@@ -30,494 +30,183 @@ triggers:
   ]
 ---
 
-# Metric · Video Text Pivot
+# Metric · Video Text Pivot (HyperFrames)
 
-Product video centered → video slides aside → giant stat appears in the freed space → both exit → kinetic text types in the center → gradient pill scales in behind a closing phrase.
+This is a "show → yield → pivot → stamp" emotional arc: the product video lands centered and breathes, claiming the viewer's full attention; then it slides aside _into_ the space the stat fills, so the viewer reads it as a single weight-transfer rather than two events; then both visual citizens clear out and kinetic text types into the vacated center, with accent words carrying the meaning the video used to carry; finally a gradient pill snaps shut around the closing line, sealing the impact statement as one graphic.
 
-Four-phase "show → tell with impact" arc; one paused GSAP timeline; constituent patterns map to [3d-text-depth-layers](../rules/3d-text-depth-layers.md) and [sine-wave-loop](../rules/sine-wave-loop.md) (for the video's idle float and the stat's breath). Accent words use a static CSS color (no per-frame glow envelope).
+Single paused GSAP timeline. Four phases, but the second and third phase each pair an exit with a same-anchor entrance, so the timeline reads as two beats not four.
 
 ## When to Use
 
-- Scene has two narrative beats: "see the feature" then "see the impact"
-- A product video should establish context before yielding to text
-- The stat / metric needs dramatic, frame-filling typographic treatment
-- The video doesn't disappear permanently — it slides aside to maintain context, then exits when the stat takes over
+- Two narrative beats: "see the feature" then "see the impact"
+- Stat / metric needs dramatic, frame-filling typographic treatment (not an overlay)
+- Video provides context and must remain visible during the stat reveal — it slides, doesn't cut
+- Not for: video-as-focal-point throughout, secondary stats, purely typographic scenes
 
-## Phase Pipeline
+## Orchestration
 
-All boundaries are in **seconds** (typically ASR-driven; convert frame indices to seconds via `frames / fps`).
+Four phases, two rules, three inline patterns. The inline patterns dominate because most of the scene is bespoke layout choreography, not motif reuse.
 
-| Phase | Time window (s)             | What Happens                                                                                              | Skill Reference                                                                                        |
-| ----- | --------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| 1     | `VIDEO_ENTRY_AT – SLIDE_AT` | Video enters centered with 3D tilt and floats gently                                                      | inline tilt + [sine-wave-loop](../rules/sine-wave-loop.md)                                             |
-| 2     | `SLIDE_AT – PIVOT_AT`       | Video slides aside; stat appears in the freed space with 3D depth layers + breathing                      | [3d-text-depth-layers](../rules/3d-text-depth-layers.md), [sine-wave-loop](../rules/sine-wave-loop.md) |
-| 3     | `PIVOT_AT – PILL_AT`        | Both video and stat exit; kinetic text types center-screen with accent-colored keywords + blinking cursor | inline typing with static CSS accent classes                                                           |
-| 4     | `PILL_AT – end`             | Gradient pill scales in behind the closing line with a glow halo                                          | inline pill scale                                                                                      |
+- **Phase 1 — video enters + floats**: inline `power3.out` scale/opacity tween on `.video-pos` for the entry. The float (a small `y` bob) is [sine-wave-loop](../rules/sine-wave-loop.md) in its **multiplicative `onUpdate` form**, written to `.video-float` (the middle wrapper). The rule's `fromTo` + yoyo form would not survive the Phase 2 slide tween — see Phase 1 seam below.
+- **Phase 2 — video slide + stat reveal**: video gets an inline `power3.out` `x` + `scale` slide on `.video-pos`. Stat enters with an inline `back.out(STAT_BOUNCE_FACTOR)` on `.stat-pos`. The stat's 3D type uses [3d-text-depth-layers](../rules/3d-text-depth-layers.md) in its **static-depth variation** (layers built at composition setup, no cascade, no depth-grow tween); the cascade default would fight the bounce entry. The stat's breath is again [sine-wave-loop](../rules/sine-wave-loop.md) in its multiplicative onUpdate form, gated to the Phase 2 window only.
+- **Phase 3 — pivot (both exit + typing enters)**: three concurrent inline tweens at `PIVOT_AT` — video exit, stat exit, typing-stage fade/scale entry. The character-by-character typing itself is inline: a single proxy tween advances `idx: 0 → totalChars` with `ease: "none"`, and `onUpdate` slices five pre-segmented spans by index. We are deliberately _not_ using `discrete-text-sequence` — that rule models discrete state swaps (typos, corrections), not a clean character stream through segmented spans. See "Rule gap" in the report.
+- **Phase 4 — pill stamp**: inline `power3.out` on `.pill-bg` `scaleX: 0 → 1` + `scaleY: PILL_INITIAL_SCALE_Y → 1`. The glow halo (`.pill-glow`) fades on the same anchor with a longer `power2.out` duration so the silhouette resolves before the bloom registers.
 
-When timings are anchored to spoken-word timestamps, bake each anchor as a `const` converted from frame indices.
+## Phase Timing
 
-## Initial Layout
+| Phase | Start ≥                                             | Internal duration                        | Notes                                                                     |
+| ----- | --------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------- |
+| 1     | `VIDEO_ENTRY_AT` (≥ 0)                              | `VIDEO_ENTRY_DUR`                        | Float starts at t=0 and runs continuously, gated by Phase 2/3 window      |
+| 2     | `VIDEO_ENTRY_AT + VIDEO_ENTRY_DUR + ~1.0s`          | `max(VIDEO_SLIDE_DUR, STAT_ENTRY_DUR)`   | The ~1s gap is the "breathing room" — see seam                            |
+| 2b    | `SLIDE_AT + STAT_ENTRY_DUR + ~0.1s`                 | until `PIVOT_AT`                         | Stat breath activates here, gated off at `PIVOT_AT`                       |
+| 3     | `STAT_BREATH_START + ~0.5s`                         | `EXIT_DUR` + `TYPING_STAGE_DUR` + typing | Pivot starts here; `TYPING_START_AT = PIVOT_AT + TYPING_STAGE_DUR`        |
+| 4     | `TYPING_START_AT + (BOUNDS.accent2End / TYPE_RATE)` | `PILL_DUR`                               | Anchored to the character index where line 2 begins — derived, not chosen |
 
-Four zones share an absolute-fill stage:
+The ~1s gap before Phase 2 (`SLIDE_AT − VIDEO_ENTRY_AT − VIDEO_ENTRY_DUR ≥ 1.0s`) is the most-tuned gap in the blueprint: shorter and the float never registers as "alive," so the slide reads as the video's first action rather than its second; longer and the scene drags. The 0.1s gap between stat entry end and breath start is the standard `back.out` settle buffer (overshoot tail and sine cannot coexist — same constraint as Phase 5 of brand-reveal). The ~0.5s minimum between breath start and `PIVOT_AT` exists to make the breath _visible_ — at least one half-cycle has to land before the exit.
 
-```html
-<div class="stage" style="position: absolute; inset: 0;">
-  <div class="bg"></div>
-  <div class="ambient-glow"></div>
-  <!-- soft radial behind everything -->
-  <div class="badge">{Brand}</div>
-  <!-- top label -->
+The pill anchor (`PILL_AT`) is not chosen, it's derived from the typing index. The full formula:
 
-  <!-- Phase 1+2: Video card. Three nested wrappers separate concerns. -->
-  <div class="video-pos">
-    <!-- GSAP: x (entry/slide/exit), scale, opacity -->
-    <div class="video-float">
-      <!-- onUpdate: y (float) -->
-      <div class="video-tilt">
-        <!-- CSS: rotateY(VIDEO_TILT_Y) rotateX(VIDEO_TILT_X) -->
-        <div class="video-content">
-          <video src="{videoAsset}" muted playsinline></video>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Phase 2: Stat. Three nested wrappers, same pattern. -->
-  <div class="stat-pos">
-    <!-- GSAP: x (entry/exit), y (entry), scale, opacity -->
-    <div class="stat-breath">
-      <!-- onUpdate: scale (breathing) -->
-      <div class="stat-tilt">
-        <!-- CSS: rotateY(STAT_TILT_Y) rotateX(STAT_TILT_X) -->
-        <div class="depth-stack" data-text="{statLabel}"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Phase 3+4: Typing + pill. -->
-  <div class="typing-stage">
-    <!-- GSAP: opacity, scale entry -->
-    <div class="typing-tilt">
-      <!-- CSS: rotateY(TYPING_TILT_Y) rotateX(TYPING_TILT_X) -->
-      <div class="line1">
-        <span class="seg main"></span>
-        <span class="seg accent"></span>
-        <span class="seg suffix"></span>
-        <span class="seg accent2"></span>
-        <span class="cursor cursor1"></span>
-      </div>
-      <div class="line2-wrap">
-        <div class="pill-bg"></div>
-        <!-- GSAP: scaleX, scaleY, opacity -->
-        <div class="pill-glow"></div>
-        <!-- GSAP: opacity -->
-        <div class="line2-content">
-          <span class="seg line2"></span>
-          <span class="cursor cursor2"></span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="vignette"></div>
-</div>
+```
+PILL_AT = TYPING_START_AT + (BOUNDS.accent2End / TYPE_RATE)
+        = (PIVOT_AT + TYPING_STAGE_DUR) + (line1Length / TYPE_RATE)
 ```
 
-```css
-.seg.accent,
-.seg.accent2 {
-  color: {accentColor};
-}
-.pill-bg {
-  background: linear-gradient(90deg, {pillStartColor} 0%, {accentColor} 100%);
-  transform-origin: center center;
+so the pill snaps in _at the instant_ line 2's first character types. Anchoring it earlier reads as the pill predicting the phrase; later reads as the pill catching up. Pick `TYPE_RATE` first, then this anchor falls out.
+
+## Initial DOM Nesting (Critical)
+
+Every moving element gets **three nested wrappers**: outer `-pos` carries the GSAP entry/slide/exit tween, middle `-float` (or `-breath`) carries the onUpdate-driven continuous motion, inner `-tilt` carries a static CSS 3D rotation. This is the structural seam unique to the blueprint — without the separation, the float's `y` onUpdate would clobber the slide's `x` tween (and vice versa) every frame.
+
+```
+.stage
+  .video-pos          ← Phase 1 entry, Phase 2 slide, Phase 3 exit
+    .video-float      ← onUpdate: y (sine-wave float, gated by t < PIVOT_AT)
+      .video-tilt     ← CSS: rotateY(VIDEO_TILT_Y) rotateX(VIDEO_TILT_X) — static
+        .video-content
+          <video />
+  .stat-pos           ← Phase 2 back.out entry, Phase 3 exit
+    .stat-breath      ← onUpdate: scale (sine-wave breath, gated to Phase 2 window)
+      .stat-tilt      ← CSS: rotateY(STAT_TILT_Y) rotateX(STAT_TILT_X) — static, opposite-Y sign vs video
+        .depth-stack  ← 3d-text-depth-layers (static variation, built once)
+  .typing-stage       ← Phase 3 fade+scale entry
+    .typing-tilt      ← CSS: rotateY(TYPING_TILT_Y) — static
+      .line1 (5 spans: main / accent / suffix / accent2 / cursor1)
+      .line2-wrap
+        .pill-bg      ← Phase 4 scaleX/scaleY entry
+        .pill-glow    ← Phase 4 opacity fade
+        .line2-content (line2 span + cursor2)
+```
+
+The video-tilt and stat-tilt should use **opposite-sign `rotateY`** values (e.g. video `+14°`, stat `-14°`) — this reads as "two surfaces angled toward camera" rather than "two surfaces in the same plane." Same-sign tilts make the slide look like a flat layer-shuffle.
+
+Accent colors are static CSS — `.seg.accent { color: {accentColor} }`. No per-frame color tween, no glow envelope on accent spans. The pill carries all the chromatic punch.
+
+## Phase 1 Seam: Float Must Be Multiplicative AND Gated
+
+The video's float uses [sine-wave-loop](../rules/sine-wave-loop.md)'s onUpdate form, not its `fromTo` + yoyo form — and not because of stylistic preference. Phase 2 will tween `.video-pos`'s `x` from center to `VIDEO_SLIDE_X`. If the float lived on the same element via `fromTo + yoyo`, GSAP would reapply the float's `from` state every yoyo cycle and snap `.video-pos` back to its un-slid position. Putting the float on the middle wrapper (`.video-float`) and writing its `y` via `onUpdate` keeps `.video-pos`'s `x` slot free for the slide tween.
+
+The float must also be **time-gated** inside the shared scene-ticker onUpdate — it should stop firing once the video exits in Phase 3, otherwise it keeps writing `y` to an off-screen `.video-float` forever and burns CPU. Gate it with `if (t < PIVOT_AT)`. This is one of two gated continuous motions in the scene (the other is the stat breath); together they're why we use a single shared scene-ticker onUpdate rather than three separate tweens.
+
+## Phase 2 Seam: Slide and Stat-Entry Share an Anchor
+
+Both tweens fire at the same `SLIDE_AT` position on the timeline. This is the scene's signature beat: the slide _creates_ the space the stat _fills_, so the eye reads them as one weight transfer. If `SLIDE_AT` for the stat lags the video slide by even 0.1s, the empty space briefly registers as "something is missing" before the stat lands, killing the illusion. Stack them on the exact same anchor.
+
+The stat enters from `(STAT_ENTRY_X, STAT_ENTRY_Y_OFFSET, STAT_ENTRY_SCALE)` with `back.out(STAT_BOUNCE_FACTOR)`. `STAT_ENTRY_Y_OFFSET` (40–80 px below final) exists specifically to give the `back.out` overshoot something to _travel_; without a y offset, the bounce reads as a pure scale-pulse rather than a "thrown into place" stamp. The stat's final position is the _space the video vacated_ — `STAT_ENTRY_X ≈ 0.55–0.65 × viewport width` and `VIDEO_SLIDE_X ≈ 0.25–0.35 × viewport width` are mirror-image anchors around the viewport midline.
+
+## Phase 2 Seam: Static-Depth Variation of 3d-text-depth-layers
+
+The stat uses [3d-text-depth-layers](../rules/3d-text-depth-layers.md) in its **static-depth variation** — all layers built at composition setup time with their final offsets, no per-layer cascade, no `DEPTH_GROW_DUR` tween. Reason: the stat _enters as one object_ via the `back.out` bounce on `.stat-pos`. A per-layer cascade firing during the bounce overshoot produces visible inter-layer jitter as layers fade in at different progress points of the spring. The static variation keeps the stack visually coherent inside the bounce.
+
+The depth-stack lives inside `.stat-tilt`, _not_ `.stat-pos` or `.stat-breath`. Putting it inside `.stat-tilt` means the CSS rotation applies to the entire stack uniformly — if the depth-stack were outside the tilt, each layer's per-layer translate offset would not get rotated, breaking the depth illusion.
+
+## Phase 2 Seam: Stat Breath Gating
+
+The stat breath is [sine-wave-loop](../rules/sine-wave-loop.md)'s multiplicative onUpdate form, written to `.stat-breath` (the middle wrapper). Unlike a typical idle breath that runs until composition end, _this_ breath must be **gated off** at `PIVOT_AT`. After `PIVOT_AT`, Phase 3's exit tween on `.stat-pos` controls the stat — but breath is on `.stat-breath`, which is the inner wrapper, so an ungated breath would keep writing `scale` to the wrapper inside an opacity-faded `.stat-pos`. The visible result: a faint scale-shimmer continues _after_ the stat is gone, only noticeable if you look closely, but it's also a wasted onUpdate forever.
+
+```js
+// Inside the shared scene-ticker onUpdate (single tween, ease: "none"):
+const t = tl.time();
+if (t > STAT_BREATH_START && t < PIVOT_AT) {
+  const breath = 1 + Math.sin((t - STAT_BREATH_START) * STAT_BREATH_FREQ) * STAT_BREATH_AMP;
+  gsap.set(".stat-breath", { scale: breath });
 }
 ```
 
-**Three nested wrappers per moving element** is the recurring pattern:
+`STAT_BREATH_START − SLIDE_AT − STAT_ENTRY_DUR ≥ 0.1s` is the standard back.out settle gap — the breath's sine starts at zero offset (`sin(0) = 0`) so it composes cleanly with `.stat-breath`'s implicit `scale: 1.0`, but only if it isn't fighting the bounce tail.
 
-- Outermost (`-pos`) handles GSAP entry / slide / exit
-- Middle (`-float` or `-breath`) handles onUpdate-driven continuous motion
-- Innermost (`-tilt`) holds the static 3D rotation via CSS
+## Phase 3 Seam: Typing-Stage Entry Must Finish Before Characters
 
-This isolation prevents the float onUpdate from overwriting the slide tween's `x`, and prevents the slide tween from overwriting the float's `y`. Each wrapper owns one concern.
+Three things fire at `PIVOT_AT`: video exit, stat exit, typing-stage fade+scale entry. The characters of line 1 do **not** fire at `PIVOT_AT` — they fire at `TYPING_START_AT = PIVOT_AT + TYPING_STAGE_DUR`. The reason: the typing-stage `scale: 0.85–0.95 → 1` is small enough that characters typed during the scale-in would draw mid-zoom and look like they're being letterpress-stamped at a wrong scale. Let the stage land, _then_ type.
 
-## Phase 1: Video Entry + Float
-
-Editorial intent: open on the product video at full attention. A small scale-up and fade-in let the viewer parse the frame before any motion off the static tilt; the gentle float keeps it "alive" while it's the only element on screen.
+The typing itself is inline because no rule covers this exact shape — five pre-existing DOM spans (main / accent / suffix / accent2 / line2), one proxy tween advancing a single `idx` value, an `onUpdate` that slices each span's `textContent` by its segment-relative offset.
 
 ```js
-gsap.set(".video-pos", { x: W / 2, y: H / 2, scale: VIDEO_ENTRY_SCALE, opacity: 0 });
-
-tl.to(
-  ".video-pos",
-  {
-    scale: 1,
-    opacity: 1,
-    duration: VIDEO_ENTRY_DUR,
-    ease: "power3.out",
-  },
-  VIDEO_ENTRY_AT,
-);
-```
-
-The 3D tilt is set once in CSS on `.video-tilt`. The float (small `y` sine) runs continuously from `t=0` in the shared scene-ticker onUpdate — see [sine-wave-loop](../rules/sine-wave-loop.md) for the breathing pattern.
-
-## Phase 2: Video Slide + Stat Reveal
-
-Editorial intent: the video remains visible (context) but yields screen real estate to the stat. Both motions land on the same timeline anchor (`SLIDE_AT`, typically the stat label's spoken-word timestamp) so the slide _creates_ the empty space the stat _fills_.
-
-```js
-/* Video slides aside and shrinks slightly to make room for the stat. */
-tl.to(
-  ".video-pos",
-  {
-    x: VIDEO_SLIDE_X,
-    scale: VIDEO_SLIDE_SCALE,
-    duration: VIDEO_SLIDE_DUR,
-    ease: "power3.out",
-  },
-  SLIDE_AT,
-);
-
-/* Stat appears in the freed space with a bouncy entry. */
-gsap.set(".stat-pos", {
-  x: STAT_ENTRY_X,
-  y: STAT_ENTRY_Y_OFFSET,
-  scale: STAT_ENTRY_SCALE,
-  opacity: 0,
-});
-
-tl.to(
-  ".stat-pos",
-  {
-    y: 0,
-    scale: 1,
-    opacity: 1,
-    duration: STAT_ENTRY_DUR,
-    ease: `back.out(${STAT_BOUNCE_FACTOR})`,
-  },
-  SLIDE_AT,
-);
-```
-
-The 3D depth stack inside `.stat-tilt` is built once at composition setup time — see [3d-text-depth-layers](../rules/3d-text-depth-layers.md). The breath multiplies onto the stat's final scale of 1.0 via the shared scene-ticker (onUpdate / multiplicative form of [sine-wave-loop](../rules/sine-wave-loop.md)):
-
-```js
-onUpdate: function () {
-  const t = tl.time();
-  if (t > STAT_BREATH_START && t < PIVOT_AT) {
-    const breath = 1 + Math.sin((t - STAT_BREATH_START) * STAT_BREATH_FREQ) * STAT_BREATH_AMP;
-    gsap.set(".stat-breath", { scale: breath });
-  }
-  // ... other continuous motions
-}
-```
-
-## Phase 3: Pivot — Both Exit + Typing Begins
-
-Editorial intent: the pivot. The video and stat both leave together so the empty stage cues a new beat; the typing fades in on the same anchor so the viewer's attention transfers without a gap.
-
-```js
-tl.to(
-  ".video-pos",
-  {
-    x: VIDEO_EXIT_X,
-    scale: EXIT_SCALE,
-    opacity: 0,
-    duration: EXIT_DUR,
-    ease: "power3.out",
-  },
-  PIVOT_AT,
-);
-
-tl.to(
-  ".stat-pos",
-  {
-    x: STAT_EXIT_X,
-    scale: EXIT_SCALE,
-    opacity: 0,
-    duration: EXIT_DUR,
-    ease: "power3.out",
-  },
-  PIVOT_AT,
-);
-
-/* Typing stage fades + scales in. */
-gsap.set(".typing-stage", { scale: TYPING_ENTRY_SCALE, opacity: 0 });
-tl.to(
-  ".typing-stage",
-  {
-    scale: 1,
-    opacity: 1,
-    duration: TYPING_STAGE_DUR,
-    ease: "power3.out",
-  },
-  PIVOT_AT,
-);
-```
-
-## Phase 3 (continued): Character-by-Character Typing
-
-A single proxy tween drives the character index `0 → totalChars`. Inside `onUpdate`, slice the full text into the correct sub-spans based on segment boundaries and current index. Accent spans are pre-styled in CSS; no per-frame color tween.
-
-The line structure is two lines: line 1 alternates between neutral and accent segments (4 segments here), line 2 is the closing phrase that sits inside the pill.
-
-```js
-const SEG = {
-  main: "{lineMainBefore}", // neutral lead-in on line 1
-  accent: "{lineMainAccent}", // accent keyword
-  suffix: "{lineMainBetween}", // neutral connector
-  accent2: "{lineMainAccent2}", // accent keyword
-  line2: "{lineClosing}", // closing phrase inside the pill
-};
-
-// Boundaries computed from segment lengths (do NOT hard-code character counts).
+// Boundaries derived from SEG.*.length — never hard-code character counts.
 const BOUNDS = {
-  mainEnd: SEG.main.length,
-  accentEnd: SEG.main.length + SEG.accent.length,
-  suffixEnd: SEG.main.length + SEG.accent.length + SEG.suffix.length,
-  accent2End: SEG.main.length + SEG.accent.length + SEG.suffix.length + SEG.accent2.length,
-  line2End:
-    SEG.main.length + SEG.accent.length + SEG.suffix.length + SEG.accent2.length + SEG.line2.length,
+  mainEnd:    SEG.main.length,
+  accentEnd:  SEG.main.length + SEG.accent.length,
+  suffixEnd:  /* ...etc */,
+  accent2End: /* end of line 1 — also when line 2 begins */,
+  line2End:   /* total chars */,
 };
 
-const typeProxy = { idx: 0 };
-const TYPE_DUR = BOUNDS.line2End / TYPE_RATE;
-
-tl.to(
-  typeProxy,
-  {
-    idx: BOUNDS.line2End,
-    duration: TYPE_DUR,
-    ease: "none",
-    onUpdate: () => {
-      const i = Math.floor(typeProxy.idx);
-      segMain.textContent = SEG.main.slice(0, Math.min(i, BOUNDS.mainEnd));
-      segAccent.textContent = SEG.accent.slice(
-        0,
-        Math.max(0, Math.min(i - BOUNDS.mainEnd, SEG.accent.length)),
-      );
-      segSuffix.textContent = SEG.suffix.slice(
-        0,
-        Math.max(0, Math.min(i - BOUNDS.accentEnd, SEG.suffix.length)),
-      );
-      segAccent2.textContent = SEG.accent2.slice(
-        0,
-        Math.max(0, Math.min(i - BOUNDS.suffixEnd, SEG.accent2.length)),
-      );
-      segLine2.textContent = SEG.line2.slice(
-        0,
-        Math.max(0, Math.min(i - BOUNDS.accent2End, SEG.line2.length)),
-      );
-    },
-  },
-  TYPING_START_AT,
-);
+// One proxy, ease: "none". Each segment gets sliced by clamping (idx − segmentStart) into [0, segmentLength].
 ```
 
-Accent-colored spans (`.seg.accent`, `.seg.accent2`) get their color from a static CSS rule referencing `{accentColor}` — no per-frame color tween or glow envelope. The cursor blinks via a separate onUpdate (next section), and switches between neutral and accent color based on which segment is currently typing.
+The single source of truth is `BOUNDS.line2End / TYPE_RATE` for total typing duration. Hard-coding character counts (rather than deriving from `SEG.x.length`) is how this scene most often breaks during copy edits — one extra word in `SEG.accent` and the cursor desyncs.
 
-## Phase 4: Gradient Pill Reveal Behind Line 2
+## Phase 3 Seam: Cursor Blink Switches Spans By Index
 
-Editorial intent: stamp of impact. The pill snaps into shape around the closing line right as line 2 starts typing, so the audience experiences "phrase + frame" as a single graphic. The glow halo arrives slightly slower so the silhouette resolves before the bloom registers.
+Two cursor elements (`cursor1`, `cursor2`) exist because cursor1 sits at the end of line 1 (after accent2) and cursor2 sits inside the pill on line 2. Only one is visible at a time, switched by the current typing index:
 
 ```js
-const PILL_AT = TYPING_START_AT + BOUNDS.accent2End / TYPE_RATE; // line 2 typing begins
-
-gsap.set(".pill-bg", { scaleX: 0, scaleY: PILL_INITIAL_SCALE_Y, opacity: 0 });
-gsap.set(".pill-glow", { opacity: 0 });
-
-/* Pill scaleX 0 → 1 + scaleY ramps to 1 + opacity → PILL_OPACITY in one ease. */
-tl.to(
-  ".pill-bg",
-  {
-    scaleX: 1,
-    scaleY: 1,
-    opacity: PILL_OPACITY,
-    duration: PILL_DUR,
-    ease: "power3.out",
-  },
-  PILL_AT,
-);
-
-/* Soft glow halo behind the pill — fades in slightly slower. */
-tl.to(
-  ".pill-glow",
-  {
-    opacity: PILL_GLOW_OPACITY,
-    duration: PILL_GLOW_DUR,
-    ease: "power2.out",
-  },
-  PILL_AT,
-);
+const cursorVisible = Math.floor(t * CURSOR_BLINK_HZ * 2) % 2 === 0 ? 1 : 0;
+cursor1.style.opacity = i < BOUNDS.accent2End ? cursorVisible : 0;
+cursor2.style.opacity = i >= BOUNDS.accent2End && i < BOUNDS.line2End ? cursorVisible : 0;
 ```
 
-The pill background is a horizontal gradient between `{pillStartColor}` and `{accentColor}`; the glow is a blurred radial gradient further behind. Both use `transform-origin: center center` so they scale outward from the phrase center.
+The blink itself is deterministic from `tl.time()` — required by the universal HF determinism rule, not unique to this blueprint. What _is_ unique: the index-based span switching, which means the cursor blink is co-driven by both `t` (for the blink) and `i` (for _which_ cursor blinks). Both must come from the same onUpdate.
 
-## Blinking Cursor
+## Phase 3 → 4 Seam: Pill Anchor Is Derived
 
-Derive deterministically from `tl.time()` so the blink is a pure function of seek position (no `Date.now`, no `Math.random`, no CSS animation):
+`PILL_AT = TYPING_START_AT + BOUNDS.accent2End / TYPE_RATE`. This is the most important derived constant in the scene — pick `TYPE_RATE` and `SEG.*` contents, and `PILL_AT` falls out. Do **not** tune `PILL_AT` independently as a free parameter; it must track the typing index. If `TYPE_RATE` changes (e.g. dropping from 30 to 20 chars/sec for dramatic effect), `PILL_AT` must be recomputed in the same revision.
 
-```js
-onUpdate: function () {
-  const t = tl.time();
-  const cursorVisible = (Math.floor(t * CURSOR_BLINK_HZ * 2) % 2 === 0) ? 1 : 0;
-  // Show cursor1 only while typing line1 (idx < accent2End)
-  cursor1.style.opacity = (i < BOUNDS.accent2End) ? cursorVisible : 0;
-  // Show cursor2 only while typing line2
-  cursor2.style.opacity = (i >= BOUNDS.accent2End && i < BOUNDS.line2End) ? cursorVisible : 0;
-}
-```
+`PILL_DUR` should finish _before_ line 2 finishes typing (i.e. `PILL_AT + PILL_DUR < TYPING_START_AT + BOUNDS.line2End / TYPE_RATE`) so the pill frames the phrase as it lands rather than catching up after it has landed.
 
-`Math.floor(t * CURSOR_BLINK_HZ * 2) % 2 === 0` produces a 50% duty-cycle blink at `CURSOR_BLINK_HZ` blinks/sec.
+## Key Values to Choose (Not Already in the Rules)
 
-## Inter-Phase State Handoff
+Only listing values specific to this blueprint; standard rule parameters (`SCALE_AMP`, `Y_AMP_PX`, `LAYER_COUNT`, `OFFSET_X`, `BACK_ALPHA_*` — all in the linked rules) live there.
 
-```
-Phase 1 → Phase 2:
-  Video entry completes by VIDEO_ENTRY_AT + VIDEO_ENTRY_DUR.
-  SLIDE_AT must leave enough breathing room (≥ ~1 s) for the float to read as
-  "alive" before the layout is disturbed.
+- **VIDEO_SLIDE_X / STAT_ENTRY_X** — mirror-image around viewport midline. Video slides to `~0.25–0.35 × W`, stat lands at `~0.55–0.65 × W`. Asymmetric placements make one element look "demoted" rather than "yielded to."
+- **VIDEO_TILT_Y vs STAT_TILT_Y** — opposite sign. Same sign reads as flat layers, not surfaces.
+- **STAT_ENTRY_Y_OFFSET** — 40–80 px below final. Smaller → bounce reads as a scale pulse; larger → reads as gravity-dropped.
+- **TYPE_RATE** — 20–40 chars/sec; 30 ≈ "1 char/frame at 30 fps." Once chosen, recompute `PILL_AT` (it derives from this).
+- **SEG.\*** — the five-span split of line 1 + line 2. Edit copy here, not in the BOUNDS computation. BOUNDS rebuilds from `SEG.*.length` automatically.
+- **PILL_INITIAL_SCALE_Y** — 0.4–0.6 vertical squash. Lower than 0.4 reads as a horizontal line snapping outward (good for "stamp" feel); near 1.0 pre-empts the climax.
+- **PILL_GLOW_DUR** — `PILL_DUR + 0.1–0.3s`. The lag is the visual "bloom after silhouette" trick; equalize them and the glow feels like part of the silhouette instead of a halo.
 
-Phase 2 → Phase 3:
-  Stat entry completes by SLIDE_AT + STAT_ENTRY_DUR.
-  Stat breath activates at STAT_BREATH_START (≥ stat entry end + small buffer).
-  PIVOT_AT cuts breathing short — the exit tween's scale overrides the breath's onUpdate
-  for the stat once t > PIVOT_AT (gated inside the scene-ticker).
+## Critical Constraints (ordered by failure frequency)
 
-Phase 3 typing:
-  Typing starts at TYPING_START_AT (= PIVOT_AT + TYPING_STAGE_DUR) so the stage has
-  scaled / faded in before characters appear.
-  Total typing duration: BOUNDS.line2End / TYPE_RATE.
+- **`PILL_AT` is derived, not chosen** — `PILL_AT = TYPING_START_AT + BOUNDS.accent2End / TYPE_RATE`. Whenever `TYPE_RATE` or `SEG.*` changes, `PILL_AT` must be recomputed in the same edit. The most common edit failure is bumping `TYPE_RATE` without touching `PILL_AT`.
+- **Three nested wrappers per moving element** — `-pos` / `-float`-or-`-breath` / `-tilt`. Collapse any two and the float / breath onUpdate clobbers the slide / exit tween every frame. This is the most common structural bug.
+- **Stat breath must be gated to `STAT_BREATH_START < t < PIVOT_AT`** — otherwise breath keeps writing `scale` to `.stat-breath` forever, including after the stat opacity-fades out in Phase 3.
+- **Video float must be gated to `t < PIVOT_AT`** — same reason as the stat breath.
+- **Video slide and stat entry share `SLIDE_AT` exactly** — even a 0.1s offset between them kills the weight-transfer illusion.
+- **Static-depth variation of 3d-text-depth-layers, not cascade** — the per-layer cascade fights the `back.out` bounce.
+- **`depth-stack` lives inside `.stat-tilt`** — outside, the CSS rotation doesn't apply to back layers' offsets and the depth illusion breaks.
+- **BOUNDS derives from `SEG.*.length`** — never hard-code character counts. Copy edits desync the cursor otherwise.
+- **Opposite-sign Y tilts on video vs stat** — same-sign reads as a flat layer-shuffle, not two angled surfaces.
+- **Typing characters start at `TYPING_START_AT`, not `PIVOT_AT`** — letting them type during the typing-stage scale-in produces wrong-scale glyphs mid-zoom.
 
-Phase 3 → Phase 4:
-  PILL_AT = TYPING_START_AT + (BOUNDS.accent2End / TYPE_RATE) — the moment line 2 starts.
-  Pill scale finishes by PILL_AT + PILL_DUR, ideally before line 2 finishes typing so
-  the pill frames the phrase as it lands.
+## Spring → Ease Selection
 
-Continuous (from t = 0):
-  Shared scene-ticker onUpdate drives the video float (Phase 1+2), the stat breath
-  (Phase 2 only), and the cursor blink (Phase 3+4). Each motion gates itself by time
-  windows so it doesn't fire outside its visibility.
-```
+Four feels, four ease choices. Full spring → ease table lives in [hyperframes-animation/SKILL.md](../SKILL.md); blueprint defaults:
 
-## How to Choose Values
-
-### Stage geometry / placeholders
-
-- **{Brand}** — top badge label
-- **{statLabel}** — the metric label rendered inside the depth stack (1-4 chars reads best at heroic font sizes)
-- **{lineMainBefore} / {lineMainAccent} / {lineMainBetween} / {lineMainAccent2}** — line 1 segments alternating neutral / accent / neutral / accent
-- **{lineClosing}** — short closing phrase that fits inside the pill
-- **{accentColor}** — single accent hue shared by the stat, the line-1 accent spans, the line-2 cursor, and the pill's end stop
-- **{pillStartColor}** — pill gradient start hue (typically a complementary brand tone)
-- **{videoAsset}** — product demo MP4 path
-- **{font} / {monoFont}** — primary typeface and (if any) cursor/mono fallback
-- **VIDEO_TILT_X / VIDEO_TILT_Y / STAT_TILT_X / STAT_TILT_Y / TYPING_TILT_X / TYPING_TILT_Y** — static CSS 3D rotations.
-  - Range: 3-8° on X (slight pitch); 10-18° on Y (clear yaw)
-  - Effects: opposite-sign Y between video and stat reads as "two surfaces angled toward camera"
-
-### Phase 1 — video entry + float
-
-- **VIDEO_ENTRY_AT** — timeline offset where the video enters.
-  - Constraints: typically `≥ 0`; if a badge precedes, ≥ that beat's end
-- **VIDEO_ENTRY_DUR** — entry tween duration.
-  - Range: 0.5-1.0 s
-- **VIDEO_ENTRY_SCALE** — initial scale before scale-up.
-  - Range: 0.5-0.75. Smaller reads as "popping forward"; larger reads as a gentle fade
-- **Float amplitude / frequency** — see [sine-wave-loop](../rules/sine-wave-loop.md) (`Y_AMP_PX` 2-6 px, ~0.7-1.0 rad/s)
-
-### Phase 2 — slide + stat reveal
-
-- **SLIDE_AT** — when the video slides and the stat appears.
-  - Constraints: `≥ VIDEO_ENTRY_AT + VIDEO_ENTRY_DUR + ~1.0 s` so the float reads before the layout changes
-- **VIDEO_SLIDE_DUR** — duration of the slide tween.
-  - Range: 0.6-1.0 s — slower than the entry so the motion reads as "yielding," not "fleeing"
-- **VIDEO_SLIDE_X** — video's new x-center after the slide.
-  - Range: 0.25-0.35 × viewport width. Smaller crowds the stat; larger leaves a hole between video and stat
-- **VIDEO_SLIDE_SCALE** — video's new scale during Phase 2.
-  - Range: 0.80-0.92. Smaller shrinkage reads as "demoted"; near-1 reads as "still a peer"
-- **STAT_ENTRY_X / STAT_ENTRY_Y_OFFSET** — stat's initial position before pop.
-  - Range: `STAT_ENTRY_X` ≈ 0.55-0.65 × viewport width; `STAT_ENTRY_Y_OFFSET` 40-80 px below final to give the bounce something to overcome
-- **STAT_ENTRY_SCALE** — stat's initial scale.
-  - Range: 0.25-0.45. Lower scale + back.out gives the "thrown into place" feel
-- **STAT_ENTRY_DUR** — stat entry duration.
-  - Range: 0.5-0.7 s
-- **STAT_BOUNCE_FACTOR** — `back.out(STAT_BOUNCE_FACTOR)` overshoot strength.
-  - Range: 1.4 (soft) → 2.0 (firm) → 2.8 (cartoony). The stat usually wants firm-to-cartoony so the entry feels like a "stamp"
-- **STAT_BREATH_START** — when breathing activates.
-  - Constraints: `≥ SLIDE_AT + STAT_ENTRY_DUR + ~0.1 s` so the breath doesn't fight the bounce's settle
-- **STAT_BREATH_FREQ / STAT_BREATH_AMP** — sine frequency (rad/s) and amplitude (fractional scale).
-  - Range: `STAT_BREATH_FREQ` 1.0-1.5 rad/s; `STAT_BREATH_AMP` 0.015-0.03. See [sine-wave-loop](../rules/sine-wave-loop.md)
-
-### Phase 3 — pivot + typing
-
-- **PIVOT_AT** — when both video and stat exit and typing starts to fade in.
-  - Constraints: `≥ STAT_BREATH_START + ~0.5 s` so at least a few breath cycles are visible
-- **EXIT_DUR** — exit tween duration for both video and stat.
-  - Range: 0.5-0.8 s
-- **VIDEO_EXIT_X / STAT_EXIT_X** — final positions during the exit (off-screen).
-  - Range: ≤ −0.5 × viewport width for the video; ≤ −0.7 × viewport width for the stat (further so the stat clears past the video)
-- **EXIT_SCALE** — final scale during exit (small reduction).
-  - Range: 0.75-0.85
-- **TYPING_ENTRY_SCALE** — typing stage's initial scale before fade-in.
-  - Range: 0.85-0.95
-- **TYPING_STAGE_DUR** — typing-stage entry duration.
-  - Range: 0.4-0.6 s
-- **TYPING_START_AT** — when characters start appearing.
-  - Constraints: `= PIVOT_AT + TYPING_STAGE_DUR` so the stage has settled before characters appear
-- **TYPE_RATE** — typing speed, in characters/sec.
-  - Range: 20-40 chars/sec. ~30 chars/sec matches "1 char/frame at 30 fps." Faster reads as machine-gun output; slower reads as deliberate / dramatic
-  - Constraints: total typing duration `= BOUNDS.line2End / TYPE_RATE` must fit inside `end − TYPING_START_AT − PILL_DUR` (the pill needs time after line 2 starts)
-
-### Phase 4 — pill
-
-- **PILL_INITIAL_SCALE_Y** — pill's pre-reveal vertical squash.
-  - Range: 0.4-0.6. Smaller reads as a horizontal line snapping outward; larger pre-empts the climax
-- **PILL_DUR** — pill scale tween duration.
-  - Range: 0.5-0.7 s
-- **PILL_OPACITY** — final pill background opacity.
-  - Range: 0.8-0.95 — slightly translucent so the glow halo bleeds through the edges
-- **PILL_GLOW_DUR** — glow halo fade duration.
-  - Range: `≈ PILL_DUR + 0.1-0.3 s` so the glow lags slightly behind the silhouette
-- **PILL_GLOW_OPACITY** — final glow halo opacity.
-  - Range: 0.4-0.6
-
-### Cursor blink
-
-- **CURSOR_BLINK_HZ** — blinks per second.
-  - Range: 1-2 Hz. 1 Hz reads as natural cursor; 2 Hz feels manic; below 0.5 Hz feels lazy
-
-## Critical Constraints
-
-- **Video stays visible during Phase 2**: it slides aside but does not exit until Phase 3. This maintains context while the stat takes focus.
-- **ASR-driven timing**: when timings are anchored to spoken-word timestamps (`SLIDE_AT`, `PIVOT_AT`, segment boundaries), bake them as constants converted from `frames / fps`. No runtime ASR lookups.
-- **Three nested wrappers per moving element**: `-pos` / `-float` (or `-breath`) / `-tilt`. Each owns one concern; the float onUpdate never overwrites the slide tween's `x`.
-- **Pill scales from center**: `transform-origin: center center` on the pill background.
-- **3D depth layers — see the rule**: layer count, offsets, alpha falloff all governed by [3d-text-depth-layers](../rules/3d-text-depth-layers.md).
-- **Conditional rendering replaced by opacity + gating**: do not conditionally mount / unmount elements. Render permanently; GSAP tweens opacity to 0 to hide. Gates inside the scene-ticker prevent breath / float from firing outside their visibility windows.
-- **GSAP transform aliases only**: `x`, `y`, `scale`, `scaleX`, `scaleY`, `rotation`, `rotationY`, `rotationX`. Never `width` / `height` / `left` / `top`.
-- **No `Math.random` / `Date.now` / `performance.now`**: all motion is a pure function of `tl.time()`.
-- **No infinite repeats**: all continuous motions in the scene-ticker run over a finite `duration: TOTAL_DUR`. No `repeat: -1`.
-- **Single paused timeline**: all four phases on one `gsap.timeline({ paused: true })`, registered to `window.__timelines[data-composition-id]`.
-
-## Spring → GSAP Ease Cheatsheet (this blueprint)
-
-| Source spring                                               | This blueprint uses                                                   |
-| ----------------------------------------------------------- | --------------------------------------------------------------------- |
-| `spring({ stiffness: 80, damping: 15 })` — video entry      | `power3.out` over `VIDEO_ENTRY_DUR`                                   |
-| `spring({ stiffness: 100, damping: 18 })` — video slide     | `power3.out` over `VIDEO_SLIDE_DUR`                                   |
-| `spring({ stiffness: 120, damping: 20 })` — video/stat exit | `power3.out` over `EXIT_DUR`                                          |
-| `spring({ stiffness: 150, damping: 12 })` — stat entry      | `back.out(${STAT_BOUNCE_FACTOR})` over `STAT_ENTRY_DUR`               |
-| `spring({ stiffness: 80, damping: 15 })` — pill scale       | `power3.out` over `PILL_DUR`                                          |
-| `spring({ stiffness: 100, damping: 15 })` — typing stage    | `power3.out` over `TYPING_STAGE_DUR`                                  |
-| `sin(frame * 0.04) * 0.02` — stat breath                    | `Math.sin(t * STAT_BREATH_FREQ) * STAT_BREATH_AMP` in onUpdate        |
-| `sin(frame * 0.03) * 6` — video float                       | `Math.sin(t * floatFreq) * Y_AMP_PX` in onUpdate (see sine-wave-loop) |
-| `frame % 30 < 15` — cursor blink                            | `Math.floor(t * CURSOR_BLINK_HZ * 2) % 2 === 0` in onUpdate           |
-
-See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
+- Video entry / slide / exit and pill scale → `power3.out` (different durations; same family makes the timeline read coherent)
+- Stat entry → `back.out(STAT_BOUNCE_FACTOR)`, 1.4 soft → 2.0 firm → 2.8 cartoony (the stat usually wants firm-to-cartoony)
+- Pill glow → `power2.out` (softer than `power3.out` so the bloom lags the silhouette)
+- Continuous motions (float, breath, cursor blink) → onUpdate `Math.sin` / floor-mod
 
 ## Golden Sample
 
-- [metric-video-text-pivot.html](../examples/metric-video-text-pivot.html) — concrete instance with all placeholders filled in: timings, copy, colors, fonts, and the chosen video asset. Use it to verify the orchestration end-to-end (lint + render).
+- [metric-video-text-pivot.html](../examples/metric-video-text-pivot.html) — runnable composition with all placeholders filled in, single paused GSAP timeline, all four phases. Run this first, then change values — much faster than building from scratch.

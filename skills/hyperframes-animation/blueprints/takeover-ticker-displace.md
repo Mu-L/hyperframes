@@ -23,133 +23,77 @@ triggers:
 
 # Takeover · Ticker Displace (HyperFrames)
 
-Text builds context (typewriter + ticker) → hero enters from off-screen → hero physically pushes text out → hero settles into breathing.
+This is a "context-build → cycling beat → collision → idle" arc: a typewriter lays down a lead-in phrase, an accent word ticks through a slot-machine of options to suggest "many things this could be," then a hero crashes in from off-screen and physically shoves the text aside — saying "actually, this is what it is." The hero then settles into ambient breathing so the climax doesn't go dead.
 
-Same four-phase arc; one paused GSAP timeline; the displacement maps to [reactive-displacement](../rules/reactive-displacement.md) and the breathing uses the multiplicative form of [sine-wave-loop](../rules/sine-wave-loop.md) (because the hero lands at a non-1 scale).
+One paused GSAP timeline, four phases. The two non-adjacent rules (ticker, displacement) hand off through a shared parent transform; sine-wave-loop closes out as a multiplicative idle.
 
 ## When to Use
 
-- Scene has a text-building phase with cycling/rolling words
-- A visual hero element should dramatically replace the text
-- The transition should feel physical (collision/push), not smooth (fade/zoom)
-- Final state is the hero element alone with subtle idle motion
+- Scene has a static lead-in phrase + a cycling accent word, all of which should be physically replaced (not faded) by a hero
+- The takeover should read as a collision — the hero arrives with momentum and the text reacts to it
+- Final frame is the hero alone with subtle idle motion
+- Not for: hero and text coexist throughout (see [brand-reveal-assemble-zoom](brand-reveal-assemble-zoom.md)), camera-zoom narrowing, or multi-hero entries
 
-## Phase Pipeline
+## Orchestration
 
-All boundaries are in **seconds**.
+This scene chains four motions; each maps to a rule or an inline pattern:
 
-| Phase | Time window (s)                 | What Happens                                       | Skill Reference                                                             |
-| ----- | ------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- |
-| 1     | `0 – typeEnd`                   | Static text reveals via typewriter (smooth slice)  | Simple typewriter — continuous `Math.floor(progress)` slice                 |
-| 2     | `ticker1 – ticker2 – tickerEnd` | Accent word cycles via vertical ticker             | [vertical-spring-ticker](../rules/vertical-spring-ticker.md)                |
-| 3     | `displaceStart – displaceEnd`   | Hero enters off-screen, physically pushes text out | [reactive-displacement](../rules/reactive-displacement.md)                  |
-| 4     | `idleStart – end`               | Hero breathes                                      | [sine-wave-loop](../rules/sine-wave-loop.md) (multiplicative onUpdate form) |
+- **Phase 1 — typewriter lead-in**: inline, no rule. The lead-in is one static phrase, so we use the **smooth-slice variation** at the bottom of [discrete-text-sequence](../rules/discrete-text-sequence.md) (continuous `Math.floor(progress)` slice, not the state-array form). The full rule's machinery is overkill for a single phrase with no typos or pauses. See "Phase 1 Seam" for the one-character pop guard.
+- **Phase 2 — accent-word ticker**: use [vertical-spring-ticker](../rules/vertical-spring-ticker.md) for the rolling accent word. The rule's default footer-reveal at the tail is NOT used — Phase 3 takes its place. `STEPS` here is the number of _options_ the hero is going to replace; pick 2–3 (more reads as filler).
+- **Phase 3 — hero crashes in, text-group ejected**: this is the blueprint's core glue and the only non-trivial seam. Use [reactive-displacement](../rules/reactive-displacement.md), but **NOT** its default `back.out` driver-with-derived-onUpdate form. We want the source's "heavy mass" feel (the hero lands rather than zips), which is best expressed in GSAP as a longer `HERO_DUR` with `power2.out` — three independent tweens sharing the same start time. See "Phase 3 Seam" below.
+- **Phase 4 — hero idle breathing**: use [sine-wave-loop](../rules/sine-wave-loop.md) in its **multiplicative `onUpdate` form**, and specifically the **dual-frequency variation** (different periods on `scale` and `rotation`). The hero lands at `HERO_FINAL_SCALE > 1` from Phase 3's overshoot — the breath must compose onto that final scale, not yoyo around 1. See "Phase 4 Seam" below.
 
-## Layout Strategy
+## Phase Timing
 
-Unlike shared-flex layouts (see [brand-reveal-assemble-zoom](brand-reveal-assemble-zoom.md)), this pattern uses **absolute stacking** — text group and hero occupy the same centered space; `z-index` controls layering during the overlap window.
+All boundaries are in seconds.
 
-```html
-<div
-  class="stage"
-  style="position: absolute; inset: 0;
-     display: flex; align-items: center; justify-content: center;
-     overflow: hidden;"
->
-  <!-- Text group: typewriter + ticker, displaced as a single unit -->
-  <div
-    class="text-group"
-    style="position: absolute; display: flex;
-       flex-direction: row; align-items: center; gap: 20px;"
-  >
-    <div class="typewriter">
-      <span class="typewriter-text"></span>
-    </div>
-    <div class="ticker-window">
-      <div class="ticker-stack">
-        <!-- N ticker items, one per cycled word -->
-        <div class="ticker-item">{w1}</div>
-        <div class="ticker-item">{w2}</div>
-        <div class="ticker-item">{w3}</div>
-      </div>
-    </div>
-  </div>
+| Phase | Start ≥                                          | Internal duration                     | Notes                                                                               |
+| ----- | ------------------------------------------------ | ------------------------------------- | ----------------------------------------------------------------------------------- |
+| 1     | `0`                                              | `TYPE_DUR`                            | Smooth slice; `TYPE_START_LEN` ≥ 1 to avoid 1-char pop                              |
+| 2     | `TYPE_END + ~1.0s` (`READ_BEAT`)                 | `(STEPS-1) × STEP_SPACING + STEP_DUR` | Reader needs ~1s on the static phrase before the ticker steals attention            |
+| 3     | `TICKER_END + ~0.8s` (`SETTLE_BEAT`)             | `HERO_DUR`                            | Last ticker word must read; `back.out` tail must settle before collision            |
+| 4     | `DISPLACE_AT + HERO_DUR + ~1.0s` (`SPRING_TAIL`) | `TOTAL - IDLE_START`                  | `power2.out` decays slowly — start sine too soon and it fights the perceived spring |
 
-  <!-- Hero: enters off-screen, ends up centered. z-index above text during overlap. -->
-  <div
-    class="hero"
-    style="position: absolute; z-index: 20;
-       width: 400px; height: 400px;
-       display: flex; align-items: center; justify-content: center;"
-  >
-    <img src="{heroAsset}" alt="{Brand}" />
-  </div>
-</div>
+The `READ_BEAT` (~1s) between Phase 1 and 2 is non-negotiable — without it, the static phrase is still being absorbed when the ticker starts rolling, and the viewer reads neither. The `SETTLE_BEAT` (~0.8s) between Phase 2 and 3 is the most-skipped value in this blueprint: the last ticker word lands with a `back.out` overshoot that takes ~0.4s to fully damp, plus the eye needs at least 0.4s to read it. Anything less and the takeover feels like a hard cut. The `SPRING_TAIL` (~1.0s) between Phase 3 and 4 is the largest gap because `power2.out` over `HERO_DUR` (0.8–1.2s) has a long visual tail even after the tween mathematically ends — sine started during that tail produces visible chatter on scale.
+
+## Initial DOM Nesting
+
+The displacement target is the **parent flex row**, not the typewriter or ticker individually. That's what makes Phase 3 work as a single collision rather than three desynced reactions, and it's the most common structural mistake in this blueprint.
+
+```
+.stage                       ← absolute fill, overflow: hidden
+  .text-group                ← Phase 3 push + fade target (single transform)
+    .typewriter
+      .typewriter-text       ← Phase 1 smooth-slice target
+    .ticker-window           ← height = ITEM_HEIGHT, overflow: hidden
+      .ticker-stack          ← Phase 2 translateY target
+        .ticker-item × N
+  .hero                      ← z-index: 20; Phase 3 entry + Phase 4 breath target
 ```
 
-The text group is a flex row containing typewriter (static) and ticker (rolling) side by side. They animate together as a unit during Phase 3 — both inherit the `text-group` parent's transform.
+`.stage` is `position: absolute; inset: 0; overflow: hidden` — Phase 3 throws both `.text-group` and `.hero` past the frame edge; without `overflow: hidden` they leak into adjacent scenes. `.hero` carries `z-index: 20` explicitly (not relying on DOM order) — during the brief overlap window in Phase 3, the hero must be in front, otherwise the text's fading edges peek through.
 
-## Phase 1: Typewriter Text Reveal
+## Phase 1 Seam: Smooth-Slice Variation (rule gap)
 
-Continuous per-character typing using the **smooth slice** variation from [discrete-text-sequence](../rules/discrete-text-sequence.md). The displayed text is a _function_ of progress, not a lookup table.
+The frontmatter of [discrete-text-sequence](../rules/discrete-text-sequence.md) describes the multi-state `{text, t}` array form, but the smooth-slice form (a single tween from `0` to `FULL_TEXT.length`, `onUpdate` writes `FULL_TEXT.slice(0, Math.floor(progress))`) is what we use here. One sentence: tween a `{progress}` proxy linearly with `ease: 'none'`, `Math.floor` the result, only write `textContent` when the slice actually changed (avoids React-style re-render thrash).
 
-```js
-const FULL_TEXT = "{phrase}"; // the static lead-in phrase
-const textEl = document.querySelector(".typewriter-text");
-const typeProxy = { progress: TYPE_START_LEN };
+Set `TYPE_START_LEN ≥ 1` — starting from 0 produces a single-character flash on the first frame as the viewport renders before any tween has fired. Starting from 1 hides this.
 
-tl.to(
-  typeProxy,
-  {
-    progress: FULL_TEXT.length,
-    duration: TYPE_DUR,
-    ease: "none",
-    onUpdate: () => {
-      const len = Math.floor(typeProxy.progress);
-      const next = FULL_TEXT.slice(0, len);
-      if (textEl.textContent !== next) textEl.textContent = next;
-    },
-  },
-  TYPE_START,
-);
-```
+## Phase 2 Seam: Suppressing the Rule's Footer
 
-## Phase 2: Vertical Ticker
+[vertical-spring-ticker](../rules/vertical-spring-ticker.md) ships with a trailing `.brand` footer reveal — omit it here. Phase 3's collision replaces that beat. Also: the rule scopes everything inside its own `.stack` flex column; in this blueprint the ticker is one cell of a flex row (`.text-group`) sharing space with the typewriter, so use only the rule's `.ticker` + `.ticker-stack` markup, not its outer `.stack` wrapper. `ITEM_HEIGHT` must equal both the container height and per-item height exactly — covered in the rule, but worth re-checking because the row context makes height mismatches less visually obvious during dev.
 
-Slot-machine scrolling with one tween per transition. For N items (the ticker cycles through N words sequentially), use N-1 tweens that each translate the stack up by one `ITEM_HEIGHT`. The set is a short list of conceptually-parallel words that build context before the takeover.
+Pick `STEPS = optionCount − 1` (you can't roll past your last item) and `STEP_SPACING ≤ STEP_DUR` for the additive-spring "click click" cadence the rule describes. The accent word's `font-weight` + `color` should distinguish it from the typewriter — readers should perceive "static base + rotating accent," not "two strings being equally typed."
 
-Each `tl.to(.ticker-stack, { y: "-=ITEM_HEIGHT", ease: "back.out(${BOUNCE_FACTOR})" })` is a single step in the ticker. See [vertical-spring-ticker](../rules/vertical-spring-ticker.md) for the full pattern.
+## Phase 3 Seam: Collision (the blueprint's core glue)
+
+The rule's default form uses a single `back.out` driver tween with `onUpdate` deriving both intruder and victim positions from `driver.p`. We **deliberately diverge** from that here, for two reasons.
+
+**Why `power2.out` instead of `back.out`:** the source pattern this blueprint emulates uses a heavy-mass spring (the hero feels weighty, lands rather than bounces). `back.out` overshoots and rebounds, which reads as "lightweight + springy" — the wrong physical metaphor. A longer `HERO_DUR` (0.8–1.2s) with `power2.out` gives the gentle high-inertia deceleration that reads as mass.
+
+**Why three independent tweens instead of one driver:** with `power2.out` (no overshoot, no oscillation), the math `driver.p × victimEnd` and `(driver.p × N)` produce monotonic linear-ish progress with no rebound — so we can express each motion as its own tween and let GSAP's clock keep them in sync. They must all start at `DISPLACE_AT` exactly; drift their start times by even a frame and the collision reads as two events.
 
 ```js
-tl.to(
-  ".ticker-stack",
-  {
-    y: `-=${ITEM_HEIGHT}`,
-    duration: STEP_DUR,
-    ease: `back.out(${BOUNCE_FACTOR})`,
-  },
-  TICKER1_AT,
-);
-
-tl.to(
-  ".ticker-stack",
-  {
-    y: `-=${ITEM_HEIGHT}`,
-    duration: STEP_DUR,
-    ease: `back.out(${BOUNCE_FACTOR})`,
-  },
-  TICKER2_AT,
-);
-```
-
-Accent words use a distinct `font-weight` and `color` (e.g. `{accentColor}` token) to visually separate from the typewriter text.
-
-## Phase 3: Reactive Displacement (Core Glue)
-
-Three concurrent tweens at the same timeline position, with carefully-tuned durations. The source pattern achieved the causal link via a single `spring()` read three times; in GSAP we achieve it with three tweens that **start at the same position** and **end at fractional multiples of the intruder's duration**.
-
-```js
-// (1) Hero enters with rotation + scale impact. Lands at HERO_FINAL_SCALE (overshoot).
 tl.fromTo(
   ".hero",
   { x: OFFSCREEN_X, scale: HERO_START_SCALE, rotation: HERO_START_ROT, opacity: 0 },
@@ -159,19 +103,17 @@ tl.fromTo(
     rotation: 0,
     opacity: 1,
     duration: HERO_DUR,
-    ease: "power2.out", // heavy-spring equivalent (gentle ease over longer duration)
+    ease: "power2.out",
   },
   DISPLACE_AT,
 );
 
-// (2) Text group pushed opposite the intruder's entry. Completes at PUSH_FRACTION of hero duration.
 tl.to(
   ".text-group",
   { x: PUSH_DIST, duration: HERO_DUR * PUSH_FRACTION, ease: "power2.out" },
   DISPLACE_AT,
 );
 
-// (3) Text group fades. Completes at FADE_FRACTION — slightly before the push lands.
 tl.to(
   ".text-group",
   { opacity: 0, duration: HERO_DUR * FADE_FRACTION, ease: "power2.out" },
@@ -179,217 +121,48 @@ tl.to(
 );
 ```
 
-### Why heavy-spring inertia matters in the source
+`PUSH_FRACTION = 0.4–0.5` and `FADE_FRACTION ≤ PUSH_FRACTION` — these recreate the rule's `VICTIM_FRACTION` for the victim's exit. The text completes its push at roughly half the hero's duration, so by the time the hero centers the text is gone. If `PUSH_FRACTION ≥ 0.7` the two motions look parallel rather than causal — the most common failure mode.
 
-A higher-mass spring in the source adds inertia — the hero feels heavy and "lands" rather than zips in. In GSAP this is recreated by using a **longer duration** with a gentle ease (`power2.out`). The numerical config differs but the perceptual result is identical.
+**Direction coupling:** `sign(OFFSCREEN_X) = -sign(PUSH_DIST)`. The hero enters from positive X → text shoves into negative X. Same axis, opposite signs. Reverse either and the momentum-transfer metaphor breaks.
 
-### Why the victim completes at a fraction of the driver
+## Phase 4 Seam: Multiplicative Breath at Non-1 Scale
 
-The eye reads collision as "instant impact, then push residue." If both the hero and text moved over the same duration, the push would feel like a parallel motion — not a consequence of the collision. Shortening the text's timeline to roughly half (or less) of the hero's makes the push feel like a _reaction_, not a coincidence. See `PUSH_FRACTION` / `FADE_FRACTION` in How to Choose Values.
+Phase 3 leaves the hero at `scale: HERO_FINAL_SCALE` (typically 1.0–1.4 — overshoot is part of "landing"). The breath must multiply onto this resting state, not yoyo around 1. [sine-wave-loop](../rules/sine-wave-loop.md)'s multiplicative `onUpdate` form does exactly this; the `fromTo` + yoyo form would re-apply `scale: 1` on every cycle, erasing the impact landing.
 
-### Directional Logic
+Use the **dual-frequency variation** (two separate `Math.sin` calls in one `onUpdate`, one driving scale, one driving rotation). The rule documents the multi-octave version primarily for scale-stacking; here we want scale + rotation oscillating _independently_, with **incommensurate periods** (no simple integer ratio). Why: synchronized scale-and-rotation reads as a single "tilt-pulse" beat — mechanical. Incommensurate periods (e.g. `SCALE_PERIOD = 1.7s`, `ROTATE_PERIOD = 2.3s`) keep the two cycles drifting against each other, which is what reads as "alive but resting."
 
-Hero enters from positive X → text is displaced in negative X direction (momentum transfer). Reversing this breaks the physical metaphor. For a hero entering from the top, push the text down.
+Compute idleTime as `Math.max(0, tl.time() - IDLE_START)` inside the onUpdate so that timeline seeks before `IDLE_START` don't produce negative-phase sine values.
 
-## Phase 4: Breathing
+## Key Values to Choose (Not Already in the Rules)
 
-The hero lands at a non-1 scale (`HERO_FINAL_SCALE` from the impact overshoot). The breath must **multiply** onto that final scale; it cannot just yoyo around 1 or it will fight the impact landing.
+Only parameters specific to this blueprint:
 
-Use **dual frequencies** on scale and rotation so the breath feels organic, not mechanical. See [sine-wave-loop](../rules/sine-wave-loop.md) (multiplicative onUpdate form).
+- **HERO_FINAL_SCALE**: 1.0 (no impact, feels light) → 1.2 (visible presence at rest) → 1.4 (heavy landing). Phase 4 breath multiplies onto this, so values >1.4 combined with `SCALE_AMP` >0.04 can push the hero past safe raster resolution.
+- **PUSH_DIST**: 100–300 px, sign opposite `OFFSCREEN_X`. Smaller than half the viewport — this isn't an exit, it's a shove; the text is gone via opacity, not via leaving the frame.
+- **PUSH_FRACTION / FADE_FRACTION**: 0.4–0.5 and `FADE_FRACTION ≤ PUSH_FRACTION` so the fade leads the push by a hair (text gets ghostly before it finishes sliding, not after).
+- **READ_BEAT / SETTLE_BEAT / SPRING_TAIL**: ~1.0s, ~0.8s, ~1.0s respectively. These are the inter-phase buffers; do NOT shrink them to fit a tight `TOTAL` — extend `TOTAL` instead.
+- **SCALE_PERIOD / ROTATE_PERIOD**: pick two values in 1.5–2.3s with NO integer ratio (e.g. 1.7 and 2.3, not 1.5 and 3.0). This is what produces organic breathing rather than mechanical pulsing.
 
-```js
-const heroEl = document.querySelector(".hero");
+## Critical Constraints (ordered by failure frequency)
 
-tl.to(
-  { tick: 0 },
-  {
-    tick: 1,
-    duration: TOTAL - IDLE_START,
-    ease: "none",
-    onUpdate: function () {
-      const idleTime = Math.max(0, tl.time() - IDLE_START);
-      const omegaS = (idleTime / SCALE_PERIOD) * Math.PI * 2;
-      const omegaR = (idleTime / ROTATE_PERIOD) * Math.PI * 2;
-      gsap.set(heroEl, {
-        scale: HERO_FINAL_SCALE * (1 + Math.sin(omegaS) * SCALE_AMP),
-        rotation: HERO_FINAL_ROTATION + Math.sin(omegaR) * ROTATE_AMP,
-      });
-    },
-  },
-  IDLE_START,
-);
-```
+- **Three Phase-3 tweens share `DISPLACE_AT` exactly** — drifting start times destroys the collision read. The most common bug: agents stagger them by 0.05s "to feel more natural" and the result feels less collisional, not more.
+- **`PUSH_FRACTION ≤ ~0.6`** — beyond this the push reads as parallel motion, not reaction. 0.4–0.5 is the sweet spot.
+- **Phase 4 breath multiplies, never yoyos around 1** — would erase `HERO_FINAL_SCALE` and undo Phase 3's landing. See Phase 4 Seam.
+- **`sign(OFFSCREEN_X) = −sign(PUSH_DIST)`** — momentum transfer requires opposite signs on the same axis.
+- **`SCALE_PERIOD : ROTATE_PERIOD` is non-integer** — equal or simple-ratio periods lock and read as mechanical.
+- **`.hero` z-index ≥ 20 (explicit, not DOM-order)** — during the Phase 3 overlap window the text's fading edges will peek through otherwise.
+- **Push the `.text-group` parent, not its children individually** — children inherit the parent transform and stay locked together; pushing them separately desynchronizes the collision.
+- **Ticker container height = item height = `ITEM_HEIGHT`** — covered in the rule but worth re-checking in this blueprint's row layout where partial-item overflow can read as a row-baseline issue rather than a ticker bug.
 
-**Why two periods?** Synchronized scale + rotation reads as a single "tilt-pulse" beat and feels mechanical. Different periods (not a simple ratio) keep the scale and rotation cycles interfering rather than locking, producing organic motion.
+## Spring → Ease Selection
 
-## Inter-Phase State Handoff
+Four phases, four feels. Full table in [hyperframes-animation/SKILL.md](../SKILL.md):
 
-```
-Phase 1 → Phase 2:
-  Typewriter completes at TYPE_START + TYPE_DUR.
-  TICKER1_AT ≥ typewriter end + READ_BEAT (gives the eye time to read the static text).
-
-Phase 2 → Phase 3:
-  Last ticker step ends at TICKER2_AT + STEP_DUR.
-  DISPLACE_AT ≥ that end + SETTLE_BEAT (lets the final ticker word settle and read).
-
-Phase 3 → Phase 4:
-  Hero entry ends at DISPLACE_AT + HERO_DUR.
-  IDLE_START ≥ entry_end + SPRING_TAIL_BUFFER (spring tail dissipates).
-  Breathing onUpdate is gated by IDLE_START — it doesn't start before then because
-  the dummy tick tween itself is scheduled at IDLE_START.
-```
-
-## How to Choose Values
-
-- **TYPE_START** — when the typewriter begins (phase 1 anchor)
-  - Range: usually `0`
-  - Effects: any non-zero value adds dead air at the front of the composition
-  - Constraints: must leave room for the full typewriter before TICKER1_AT
-  - Reference: example starts at 0
-
-- **TYPE_DUR** — typewriter total duration
-  - Range: 0.5-1.0 s for a short phrase; scale with character count
-  - Effects: short = staccato; long = readable but slow
-  - Constraints: should resolve well before TICKER1_AT
-  - Reference: example uses a sub-second duration for a short phrase
-
-- **TYPE_START_LEN** — characters already showing when typing begins
-  - Range: 0-5 characters
-  - Effects: 0 = empty line that suddenly grows; higher = stable head, partial reveal
-  - Constraints: < FULL_TEXT.length; > 0 prevents a 1-character pop on first frame
-  - Reference: example uses a small positive value
-
-- **ITEM_HEIGHT** — ticker item box height in pixels (must match CSS)
-  - Range: `FONT_SIZE × line-height` (≈ font-size × 1.2)
-  - Effects: must equal the rendered text line height, or items show partially
-  - Constraints: container height, item height, and translate-Y step all use this exact value
-  - Reference: example uses font-size × 1.2
-
-- **TICKER1_AT / TICKER2_AT** — ticker step anchors
-  - Range: phase-dependent; spacing typically 1.5-2.0 s apart
-  - Effects: too tight = words blur together; too loose = ticker stalls
-  - Constraints: TICKER1_AT ≥ TYPE_START + TYPE_DUR + READ_BEAT (≈ 1 s)
-  - Reference: example schedules two ticker steps with comfortable reading gaps
-
-- **STEP_DUR** — duration of one ticker translate
-  - Range: 0.4-0.7 s
-  - Effects: short = snappy slot machine; long = lazy roll
-  - Constraints: shorter than the gap between consecutive ticker anchors
-  - Reference: example sits mid-range
-
-- **BOUNCE_FACTOR** — `back.out()` coefficient on ticker steps
-  - Range: 1.2-1.8 (discrete choice within `back.out` family)
-  - Effects: low = firm stop; high = overshoot/spring
-  - Constraints: keep consistent across ticker steps
-  - Reference: example uses a moderate overshoot
-
-- **DISPLACE_AT** — when phase 3 begins
-  - Range: phase-dependent
-  - Effects: too early cuts off the ticker; too late stalls the comp
-  - Constraints: DISPLACE_AT ≥ TICKER2_AT + STEP_DUR + SETTLE_BEAT (≈ 0.8 s)
-  - Reference: example schedules after the last ticker word settles
-
-- **HERO_DUR** — full hero entry duration
-  - Range: 0.6-1.2 s
-  - Effects: short = zippy; long = heavy/landed (recreates `mass > 1` springs in source)
-  - Constraints: ease stays `power2.out` for this "heavy land" feel
-  - Reference: example uses a long-side duration for inertia
-
-- **OFFSCREEN_X** — hero's starting X offset (off-stage)
-  - Range: enough that the hero is fully outside the frame at scale = HERO_START_SCALE
-  - Effects: smaller values leak the hero into view at start; very large values waste motion budget
-  - Constraints: sign sets entry direction (positive = enters from right)
-  - Reference: example uses several hundred px
-
-- **HERO_START_SCALE / HERO_START_ROT** — hero's initial transform
-  - Range: scale 0.4-0.7; rotation ±20-60°
-  - Effects: lower scale + larger rotation = more violent impact arc
-  - Constraints: must land at HERO_FINAL_SCALE / 0° rotation by end of entry
-  - Reference: example uses moderate values
-
-- **HERO_FINAL_SCALE** — landing scale after impact overshoot
-  - Range: 1.0-1.4
-  - Effects: 1.0 = no overshoot (feels light); > 1 = visible "presence" at rest
-  - Constraints: phase 4 breathing MUST multiply on this (not yoyo around 1) or impact undoes itself
-  - Reference: example lands above 1.0
-
-- **HERO_FINAL_ROTATION** — landing rotation (degrees)
-  - Range: usually 0
-  - Effects: nonzero values make the hero rest tilted; rarely desired
-  - Constraints: phase 4 breathing oscillates around this value
-  - Reference: example uses 0
-
-- **PUSH_DIST** — text translate distance during displacement
-  - Range: 100-300 px (sign opposite the hero's entry direction)
-  - Effects: small = barely-shoved; large = aggressive push
-  - Constraints: sign must be opposite OFFSCREEN_X for momentum transfer
-  - Reference: example uses a moderate push opposite the hero's direction
-
-- **PUSH_FRACTION** — fraction of HERO_DUR for the text push
-  - Range: 0.4-0.5
-  - Effects: < 0.4 = push reads instantaneous; > 0.5 = parallel motion, not a reaction
-  - Constraints: hard ceiling ~0.6 before causality reads break
-  - Reference: example sits at 0.5
-
-- **FADE_FRACTION** — fraction of HERO_DUR for the text opacity fade
-  - Range: 0.3-0.5 (typically ≤ PUSH_FRACTION so fade leads push by a hair)
-  - Effects: lower = text vanishes first then push completes empty space; higher = text rides the push longer
-  - Constraints: ≤ PUSH_FRACTION
-  - Reference: example uses ~0.4
-
-- **IDLE_START** — when phase 4 breathing begins
-  - Range: DISPLACE_AT + HERO_DUR + SPRING_TAIL_BUFFER (≥ ~1 s of buffer)
-  - Effects: too early = breathing fights the spring tail; too late = static dead air
-  - Constraints: buffer should allow the perceived spring to dissipate
-  - Reference: example begins after a ~1 s buffer
-
-- **TOTAL** — composition total duration (matches `data-duration`)
-  - Range: 5-8 s for this blueprint
-  - Effects: longer extends the breathing tail; shorter cuts it
-  - Constraints: must equal root `data-duration`
-  - Reference: see example's `data-duration`
-
-- **SCALE_PERIOD / ROTATE_PERIOD** — breathing cycle lengths
-  - Range: 0.8-2.0 s each
-  - Effects: short = fast pulse; long = slow drift
-  - Constraints: must NOT be a simple integer ratio (1:1, 2:1) — pick incommensurate values so cycles interfere
-  - Reference: example uses two close-but-unrelated periods near 1 s
-
-- **SCALE_AMP** — breathing scale amplitude (multiplicative)
-  - Range: 0.02-0.08 (final scale oscillates by ±SCALE_AMP × HERO_FINAL_SCALE)
-  - Effects: small = subtle breath; large = pulsing
-  - Constraints: keep small; this is idle motion, not animation
-  - Reference: example uses a low-single-digit percent
-
-- **ROTATE_AMP** — breathing rotation amplitude (degrees)
-  - Range: 1-5°
-  - Effects: small = barely visible sway; large = wobble
-  - Constraints: pair with rotation period that doesn't lock with scale period
-  - Reference: example uses a few degrees
-
-## Critical Constraints
-
-- **Three concurrent tweens, same timeline position**: This is the causal link. Drift the start times and the displacement feels like two separate animations playing in parallel, not collision-and-reaction.
-- **Victim duration < driver duration**: Push completes at PUSH_FRACTION × driver duration (~0.4-0.5). Anything ≥ 0.7 loses the "impact" feel.
-- **Z-index layering**: Hero `z-index: 20`, text-group no z-index. Without this, the text's fading edges peek through the hero.
-- **Hero lands at non-1 scale**: The impact overshoots to HERO_FINAL_SCALE. The breathing must **multiply** onto this; using a `fromTo` yoyo with `scale: 1` would overwrite HERO_FINAL_SCALE and undo the impact.
-- **Ticker height triangle**: Container height, item height, and translateY all use the same `ITEM_HEIGHT` value. Mismatch = items half-visible at rest.
-- **Directional consistency**: Hero entry direction (sign of OFFSCREEN_X) and text push direction (sign of PUSH_DIST) must be opposite — momentum transfer.
-- **Dual breathing periods**: Use incommensurate periods for scale vs rotation. Equal or simple-ratio periods sync up and look mechanical.
-- **Single paused timeline**: All four phases on one `gsap.timeline({ paused: true })`, registered to `window.__timelines[data-composition-id]`.
-- **GSAP transform aliases only**: `x`, `y`, `scale`, `rotation`. Never `left`/`top`/`width`/`height`.
-
-## Spring → GSAP Ease Cheatsheet (this blueprint)
-
-| Source spring                                             | This blueprint uses                      |
-| --------------------------------------------------------- | ---------------------------------------- |
-| Snappy spring on ticker step                              | `back.out(${BOUNCE_FACTOR})`             |
-| Heavy spring on hero impact (high mass)                   | `power2.out` over longer `HERO_DUR`      |
-| Continuous breath with different scale / rotation periods | Two `Math.sin()` calls in one `onUpdate` |
-
-See [hyperframes-animation/SKILL.md](../SKILL.md) for the full spring → ease mapping table.
+- Phase 1 typewriter: `ease: "none"` (linear, sine isn't involved — the discreteness comes from `Math.floor`)
+- Phase 2 ticker steps: `back.out(BOUNCE_FACTOR)` per step (the rule's default)
+- Phase 3 collision: `power2.out` over a long `HERO_DUR` (heavy-mass equivalent; NOT `back.out`)
+- Phase 4 idle: dual `Math.sin` in one `onUpdate`, incommensurate periods
 
 ## Golden Sample
 
-- [takeover-ticker-displace.html](../examples/takeover-ticker-displace.html) — typewriter phrase + three-word ticker → hero logo enters from off-screen right with rotation + scale impact → text pushed left and fades → logo breathes with dual-frequency sine. Single paused GSAP timeline drives all four phases.
+- [takeover-ticker-displace.html](../examples/takeover-ticker-displace.html) — runnable composition with concrete values for every named constant above; single paused GSAP timeline drives all four phases. Run this first, then change values — much faster than building from scratch.
