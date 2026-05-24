@@ -46,8 +46,10 @@ Where `<type-dir>` is `examples`, `blocks`, or `components`.
 
 ### Components
 
-| Name                 | Description                             | Tags                             |
-| -------------------- | --------------------------------------- | -------------------------------- |
-| `grain-overlay`      | Animated film grain texture overlay     | texture, grain, overlay, film    |
-| `shimmer-sweep`      | CSS gradient light sweep for AI accents | text, shimmer, highlight, effect |
-| `grid-pixelate-wipe` | Grid dissolve transition between scenes | transition, wipe, grid, pixelate |
+| Name                 | Description                                                                                               | Tags                                             |
+| -------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `grain-overlay`      | Animated film grain texture overlay                                                                       | texture, grain, overlay, film                    |
+| `shimmer-sweep`      | CSS gradient light sweep for AI accents                                                                   | text, shimmer, highlight, effect                 |
+| `grid-pixelate-wipe` | Grid dissolve transition between scenes                                                                   | transition, wipe, grid, pixelate                 |
+| `parallax-zoom`      | Center card scales up to fill the frame while siblings parallax outward (single `--pz-progress` 0→1)      | transition, zoom, parallax, grid, hero           |
+| `parallax-unzoom`    | Reverse of `parallax-zoom` — focus card shrinks from full frame as siblings parallax in (`--pu-progress`) | transition, reveal, unzoom, parallax, grid, hero |
