@@ -111,7 +111,6 @@ cursor-tests/
 basecamp-video/
 launch-video*/
 !skills/launch-video/
-!skills/launch-video-v2/
 ab-test/
 compositions/
 video-6-2-patched/
@@ -137,3 +136,5 @@ registry/_preview.html
 registry/index.html
 heygen-research
 extraction
+# Studio dev-server Vite pre-bundle cache (never commit)
+packages/studio/.vite/
