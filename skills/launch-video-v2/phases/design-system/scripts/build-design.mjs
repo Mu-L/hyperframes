@@ -637,6 +637,112 @@ const FINAL_FONT_FALLBACK = {
   mono: "JetBrains Mono",
 };
 
+// ═══════════════════ Local font discovery ════════════════
+// Phase 1 (web-research) downloads site-served woff/woff2/otf/ttf into
+// research/assets/. If a site font is not on Google Fonts but a matching
+// binary exists locally, we self-host it via @font-face so the real brand
+// face renders instead of falling back to the preset's §D suggestion.
+//
+// Heuristic for matching a designlang family name to a downloaded file:
+//   - Normalize both sides (lowercase, strip non-alphanum)
+//   - File name's leading "<NNN>-" hash prefix and trailing weight/style
+//     suffixes (-Regular, -Bold, -Italic, -700, etc.) are stripped before
+//     compare. A trailing "-<hex8>" content hash from capture_web_context.py
+//     is also stripped.
+const FONT_FILE_EXTS = new Set([".woff2", ".woff", ".otf", ".ttf"]);
+function normalizeFamily(s) {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+// designlang sometimes emits a family name that has been mashed together
+// without separators (e.g. "GeistVF" → "Geistvf", "DM Serif Display" →
+// "Dmserifdisplay"). The local-font filename usually does NOT have those
+// axis-suffix letters. Strip a small set of trailing axis tags from a
+// normalized key so getComputedStyle('Geistvf') still matches a downloaded
+// "Geist-Regular.woff2".
+function normalizeFamilyLoose(s) {
+  return normalizeFamily(s)
+    .replace(/(variablefont|variable|vf)$/i, "")
+    .replace(/(wght|opsz|slnt|ital)$/i, "");
+}
+function splitCamelToWords(s) {
+  // "DMSerifDisplay" → "DM Serif Display"; "GeistVF" → "Geist VF"; "Poppins" → "Poppins".
+  // Two rules in order: insert a space between a lower→upper transition
+  // ("Geist|VF"), and between two uppers followed by a lower ("DM|Serif").
+  return String(s || "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function fileBaseToFamily(fileName) {
+  // Strip extension
+  let base = fileName.replace(/\.(woff2?|otf|ttf)$/i, "");
+  // Strip leading "NNN-" capture index prefix (capture_web_context.py format)
+  base = base.replace(/^\d{3}-/, "");
+  // Strip trailing "-<hex 8-10 chars>" content digest (capture_web_context.py
+  // adds this to dedupe asset URLs; not part of the family name).
+  base = base.replace(/-[0-9a-f]{8,10}$/i, "");
+  // Webflow / CMS asset hosts prefix files with a "<24-hex-id>_" resource ID.
+  // Example: 657d6bc6bcb648163fa2c02b_Poppins-Regular.woff2. Pull anything
+  // up to and including the underscore so we end up with "Poppins-Regular".
+  base = base.replace(/^[0-9a-f]{16,32}_/i, "");
+  // Same pattern can appear without trailing underscore but with a separating
+  // dash — e.g. "657d6bc6bcb648163fa2c02b-Poppins". Less common, but cheap to handle.
+  base = base.replace(/^[0-9a-f]{16,32}-/i, "");
+  // Strip Google Fonts static-host variable-axis suffix conventions.
+  // Examples: "Oswald-VariableFont_wght", "Inter-VariableFont_opsz,wght".
+  base = base.replace(/[-_]VariableFont[_,a-zA-Z]*$/i, "");
+  // Strip common font-weight/style suffixes. We loop because foundries chain
+  // multiple suffixes (e.g. "AnthropicSans-Roman-Web", "Inter-Bold-Italic")
+  // and a single pass would leave the inner one behind.
+  const SUFFIX_RES = [
+    /[-_](Thin|ExtraLight|Light|Regular|Book|Roman|Upright|Medium|SemiBold|DemiBold|Bold|ExtraBold|Heavy|Black)$/i,
+    /[-_](Italic|Oblique)$/i,
+    /[-_](Web|Desktop|Print|Display|Text)$/i,
+    /[-_](100|200|300|400|500|600|700|800|900)$/i,
+    /[-_]?VF$/i,
+    /[-_]?Variable$/i,
+  ];
+  let prev;
+  do {
+    prev = base;
+    for (const re of SUFFIX_RES) base = base.replace(re, "");
+  } while (base !== prev);
+  return base;
+}
+function discoverLocalFonts(researchAssetsDir) {
+  // Returns Map<normalized-family, { family: <display-cased>, files: [abs-path...] }>.
+  // Each font is indexed under BOTH its strict normalized key and its loose
+  // key (axis suffixes stripped), so lookups by either form hit the same entry.
+  const found = new Map();
+  if (!fs.existsSync(researchAssetsDir)) return found;
+  for (const ent of fs.readdirSync(researchAssetsDir, { withFileTypes: true })) {
+    if (!ent.isFile()) continue;
+    const ext = path.extname(ent.name).toLowerCase();
+    if (!FONT_FILE_EXTS.has(ext)) continue;
+    const familyRaw = fileBaseToFamily(ent.name);
+    // "DMSerifDisplay" → "DM Serif Display" so it survives as a valid CSS
+    // font-family identifier; one-word names ("Poppins") are left alone.
+    const familyDisplay = splitCamelToWords(familyRaw);
+    const norm = normalizeFamily(familyDisplay);
+    if (!norm) continue;
+    const abs = path.join(researchAssetsDir, ent.name);
+    if (!found.has(norm)) {
+      found.set(norm, { family: familyDisplay, files: [] });
+    }
+    found.get(norm).files.push(abs);
+    // Alias the loose key (strip "VF" / "Variable" / axis tags) to the same
+    // entry so designlang's mashed "Geistvf" lookup finds the "Geist" files.
+    const looseNorm = normalizeFamilyLoose(familyDisplay);
+    if (looseNorm && looseNorm !== norm && !found.has(looseNorm)) {
+      found.set(looseNorm, found.get(norm));
+    }
+  }
+  return found;
+}
+const researchAssetsDir = path.resolve(outDir, "..", "research", "assets");
+const localFonts = discoverLocalFonts(researchAssetsDir);
+
 // Pick the first Google-Fonts-available name from a preset's §D bullet for one
 // role. Bullet format (per README §D): `- **<role>**: \`'Name1'\` · \`'Name2'\` · ...`
 function parsePresetFontFallback(presetSections) {
@@ -657,12 +763,27 @@ function parsePresetFontFallback(presetSections) {
 }
 
 function resolveFont(siteName, role, presetFontFallback) {
-  const norm = String(siteName || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
+  const norm = normalizeFamily(siteName);
+  const looseNorm = normalizeFamilyLoose(siteName);
+  // 1. Site family is a known Google Font → load from fonts.googleapis.com
   if (norm && GFONTS.has(norm)) {
     return { name: siteCanonicalName(siteName), source: "site" };
   }
+  // 2. Site family has a matching woff/woff2 in research/assets/ → self-host.
+  // Try strict normalized key first, then the loose key (which lets
+  // designlang's "Geistvf" match a downloaded "Geist-Regular.woff2"). The
+  // canonical display name comes from the discovered file's parsed family,
+  // not designlang's mashed string — so "Geistvf" renders as "Geist".
+  const localHit = (norm && localFonts.get(norm)) || (looseNorm && localFonts.get(looseNorm));
+  if (localHit) {
+    return {
+      name: localHit.family,
+      source: "site-local",
+      localFiles: localHit.files,
+    };
+  }
+  // 3. Preset §D bullet → first Google-Fonts-available name
+  // 4. Final hard-coded fallback
   const fallback = presetFontFallback[role] || FINAL_FONT_FALLBACK[role];
   return { name: fallback, source: "preset", originalName: siteName };
 }
@@ -676,11 +797,14 @@ function siteCanonicalName(s) {
 
 // designlang sometimes ships only one family; split display/body/mono heuristically.
 // Heuristic: first non-mono family is body, second/mono-named is the alternate.
+// If the site has NO mono family, leave rawMono empty so resolveFont() routes
+// to the preset fallback path (which honestly reports "preset fallback" in the
+// type-roles card) instead of pretending "JetBrains Mono" came from the site.
 const monoFromList = fontFamilies.find((f) => /mono|code/i.test(f));
 const nonMono = fontFamilies.filter((f) => !/mono|code/i.test(f));
-const rawDisplay = nonMono[1] || nonMono[0] || "system-ui";
-const rawBody = nonMono[0] || "system-ui";
-const rawMono = monoFromList || "JetBrains Mono";
+const rawDisplay = nonMono[1] || nonMono[0] || "";
+const rawBody = nonMono[0] || "";
+const rawMono = monoFromList || "";
 
 const presetFontFallback = parsePresetFontFallback(preset.sections);
 const display = resolveFont(rawDisplay, "display", presetFontFallback);
@@ -688,9 +812,14 @@ const body = resolveFont(rawBody, "body", presetFontFallback);
 const mono = resolveFont(rawMono, "mono", presetFontFallback);
 
 function gfontsUrl() {
+  // Only Google-Fonts and preset-fallback families go through fonts.googleapis.
+  // site-local families are loaded via the @font-face block built below.
+  const remoteRoles = [display, body, mono].filter((r) => r.source !== "site-local");
+  if (remoteRoles.length === 0) return null;
   const fams = [];
   const seen = new Set();
-  for (const f of [display.name, body.name, mono.name]) {
+  for (const role of remoteRoles) {
+    const f = role.name;
     if (seen.has(f)) continue;
     seen.add(f);
     const wts =
@@ -699,6 +828,48 @@ function gfontsUrl() {
   }
   return `https://fonts.googleapis.com/css2?${fams.join("&")}&display=swap`;
 }
+
+// ═══════════════════ Self-hosted @font-face block ════════
+// For each site-local font role, copy its woff/woff2/otf/ttf binaries from
+// research/assets/ into <outDir>/fonts/ (where prep.mjs Step 2b expects them),
+// then emit one @font-face declaration per file. The block is wrapped in the
+// exact comment anchors prep.mjs Step 2c greps for, so the path-rewrite +
+// inject-into-index.html flow lights up without any changes downstream.
+function buildLocalFontFaceBlock() {
+  const localRoles = [display, body, mono].filter((r) => r.source === "site-local");
+  if (localRoles.length === 0) return { block: "", copiedFiles: [] };
+  const fontsDestDir = path.join(outDir, "fonts");
+  fs.mkdirSync(fontsDestDir, { recursive: true });
+  const copiedFiles = [];
+  const seenRoles = new Set();
+  const faces = [];
+  for (const role of localRoles) {
+    // Deduplicate: if display + body resolve to the same site-local family,
+    // emit @font-face declarations once.
+    if (seenRoles.has(role.name)) continue;
+    seenRoles.add(role.name);
+    for (const src of role.localFiles) {
+      const fileName = path.basename(src);
+      const dest = path.join(fontsDestDir, fileName);
+      if (!fs.existsSync(dest)) {
+        fs.copyFileSync(src, dest);
+      }
+      copiedFiles.push(fileName);
+      const ext = path.extname(fileName).toLowerCase().slice(1);
+      const formatMap = { woff2: "woff2", woff: "woff", otf: "opentype", ttf: "truetype" };
+      const format = formatMap[ext] || ext;
+      faces.push(
+        `@font-face {\n  font-family: '${role.name}';\n  src: url('fonts/${fileName}') format('${format}');\n  font-display: swap;\n}`,
+      );
+    }
+  }
+  // The wrapper anchors are NOT cosmetic — prep.mjs:159 greps for this exact
+  // comment pair to extract the block and inject it into index.html <head>.
+  // Do not rename without updating prep.mjs in lockstep.
+  const block = `/* === auto-injected by download-fonts.mjs === */\n${faces.join("\n")}\n/* === end download-fonts.mjs block === */`;
+  return { block, copiedFiles };
+}
+const { block: localFontFaceBlock, copiedFiles: copiedFontFiles } = buildLocalFontFaceBlock();
 
 // ═══════════════════ Voice transform demo ════════════════
 // Run the preset's voice recipe against a sample brand sentence so the human
@@ -828,6 +999,14 @@ function renderColorAndTokens() {
     tokenLines.push(rest.length ? first + "\n" + rest.join("\n") : first);
     i++;
   }
+  // Font role tokens. The unquoted name lets components reference `var(--font-display)`
+  // and CSS will look up the @font-face declaration in <head>. The fallback chain
+  // covers (a) Google Fonts hadn't finished loading, (b) self-hosted woff failed.
+  // serif vs sans-serif vs monospace are chosen per role; the role's resolved
+  // name lives in `display.name` / `body.name` / `mono.name`.
+  const fontDisplayStack = `'${display.name}', ${preset.name === "neo-brutalism" || /Mono/i.test(display.name) ? "ui-monospace, monospace" : /Serif|Playfair|Lora|Garamond|Fraunces|Newsreader|Spectral|Times/i.test(display.name) ? "Georgia, serif" : "system-ui, sans-serif"}`;
+  const fontBodyStack = `'${body.name}', -apple-system, BlinkMacSystemFont, system-ui, sans-serif`;
+  const fontMonoStack = `'${mono.name}', ui-monospace, SFMono-Regular, Menlo, monospace`;
   const rootBody = `
   --brand-primary:   ${primaryHex};
   --brand-secondary: ${secondaryHex};
@@ -839,6 +1018,9 @@ function renderColorAndTokens() {
   --deco-2:          ${decoColors[1]};
   --deco-3:          ${decoColors[2]};
   --deco-4:          ${decoColors[3]};
+  --font-display:    ${fontDisplayStack};
+  --font-body:       ${fontBodyStack};
+  --font-mono:       ${fontMonoStack};
 ${tokenLines.map((l) => "  " + l).join("\n")}`;
   return `
 <section id="color-tokens" class="ds-section">
@@ -859,27 +1041,31 @@ function renderTypography() {
 <section id="typography" class="ds-section">
   <div class="eyebrow">§3 · Typography</div>
   <h2>Type roles</h2>
-  <p class="ds-prose">Font families resolved from site → Google Fonts (preset provides the fallback list).</p>
+  <p class="ds-prose">Font families resolved by 4-step lookup: site name on Google Fonts → self-host local woff2 → preset §D fallback → final hard-coded fallback. Each card shows which step landed.</p>
 
   <div class="type-grid">
+    ${[["Display", display, "serif", `font-size: 72px; font-weight: ${preset.name === "neo-brutalism" ? 800 : 400}; letter-spacing: ${preset.name === "neo-brutalism" ? "-0.04em" : "-0.02em"}; line-height: 1;`, brandName],
+       ["Body", body, "sans-serif", "font-size: 22px; line-height: 1.5;", "The quick brown fox jumps over the lazy dog."],
+       ["Mono", mono, "ui-monospace, monospace", "font-size: 18px;", `font: ${mono.name}`]].map(([roleLabel, role, fallbackChain, specimenStyle, specimenText]) => {
+      let note;
+      if (role.source === "site") {
+        note = `<div class="type-note">✓ from site (Google Fonts CDN)</div>`;
+      } else if (role.source === "site-local") {
+        const fileCount = role.localFiles.length;
+        note = `<div class="type-note">✓ from site (self-hosted, ${fileCount} woff/woff2 file${fileCount > 1 ? "s" : ""})</div>`;
+      } else if (role.originalName) {
+        note = `<div class="type-note">site '${esc(role.originalName)}' not resolvable → preset fallback</div>`;
+      } else {
+        note = `<div class="type-note">site has no ${roleLabel.toLowerCase()} face → preset fallback</div>`;
+      }
+      return `
     <div class="type-card">
-      <div class="type-role">Display</div>
-      <div class="type-name">${esc(display.name)}</div>
-      ${display.source === "preset" ? `<div class="type-note">site '${esc(display.originalName)}' not on Google Fonts → preset fallback</div>` : '<div class="type-note">from site</div>'}
-      <div class="type-specimen" style="font-family: '${esc(display.name)}', serif; font-size: 72px; font-weight: ${preset.name === "neo-brutalism" ? 800 : 400}; letter-spacing: ${preset.name === "neo-brutalism" ? "-0.04em" : "-0.02em"}; line-height: 1;">${esc(brandName)}</div>
-    </div>
-    <div class="type-card">
-      <div class="type-role">Body</div>
-      <div class="type-name">${esc(body.name)}</div>
-      ${body.source === "preset" ? `<div class="type-note">site '${esc(body.originalName)}' not on Google Fonts → preset fallback</div>` : '<div class="type-note">from site</div>'}
-      <div class="type-specimen" style="font-family: '${esc(body.name)}', sans-serif; font-size: 22px; line-height: 1.5;">The quick brown fox jumps over the lazy dog.</div>
-    </div>
-    <div class="type-card">
-      <div class="type-role">Mono</div>
-      <div class="type-name">${esc(mono.name)}</div>
-      ${mono.source === "preset" ? `<div class="type-note">site '${esc(mono.originalName)}' not on Google Fonts → preset fallback</div>` : '<div class="type-note">from site</div>'}
-      <div class="type-specimen" style="font-family: '${esc(mono.name)}', ui-monospace, monospace; font-size: 18px;">font: ${esc(mono.name)}</div>
-    </div>
+      <div class="type-role">${roleLabel}</div>
+      <div class="type-name">${esc(role.name)}</div>
+      ${note}
+      <div class="type-specimen" style="font-family: '${esc(role.name)}', ${fallbackChain}; ${specimenStyle}">${esc(specimenText)}</div>
+    </div>`;
+    }).join("")}
   </div>
 
   <details>
@@ -980,16 +1166,50 @@ ${esc(voiceMd)}
 }
 
 // ═══════════════════ Render: §6 Components ═══════════════
+// Rewrite hardcoded font-family declarations in preset component CSS into
+// var(--font-*) token references. Preset MD files were written with literal
+// font names ("Bodoni Moda", "Manrope") as design-time hints — at composition
+// time we want them flowing through the brand-resolved tokens (which may be
+// site-local woff2, Google Fonts CDN, or preset fallback).
+//
+// Classification:
+//   - Any family list containing a serif name → --font-display (display roles
+//     in editorial / capsule / Bodoni-class presets are the prominent serifs)
+//   - Any family list containing a mono name → --font-mono
+//   - Everything else (sans-serif body fonts: Manrope/Inter/Geist/etc) → --font-body
+//
+// We rewrite a font-family line as a whole; once stripped down to a token
+// reference we drop the original fallback chain (the token itself carries
+// system-ui / serif / monospace fallbacks).
+// "serif" must not be preceded by "sans-" (the generic family "sans-serif" is
+// a sans, not a serif). We test for "serif" only when no "sans-" appears just
+// before it. Other serif family names match by literal word.
+const SERIF_NAME_RE = /(?<!sans-)\bserif\b|\b(Bodoni|Playfair|Garamond|Fraunces|Newsreader|Spectral|Times|Lora|Source Serif|Crimson|Merriweather|PT Serif|DM Serif)\b/i;
+const MONO_NAME_RE = /\b(monospace|JetBrains Mono|Fira Code|IBM Plex Mono|Roboto Mono|Source Code|Space Mono|Geist Mono|DM Mono|Inconsolata|SFMono|Menlo|Consolas|ui-monospace)\b/i;
+function rewriteComponentFontFamilies(block) {
+  // Replace each `font-family: <chain>;` with the right token. Skip values
+  // that already reference var(--font-*) so re-running is a no-op.
+  return block.replace(/font-family:\s*([^;\n}]+);/g, (full, chain) => {
+    if (/var\(--font-/.test(chain)) return full;
+    let token;
+    if (MONO_NAME_RE.test(chain)) token = "var(--font-mono)";
+    else if (SERIF_NAME_RE.test(chain)) token = "var(--font-display)";
+    else token = "var(--font-body)";
+    return `font-family: ${token};`;
+  });
+}
+
 function renderComponents() {
   if (!preset.components.length) return "";
   return `
 <section id="components" class="ds-section">
   <div class="eyebrow">§6 · Components (paste-ready)</div>
   <h2>${esc(preset.label)} component library</h2>
-  <p class="ds-prose">Each component below is wrapped with <code>&lt;!-- COMPONENT: name --&gt;</code> markers. Phase 4b workers can <code>grep</code> by name and paste verbatim. CSS variables (<code>--brand-primary</code>, <code>--canvas</code>, etc.) come from §2.</p>
+  <p class="ds-prose">Each component below is wrapped with <code>&lt;!-- COMPONENT: name --&gt;</code> markers. Phase 4b workers can <code>grep</code> by name and paste verbatim. CSS variables (<code>--brand-primary</code>, <code>--canvas</code>, etc.) come from §2. Font families have been rewritten to <code>var(--font-display/body/mono)</code> tokens so they resolve to the brand's actual typefaces.</p>
 
   ${preset.components
-    .map((c) => {
+    .map((rawC) => {
+      const c = { ...rawC, block: rewriteComponentFontFamilies(rawC.block) };
       // Live preview = render the HTML inside the component block (it's already a working snippet)
       // For safety we extract first ```html ... ``` and first ```...``` style blocks if present.
       const htmlMatch = c.block.match(/```html\n([\s\S]*?)```/);
@@ -1158,10 +1378,15 @@ const html = `<!DOCTYPE html>
     - §5: grep <!-- VOICE-START --> .. <!-- VOICE-END --> → register for DOM text copy
     - §6: grep <!-- COMPONENT: <name> --> .. <!-- /COMPONENT --> → paste by name
 -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
+${(() => {
+  const url = gfontsUrl();
+  if (!url) return "<!-- (all type roles self-hosted; no Google Fonts request) -->";
+  return `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="${gfontsUrl()}" rel="stylesheet">
+<link href="${url}" rel="stylesheet">`;
+})()}
 <style>
+${localFontFaceBlock}
 ${renderPageStyles()}
 ${extractPagePresetCss()}
 </style>
@@ -1289,12 +1514,21 @@ console.log(`  brand:    ${brandName} · ${materialLabel} material · ${intentLa
 console.log(`  palette:  ${primaryHex} primary · ${secondaryHex} secondary · ${accentHex} accent`);
 console.log(`  deco:     ${decoColors.join(" · ")}`);
 console.log(`  fonts:    ${display.name} display · ${body.name} body · ${mono.name} mono`);
-if (display.source === "preset")
-  console.log(`    ! display: '${display.originalName}' not on Google Fonts → ${display.name}`);
-if (body.source === "preset")
-  console.log(`    ! body:    '${body.originalName}' not on Google Fonts → ${body.name}`);
-if (mono.source === "preset")
-  console.log(`    ! mono:    '${mono.originalName}' not on Google Fonts → ${mono.name}`);
+for (const [roleName, role] of [["display", display], ["body", body], ["mono", mono]]) {
+  if (role.source === "preset") {
+    if (role.originalName) {
+      console.log(`    ! ${roleName.padEnd(7)}: '${role.originalName}' not resolvable → ${role.name}`);
+    } else {
+      console.log(`    ! ${roleName.padEnd(7)}: site has no ${roleName} face → ${role.name} (preset fallback)`);
+    }
+  } else if (role.source === "site-local") {
+    const fileList = role.localFiles.map((f) => path.basename(f)).join(", ");
+    console.log(`    ✓ ${roleName.padEnd(7)}: '${role.name}' self-hosted (${fileList})`);
+  }
+}
+if (copiedFontFiles.length > 0) {
+  console.log(`  fonts/:   ${copiedFontFiles.length} file(s) copied to ${path.relative(process.cwd(), path.join(outDir, "fonts"))}/`);
+}
 console.log(`  preset:   ${preset.name} (${mode}, confidence=${inferenceReport.confidence})`);
 if (scores && scores.length) {
   console.log(`    scores: ${scores.slice(0, 5).map((s) => `${s.name}=${s.combined.toFixed(2)}`).join(" · ")}`);

@@ -232,6 +232,32 @@ async def collect_page_data(options: CaptureOptions) -> dict[str, Any]:
                     pushAsset({ kind: el.tagName.toLowerCase(), url, selector: selectorFor(el), rect: rectFor(el) });
                 });
 
+                // CSSOM walk for @font-face src URLs. Sites typically declare
+                // brand fonts via <style>@font-face{src:url(...)}</style>, not
+                // as <link rel="preload" as="font"> tags, so the DOM-only scan
+                // above misses them. Iterate stylesheets that are same-origin
+                // (cross-origin sheets throw on .cssRules access and are skipped).
+                for (const sheet of Array.from(document.styleSheets)) {
+                    let rules;
+                    try { rules = sheet.cssRules; } catch { continue; }
+                    if (!rules) continue;
+                    for (const rule of Array.from(rules)) {
+                        if (rule.type !== CSSRule.FONT_FACE_RULE) continue;
+                        const family = (rule.style.getPropertyValue('font-family') || '').replace(/^['"]|['"]$/g, '');
+                        const src = rule.style.getPropertyValue('src') || '';
+                        // src can carry multiple url(...) entries (woff2 + woff fallback); pull all.
+                        const urlMatches = [...src.matchAll(/url\\(\\s*["']?([^"')]+)["']?\\s*\\)/g)];
+                        for (const m of urlMatches) {
+                            pushAsset({
+                                kind: 'font-face',
+                                url: abs(m[1]),
+                                family,
+                                selector: '@font-face'
+                            });
+                        }
+                    }
+                }
+
                 document.querySelectorAll('meta[property], meta[name]').forEach((el) => {
                     const key = el.getAttribute('property') || el.getAttribute('name') || '';
                     const content = el.getAttribute('content') || '';
@@ -424,7 +450,19 @@ def download_assets(out_dir: Path, data: dict[str, Any], max_assets: int) -> lis
     downloaded: list[dict[str, Any]] = []
     candidates = [asset for asset in data.get("assets", []) if is_probable_asset(asset.get("url", ""))]
 
-    for index, asset in enumerate(candidates[:max_assets], start=1):
+    # Fonts are critical for matching site brand identity downstream
+    # (build-design.mjs greps research/assets/ for woff/woff2). They are also
+    # rare (typically 1-6 per site) and often listed late in the asset map
+    # (after every image and srcset), so the default max_assets=80 truncation
+    # silently drops them. Hoist them to the front so they always download.
+    def is_font(url: str) -> bool:
+        return any(url.lower().split("?", 1)[0].endswith(ext) for ext in (".woff2", ".woff", ".otf", ".ttf"))
+
+    fonts = [a for a in candidates if is_font(a.get("url", ""))]
+    non_fonts = [a for a in candidates if not is_font(a.get("url", ""))]
+    candidates = fonts + non_fonts[: max(0, max_assets - len(fonts))]
+
+    for index, asset in enumerate(candidates, start=1):
         url = asset["url"]
         filename = safe_filename(url, index)
         path = assets_dir / filename

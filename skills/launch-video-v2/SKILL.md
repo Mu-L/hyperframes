@@ -247,3 +247,16 @@ node <SKILL_DIR>/scripts/check-compositions.mjs \
 ---
 
 > ❌ Step 1 的两个 branch、Step 6 的 N 个 worker，**都**必须同一条 message 里 fan-out，每个 `run_in_background: true`。先起一个等完成再起另一个 = 串行化反模式（GitHub issue #29181 的默认行为，请刻意对抗）。
+
+---
+
+## 跨阶段 invariant
+
+上游一次写对，下游 gate 不返工。触发了下游 gate 报错就回上游修，不要在 finalize 里 patch。
+
+| 上游               | invariant                                                                                                                                                                                     | 错了下游怎么炸                                                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| worker（Step 6）   | timeline 注册用字面 scene id：`window.__timelines["scene_1"] = tl;`，不要 `SID` 变量绕一层                                                                                                    | `check-compositions.mjs` 正则扫不出 → 预飞 fatal · 见 `agents/hyperframes-scene.md` #9                                            |
+| worker（Step 6）   | macro-camera scene（effects 含 `coordinate-target-zoom` / `multi-phase-camera` / `camera-cursor-tracking` / `viewport-change`）最外层 zoom/pan wrapper 挂 `data-layout-allow-overflow="true"` | `npx hyperframes inspect` 必报 overflow → finalize 返工 ~60s · 见 `agents/hyperframes-scene.md` #10                               |
+| finalize（Step 7） | scene start 直接读 `group_spec.json.groups[].scenes[<sid>].start_s`，不在 agent 里 `S += dur`                                                                                                 | 浮点累积 `2.24 + 6.357 = 8.597000000000001` → lint 报 `overlapping_clips_same_track` · 见 `agents/hyperframes-finalize.md` Step 2 |
+| prep（Step 5）     | `ASSET_EXTS` 含 `mp4` / `mov` / `webm`（已就绪）                                                                                                                                              | 否则 Phase 3 引的视频落不到 `hyperframes/public/`，worker 被迫降级到 poster.webp 丢动效                                           |

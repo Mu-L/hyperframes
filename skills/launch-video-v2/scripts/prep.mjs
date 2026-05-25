@@ -100,7 +100,14 @@ mkdirSync(publicDir, { recursive: true });
 // `.bin` 是 web-research 阶段对未识别 MIME 的图片的兜底命名（典型为 image/* 但 Content-Type
 // 缺失或被 CDN 改写）。下游 Phase 4b worker 把它们当 <img src> 引用 —— 浏览器会按 magic bytes
 // 渲染，绝大多数能正常显示。把它纳入白名单避免文件被孤立在 research/ 里。
-const ASSET_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".svg", ".bin"]);
+const ASSET_EXTS = new Set([
+  ".png", ".jpg", ".jpeg", ".webp", ".svg", ".bin",
+  // Video extensions — Phase 3 frequently quotes hero/demo .mp4 from research/.
+  // Forgetting these forces Phase 4b workers to substitute poster .webp, losing
+  // motion fidelity. Keep in sync with the playable formats hyperframes-core
+  // accepts in <video>/clip sub-comps.
+  ".mp4", ".mov", ".webm",
+]);
 const collisions = [];
 let copied = 0;
 
@@ -400,7 +407,11 @@ for (const s of scenes) {
     finalDur = audioDur;
     source = "audio_meta";
   }
-  s.estimatedDuration_s = finalDur;
+  // Round to 3 decimals — naive cumulative `start_s += dur` accumulates
+  // float error fast enough that lint catches it (2.24 + 6.357 = 8.597000…1
+  // → overlapping_clips_same_track). Round per scene and we emit a
+  // precomputed start_s below so finalize never accumulates.
+  s.estimatedDuration_s = Number(finalDur.toFixed(3));
 
   // Anomalies: surface cross-stage inconsistencies. audio_meta is truth when
   // present; plan and narrator are estimates that may legitimately differ within
@@ -465,6 +476,10 @@ for (const s of scenes) {
 // ---------- Step 6: group by continuity, cap=N ----------
 const groups = [];
 let cur = null;
+// Precomputed cumulative scene start — finalize reads this verbatim instead of
+// accumulating in JS, dodging FP-precision overlaps that lint catches as
+// `overlapping_clips_same_track`.
+let runningStart = 0;
 for (const s of scenes) {
   const startNew = s.continuity === "break" || !cur || cur.scene_ids.length >= scenesPerGroupMax;
   if (startNew) {
@@ -475,8 +490,10 @@ for (const s of scenes) {
       scenes: {},
     };
   }
+  const start_s = Number(runningStart.toFixed(3));
   cur.scene_ids.push(s.sceneId);
   cur.scenes[s.sceneId] = {
+    start_s,
     effects: s.effects,
     rule_paths: s.rule_paths,
     assetCandidates: s.assetCandidates,
@@ -487,6 +504,7 @@ for (const s of scenes) {
     design_chunks: s.design_chunks,
     creative_brief: s.creative_brief,
   };
+  runningStart += s.estimatedDuration_s;
 }
 if (cur) groups.push(cur);
 
