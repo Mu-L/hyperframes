@@ -292,6 +292,17 @@ for (const sceneId of sceneIds) {
     });
   }
 
+  // Rule 6b: 注释里禁止字面 HTML 开标签
+  // `npx hyperframes lint` 用正则扫 <template> / <style> / <script>，注释里写字面标签会被当成真标签 → 误报结构错。
+  // 在预飞阶段拦住，省掉 finalize 90s 的 lint debug 循环。
+  if (/<!--[^>]*<(template|style|script)[> ][^>]*-->/.test(html)) {
+    errors.push({
+      sceneId,
+      rule: "literal-tag-in-comment",
+      detail: `注释里有字面 <template>/<style>/<script> — 会污染 npx hyperframes lint 的正则扫描；把 < 转义成 &lt; 或改成纯文本描述`,
+    });
+  }
+
   // Rule 7（v2 新增，soft）：blueprint 引用
   //
   // group_spec.json.groups[].scenes[<sid>].blueprint 取值：

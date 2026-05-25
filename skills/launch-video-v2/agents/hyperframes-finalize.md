@@ -46,6 +46,8 @@ node <SKILL_DIR>/scripts/check-compositions.mjs \
 
 harness 检查 root contract / timeline registration / CSS+JS scope / asset 引用 / forbidden patterns / asset path 前导斜杠 / blueprint 软引用。**Exit 0 → 继续**。**Exit 1 → STOP**，列违规给编排器；修在上游（重派 worker），不在 finalize 里 patch。
 
+> **注意**：dispatch 上下文可能告诉你"编排器已跑过 check-compositions.mjs"，**但这不代替** Step 3 的 `npx hyperframes lint / validate / inspect`。自定义 harness 与官方 CLI gate 用不同的扫描逻辑，覆盖面不同（典型差异：harness 不查注释里字面 HTML 标签、不查 layout overflow）。Step 3 必须完整跑，不要因为预飞过了就跳过任何 gate。
+
 （finalize 里 `Edit` 修只允许 lint/validate/inspect 抱怨的、harness 没拦下来的局部问题。）
 
 ## Step 2：拼装 `hyperframes/index.html`
@@ -125,9 +127,29 @@ Lane 归属：0 = scene clip，10 = voice，11 = BGM。worker 内部只能用 0-
 (cd hyperframes && npx hyperframes inspect)
 ```
 
-- **lint / validate** 局部错（单文件未 scope、漏 `class="clip"`）→ `Edit` 修了重跑
-- **lint / validate** 结构错（缺 `data-composition-id`、sub-comp ref 断、timeline 没注册、async 构 timeline）→ STOP，重派 worker
-- **inspect** warning 默认不 block，严重（CTA 出画、主文字裁 >30px）记 `context.log` + `Edit` 修
+### 首次失败：立刻 `--json`，不要凭目测猜
+
+任何 gate 首次失败时，**立刻**用 `--json` 拿结构化输出（看 `snippet` / `line` / `column`），而不是先 Read 文件凭目测找差异 —— linter 用正则扫，触发点经常和"肉眼合理"完全错开（典型案例：注释里字面 `<template>` 被当成真标签）。
+
+failed 时的标准动作：
+
+```bash
+(cd hyperframes && npx hyperframes lint --json 2>&1 | jq '.findings[] | {code, severity, snippet, line}')
+(cd hyperframes && npx hyperframes validate --json 2>&1 | jq '.findings[] | {code, severity, snippet, line}')
+(cd hyperframes && npx hyperframes inspect --json 2>&1 | jq '.findings[] | {code, severity, snippet, line}')
+```
+
+### Gate 报错分类决策表
+
+拿到 `--json` 输出后，对每条 finding 按下表分类，决定是回 worker 还是 finalize 内修：
+
+| Gate 报错类型                                                                                                          | 是 bug 还是 by-design？ | 修在哪                                                                                                          |
+| ---------------------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **结构错** —— 缺 attribute / timeline 没注册 / sub-comp ref 断 / `data-composition-id` 缺失 / async 构 timeline        | bug                     | **回 worker**，finalize 内不修                                                                                  |
+| **regex 误伤 / 局部 layout 调整** —— 注释里字面标签、单行→多行、属性顺序、漏 `class="clip"`、未 scope selector         | bug                     | **finalize 内 `Edit` 一次修**，不需要回 worker                                                                  |
+| **by-design 视觉效果违反 layout 检查** —— depth-layer 故意溢出 ≤ 5px、装饰元素故意越框、低对比文字（editorial intent） | by-design               | **加 escape hatch**：`data-layout-allow-overflow="true"` / `data-contrast-allow-low="true"` —— 别去 reshape CSS |
+
+- **inspect** warning 默认不 block，严重（CTA 出画、主文字裁 >30px）按上表第二/三档处理并记 `context.log`
 
 ## Step 4：Snapshot smoke test
 

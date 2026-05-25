@@ -407,6 +407,7 @@ function detectSiteFeatures() {
       });
     }),
     thick_solid_border: borderStrings.some((s) => /^\s*[3-9]px\s+solid/.test(s)),
+    medium_solid_border: borderStrings.some((s) => /^\s*2px\s+solid/.test(s)),
     hairline_border: borderStrings.some((s) => /^\s*1px\s+solid/.test(s)),
     condensed_display: /Anton|Archivo Black|Bebas|Oswald|Space Grotesk/i.test(
       fontFamilies.join(" "),
@@ -523,20 +524,42 @@ const GFONTS = new Set(
   ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, "")),
 );
 
-const PRESET_FONT_FALLBACK = {
-  "neo-brutalism": { display: "Anton", body: "Inter", mono: "Space Mono" },
-  editorial: { display: "Instrument Serif", body: "Inter", mono: "JetBrains Mono" },
+// Final-fallback families if a preset's §D can't be parsed or names nothing on
+// Google Fonts. Used when both site DNA and the preset's own §D fall through.
+const FINAL_FONT_FALLBACK = {
+  display: "Instrument Serif",
+  body: "Inter",
+  mono: "JetBrains Mono",
 };
 
-function resolveFont(siteName, role, presetName) {
+// Pick the first Google-Fonts-available name from a preset's §D bullet for one
+// role. Bullet format (per README §D): `- **<role>**: \`'Name1'\` · \`'Name2'\` · ...`
+function parsePresetFontFallback(presetSections) {
+  const dContent = presetSections.D?.content || "";
+  const roles = { display: null, body: null, mono: null };
+  for (const role of Object.keys(roles)) {
+    // Match the bullet line for this role; capture everything after the colon.
+    const lineRe = new RegExp(`^\\s*-\\s*\\*\\*${role}\\*\\*\\s*:\\s*(.+)$`, "mi");
+    const lineMatch = dContent.match(lineRe);
+    if (!lineMatch) continue;
+    // Extract each backtick-wrapped name; quotes inside are optional.
+    const names = [...lineMatch[1].matchAll(/`['"]?([^'"`]+?)['"]?`/g)].map((m) => m[1].trim());
+    // Pick the first name that's on Google Fonts.
+    const pick = names.find((n) => GFONTS.has(n.toLowerCase().replace(/[^a-z0-9]/g, "")));
+    if (pick) roles[role] = pick;
+  }
+  return roles;
+}
+
+function resolveFont(siteName, role, presetFontFallback) {
   const norm = String(siteName || "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
   if (norm && GFONTS.has(norm)) {
     return { name: siteCanonicalName(siteName), source: "site" };
   }
-  const fb = PRESET_FONT_FALLBACK[presetName] || PRESET_FONT_FALLBACK["editorial"];
-  return { name: fb[role], source: "preset", originalName: siteName };
+  const fallback = presetFontFallback[role] || FINAL_FONT_FALLBACK[role];
+  return { name: fallback, source: "preset", originalName: siteName };
 }
 function siteCanonicalName(s) {
   // Title-case each word, keep canonical names like "JetBrains Mono" intact
@@ -554,9 +577,10 @@ const rawDisplay = nonMono[1] || nonMono[0] || "system-ui";
 const rawBody = nonMono[0] || "system-ui";
 const rawMono = monoFromList || "JetBrains Mono";
 
-const display = resolveFont(rawDisplay, "display", preset.name);
-const body = resolveFont(rawBody, "body", preset.name);
-const mono = resolveFont(rawMono, "mono", preset.name);
+const presetFontFallback = parsePresetFontFallback(preset.sections);
+const display = resolveFont(rawDisplay, "display", presetFontFallback);
+const body = resolveFont(rawBody, "body", presetFontFallback);
+const mono = resolveFont(rawMono, "mono", presetFontFallback);
 
 function gfontsUrl() {
   const fams = [];
@@ -656,11 +680,49 @@ function renderBrandDNA() {
 // ═══════════════════ Render: §2 Color × Style ════════════
 function renderColorAndTokens() {
   const decorationTokens = preset.sections.B?.content || "";
-  // Extract just the CSS variables (lines starting with --)
-  const tokenLines = decorationTokens
-    .split("\n")
-    .filter((l) => /^\s*--/.test(l))
-    .map((l) => l.trim());
+  // Extract CSS variable declarations. A declaration starts with a line whose
+  // first non-whitespace tokens are `--`, and continues across lines until
+  // every opening paren has been closed AND a `;` terminator is seen.
+  //
+  // This supports multi-line values like:
+  //
+  //   --grain-image: radial-gradient(
+  //     rgba(0,0,0,0.04) 1px,
+  //     transparent 1px
+  //   );
+  //
+  // Stray non-declaration lines (`}`, comments, blanks, the opening `:root {`
+  // brace, fenced ```css markers) are skipped between declarations.
+  const tokenLines = [];
+  const rawLines = decorationTokens.split("\n");
+  let i = 0;
+  while (i < rawLines.length) {
+    const line = rawLines[i];
+    if (!/^\s*--/.test(line)) {
+      i++;
+      continue;
+    }
+    // Start of a declaration. Accumulate until paren depth is 0 and line ends with `;`.
+    const buffer = [line];
+    let depth = (line.match(/\(/g) || []).length - (line.match(/\)/g) || []).length;
+    let terminated = depth === 0 && /;\s*(\/\*.*\*\/)?\s*$/.test(line);
+    while (!terminated && i + 1 < rawLines.length) {
+      i++;
+      const cont = rawLines[i];
+      buffer.push(cont);
+      depth += (cont.match(/\(/g) || []).length - (cont.match(/\)/g) || []).length;
+      if (depth === 0 && /;\s*(\/\*.*\*\/)?\s*$/.test(cont)) {
+        terminated = true;
+      }
+    }
+    // Re-emit the declaration with the original indentation of subsequent lines
+    // (preserve formatting; the renderColorAndTokens output later re-indents the
+    // first line uniformly with "  " — keep continuation lines untouched).
+    const first = buffer[0].trim();
+    const rest = buffer.slice(1);
+    tokenLines.push(rest.length ? first + "\n" + rest.join("\n") : first);
+    i++;
+  }
   const rootBody = `
   --brand-primary:   ${primaryHex};
   --brand-secondary: ${secondaryHex};

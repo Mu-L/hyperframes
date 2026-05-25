@@ -200,6 +200,7 @@ node <SKILL_DIR>/scripts/check-compositions.mjs \
   ```
   SKILL_DIR: <绝对路径>
   Step 6 summary: <scene 数> scenes / <worker 数> workers
+  Preflight harness: check-compositions.mjs 已在编排器侧通过（这**不代替** Step 3 的 npx hyperframes lint / validate / inspect — 覆盖面不同，三个 gate 必须完整跑）
   Render quality: high  # 或编排器决定 draft / standard
   ```
 
