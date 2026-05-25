@@ -111,6 +111,7 @@ cursor-tests/
 basecamp-video/
 launch-video*/
 !skills/launch-video/
+!skills/launch-video-v2/
 ab-test/
 compositions/
 video-6-2-patched/
