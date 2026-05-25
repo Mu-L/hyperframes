@@ -7,11 +7,17 @@
  * read.
  *
  * Usage:
- *   node build-design.mjs <design-system-dir> [--style <preset-name>] [--prefix <site-prefix>] [--out <file>]
+ *   node build-design.mjs <design-system-dir> [--style <preset-name>] [--prefix <site-prefix>]
+ *                                              [--out <file>] [--out-scores <file>] [--no-emit]
  *
- * --style: force a preset (e.g. neo-brutalism, editorial). If omitted, auto-infers.
- * --prefix: override site prefix (auto-detects <prefix>-design-tokens.json otherwise).
- * --out: override output path (default: <dir>/design.html).
+ * --style:      force a preset (e.g. neo-brutalism, editorial). If omitted, auto-infers.
+ * --prefix:     override site prefix (auto-detects <prefix>-design-tokens.json otherwise).
+ * --out:        override design.html output path (default: <dir>/design.html).
+ * --out-scores: where to write inference.json (default: <dir>/inference.json). Always written.
+ * --no-emit:    run inference + write inference.json, but skip design.html / component rendering.
+ *               Used by the design-system subagent for the "review before commit" pass:
+ *               first run with --no-emit, read inference.json + designlang JSON, decide
+ *               whether to override the baseline winner, then re-run with --style <X> to emit.
  */
 
 import fs from "node:fs";
@@ -26,11 +32,15 @@ const argv = process.argv.slice(2);
 const outDir = path.resolve(argv[0] || ".");
 let cliPrefix = null,
   cliOut = null,
-  cliStyle = null;
+  cliStyle = null,
+  cliOutScores = null,
+  cliNoEmit = false;
 for (let i = 1; i < argv.length; i++) {
   if (argv[i] === "--prefix" && argv[i + 1]) cliPrefix = argv[++i];
   else if (argv[i] === "--out" && argv[i + 1]) cliOut = argv[++i];
   else if (argv[i] === "--style" && argv[i + 1]) cliStyle = argv[++i];
+  else if (argv[i] === "--out-scores" && argv[i + 1]) cliOutScores = argv[++i];
+  else if (argv[i] === "--no-emit") cliNoEmit = true;
 }
 if (!fs.existsSync(outDir) || !fs.statSync(outDir).isDirectory()) {
   console.error(`✗ ${outDir} is not a directory`);
@@ -48,6 +58,7 @@ if (!prefix) {
   prefix = match.replace(/-design-tokens\.json$/, "");
 }
 const outFile = cliOut ? path.resolve(cliOut) : path.join(outDir, "design.html");
+const outScoresFile = cliOutScores ? path.resolve(cliOutScores) : path.join(outDir, "inference.json");
 
 // ═══════════════════ Load designlang artifacts ═════════
 function readJSON(file, fallback) {
@@ -68,6 +79,10 @@ const tokens = readJSON(`${prefix}-design-tokens.json`, null);
 const motion = readJSON(`${prefix}-motion-tokens.json`, { duration: {}, easing: {} });
 const dna = readJSON(`${prefix}-visual-dna.json`, null);
 const voice = readJSON(`${prefix}-voice.json`, null);
+// intent.json holds pageIntent.type + sectionRoles.counts. Read separately —
+// the old dna?.pageIntent?.type lookup silently fell back to "unknown" because
+// pageIntent lives in intent.json, not visual-dna.json.
+const intent = readJSON(`${prefix}-intent.json`, null);
 // brand.html: designlang's canonical brand guidelines (already-classified
 // primary/secondary/accent). Authoritative when present.
 const brandHtml = readText(`${prefix}.brand.html`);
@@ -355,10 +370,66 @@ function parsePreset(presetDir) {
     label: meta.label || meta.name,
     fingerprint: meta.fingerprint || {},
     matchSignals: meta.match_signals || [],
+    // Semantic hints for the LLM-review pass. Empty arrays = preset hasn't
+    // declared them yet (parser-tolerant; build still works).
+    bestFor: Array.isArray(meta.best_for) ? meta.best_for : [],
+    avoidFor: Array.isArray(meta.avoid_for) ? meta.avoid_for : [],
+    // Hard runtime / environment requirements. Each entry is checked at
+    // pickPreset() time; any missing requirement zeroes the preset's combined
+    // score and surfaces a capabilities_missing[] list in inference.json so
+    // the subagent can auto-install or report. See checkCapabilities() below.
+    requiresCapabilities: Array.isArray(meta.requires_capabilities) ? meta.requires_capabilities : [],
     sections,
     components,
     rawBody: body,
   };
+}
+
+// ═══════════════════ Capability detection ═════════════════
+// A capability requirement is satisfied when its kind-specific check passes:
+//   block_installed: BOTH `verify_file` AND `verify_lib` exist on disk.
+//                    `verify_file` alone is not enough — `hyperframes add` writes
+//                    the block HTML but the lib/*.iife.js is shipped separately
+//                    by some blocks, so we check both. Missing → subagent should
+//                    run `auto_install` command (if non-null) to materialise it.
+//   env_var_set:     process.env[var] is set + non-empty.
+// Paths in verify_* are resolved relative to process.cwd() — that's the project
+// root for the v2 pipeline. build-design.mjs is invoked from project root, not
+// from the design-system/ dir, so relative paths Just Work.
+function checkCapabilities(preset) {
+  const missing = [];
+  for (const req of preset.requiresCapabilities) {
+    if (req.kind === "block_installed") {
+      const fileOk = req.verify_file ? fs.existsSync(path.resolve(req.verify_file)) : true;
+      const libOk = req.verify_lib ? fs.existsSync(path.resolve(req.verify_lib)) : true;
+      if (!fileOk || !libOk) {
+        missing.push({
+          kind: req.kind,
+          block: req.block,
+          missing_files: [
+            !fileOk ? req.verify_file : null,
+            !libOk ? req.verify_lib : null,
+          ].filter(Boolean),
+          auto_install: req.auto_install || null,
+          alternates: req.alternates || [],
+        });
+      }
+    } else if (req.kind === "env_var_set") {
+      const val = process.env[req.var];
+      if (!val || !val.trim()) {
+        missing.push({
+          kind: req.kind,
+          var: req.var,
+          reason: req.reason || null,
+          auto_install: req.auto_install || null,
+        });
+      }
+    } else {
+      // Unknown capability kind — surface but don't gate (forward-compatible).
+      missing.push({ kind: req.kind, unknown: true, raw: req });
+    }
+  }
+  return missing;
 }
 
 // ═══════════════════ Style auto-inference ════════════════
@@ -438,7 +509,44 @@ function scorePreset(preset, features) {
   return { raw: total, normalized: maxTotal ? total / maxTotal : 0 };
 }
 
+// Hybrid score: 0.7 * normalized + 0.3 * raw.
+// Pure-raw sort penalises presets that declare few signals (e.g. scatterbrain
+// at total weight 0.45 can never beat editorial at 1.00 even with perfect
+// hits). Pure-normalised lets a 1-signal preset edge out a 5-signal one by
+// matching its only signal. Hybrid: normalised dominates (precision), raw
+// breaks ties toward "broadly-aware" presets.
+function combinedScore(s) {
+  return 0.7 * s.normalized + 0.3 * s.raw;
+}
+
 function pickPreset() {
+  // Always compute features so inference.json can report them, even on --style.
+  const features = detectSiteFeatures();
+  // Presets with no match_signals fully opt out of auto-inference (no preset
+  // currently does this — both prior opt-outs, 8-bit-orbit and liquid-glass,
+  // now declare match_signals and gate via requires_capabilities instead).
+  const inferablePresets = presets.filter((p) => p.matchSignals.length > 0);
+  const scores = inferablePresets.map((p) => {
+    const s = scorePreset(p, features);
+    const matched = p.matchSignals.filter((sig) => features[sig.kind]).map((sig) => sig.kind);
+    const capabilitiesMissing = checkCapabilities(p);
+    // Hard rule: any unmet capability zeroes the auto-pick score. The preset
+    // still appears in inference.json so the subagent / user can see what would
+    // need to be installed to enable it (and auto_install command is surfaced).
+    const baseCombined = combinedScore(s);
+    const combined = capabilitiesMissing.length > 0 ? 0 : baseCombined;
+    return {
+      name: p.name,
+      raw: s.raw,
+      normalized: s.normalized,
+      combined,
+      combined_pre_capability: baseCombined,
+      matched,
+      capabilities_missing: capabilitiesMissing,
+    };
+  });
+  scores.sort((a, b) => b.combined - a.combined);
+
   if (cliStyle) {
     const forced = presets.find((p) => p.name === cliStyle);
     if (!forced) {
@@ -447,18 +555,15 @@ function pickPreset() {
       );
       process.exit(1);
     }
-    return { preset: forced, mode: "forced", scores: null };
+    // --style is a deliberate override — the subagent is responsible for having
+    // already satisfied the capabilities (e.g. installed the block). We don't
+    // re-gate here, but we do surface what's still missing so the agent can act.
+    return { preset: forced, mode: "forced", scores, features };
   }
-  const features = detectSiteFeatures();
-  // Presets with no match_signals opt out of auto-inference (they require
-  // explicit --style — e.g. liquid-glass needs WebGPU + runtime install).
-  const inferablePresets = presets.filter((p) => p.matchSignals.length > 0);
   if (inferablePresets.length === 0) {
     console.error(`✗ No presets are eligible for auto-inference. Use --style <name>.`);
     process.exit(1);
   }
-  const scores = inferablePresets.map((p) => ({ name: p.name, ...scorePreset(p, features) }));
-  scores.sort((a, b) => b.raw - a.raw);
   const winner = presets.find((p) => p.name === scores[0].name);
   return { preset: winner, mode: "inferred", scores, features };
 }
@@ -1078,11 +1183,107 @@ ${renderComponents()}
 </html>
 `;
 
-// ═══════════════════ Write + report ══════════════════════
+// ═══════════════════ Write inference.json ════════════════
+// Always written — even on --no-emit and --style — so the design-system
+// subagent (Phase 1b) can review the ranked candidate pool, the matched
+// signals, and the site DNA in one structured file before deciding whether
+// to override the baseline winner.
+function summariseCandidate(s) {
+  const p = presets.find((pp) => pp.name === s.name);
+  return {
+    name: s.name,
+    label: p?.label || s.name,
+    raw: Number(s.raw.toFixed(3)),
+    normalized: Number(s.normalized.toFixed(3)),
+    combined: Number(s.combined.toFixed(3)),
+    combined_pre_capability: Number((s.combined_pre_capability ?? s.combined).toFixed(3)),
+    matched_signals: s.matched,
+    capabilities_missing: s.capabilities_missing || [],
+    fingerprint: p?.fingerprint || {},
+    best_for: p?.bestFor || [],
+    avoid_for: p?.avoidFor || [],
+    sectionA_excerpt: (p?.sections?.A?.content || "").slice(0, 800),
+  };
+}
+function summariseTopCandidates(n) {
+  if (!scores) return [];
+  // Only include eligible (capability-satisfied) candidates in top_candidates.
+  const winnerScore = scores[0]?.combined || 0;
+  return scores
+    .filter((s) => s.combined > 0)
+    .slice(0, n)
+    .map((s) => ({
+      ...summariseCandidate(s),
+      delta_from_winner: Number((winnerScore - s.combined).toFixed(3)),
+    }));
+}
+// Capability-gated: would have scored well but is missing runtime / env reqs.
+// Subagent reads this to know "if I install X, this preset becomes available".
+function summariseCapabilityGated() {
+  if (!scores) return [];
+  return scores
+    .filter((s) => s.capabilities_missing && s.capabilities_missing.length > 0)
+    .map(summariseCandidate);
+}
+// confidence: high if winner clearly ahead, low if next candidate is within 0.05.
+// Only considers eligible (combined > 0) candidates.
+function inferConfidence() {
+  const eligible = (scores || []).filter((s) => s.combined > 0);
+  if (eligible.length < 2) return "high";
+  const delta = eligible[0].combined - eligible[1].combined;
+  if (delta < 0.05) return "low";
+  if (delta < 0.12) return "medium";
+  return "high";
+}
+const inferenceReport = {
+  mode,
+  selected: { name: preset.name, label: preset.label },
+  confidence: mode === "forced" ? "forced" : inferConfidence(),
+  baseline_winner:
+    scores && scores.find((s) => s.combined > 0)
+      ? {
+          name: scores.find((s) => s.combined > 0).name,
+          combined: Number(scores.find((s) => s.combined > 0).combined.toFixed(3)),
+        }
+      : null,
+  top_candidates: summariseTopCandidates(5),
+  // Presets whose match_signals would put them in the top-N but a runtime /
+  // environment requirement is unmet. Each entry includes `capabilities_missing`
+  // with `auto_install` commands the subagent can run to materialise the dep.
+  // If empty, no preset is currently gated — all eligible candidates compete.
+  capability_gated_presets: summariseCapabilityGated(),
+  site_features: features || {},
+  site_dna: {
+    source: sourceUrl || null,
+    brand_name: brandName,
+    material: dna?.materialLanguage?.label || null,
+    imagery: dna?.imageryStyle?.label || null,
+    background_patterns: dna?.backgroundPatterns?.labels || [],
+    page_intent: intent?.pageIntent?.type || null,
+    section_role_counts: intent?.sectionRoles?.counts || {},
+    voice_tone: voice?.tone || null,
+    voice_heading_style: voice?.headingStyle || null,
+    voice_heading_length: voice?.headingLengthClass || null,
+  },
+  generated_at: new Date().toISOString(),
+};
+fs.mkdirSync(path.dirname(outScoresFile), { recursive: true });
+fs.writeFileSync(outScoresFile, JSON.stringify(inferenceReport, null, 2));
+
+// ═══════════════════ Write design.html + report ══════════
+if (cliNoEmit) {
+  console.log(`✓ ${path.relative(process.cwd(), outScoresFile)} (inference only; --no-emit, design.html skipped)`);
+  console.log(`  preset:   ${preset.name} (${mode}, confidence=${inferenceReport.confidence})`);
+  if (mode === "inferred" && scores) {
+    console.log(`    top-5:  ${scores.slice(0, 5).map((s) => `${s.name}=${s.combined.toFixed(2)}`).join(" · ")}`);
+  }
+  process.exit(0);
+}
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, html);
 const sizeKb = (Buffer.byteLength(html) / 1024).toFixed(1);
 console.log(`✓ ${path.relative(process.cwd(), outFile)} (${sizeKb}KB)`);
+console.log(`✓ ${path.relative(process.cwd(), outScoresFile)} (inference report)`);
 console.log(`  source:   ${sourceUrl || "(no source)"}`);
 console.log(`  brand:    ${brandName} · ${materialLabel} material · ${intentLabel} intent`);
 console.log(`  palette:  ${primaryHex} primary · ${secondaryHex} secondary · ${accentHex} accent`);
@@ -1094,9 +1295,9 @@ if (body.source === "preset")
   console.log(`    ! body:    '${body.originalName}' not on Google Fonts → ${body.name}`);
 if (mono.source === "preset")
   console.log(`    ! mono:    '${mono.originalName}' not on Google Fonts → ${mono.name}`);
-console.log(`  preset:   ${preset.name} (${mode})`);
-if (mode === "inferred" && scores) {
-  console.log(`    scores: ${scores.map((s) => `${s.name}=${s.raw.toFixed(2)}`).join(" · ")}`);
+console.log(`  preset:   ${preset.name} (${mode}, confidence=${inferenceReport.confidence})`);
+if (scores && scores.length) {
+  console.log(`    scores: ${scores.slice(0, 5).map((s) => `${s.name}=${s.combined.toFixed(2)}`).join(" · ")}`);
   const trueFeatures = Object.entries(features)
     .filter(([, v]) => v)
     .map(([k]) => k);

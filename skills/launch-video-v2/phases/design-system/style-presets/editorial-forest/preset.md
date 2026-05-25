@@ -15,7 +15,9 @@
     { "kind": "minimal_decoration", "weight": 0.2 },
     { "kind": "low_saturation", "weight": 0.15 },
     { "kind": "medium_solid_border", "weight": 0.15 }
-  ]
+  ],
+  "best_for": ["warm unhurried product stories", "research recaps", "studio updates", "literary brands", "quiet annual reports"],
+  "avoid_for": ["urgent sales-driven registers", "punchy promo", "high-energy launches", "consumer hype"]
 }
 ```
 

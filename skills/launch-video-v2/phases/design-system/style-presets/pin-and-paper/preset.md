@@ -14,7 +14,9 @@
     { "kind": "hairline_border", "weight": 0.3 },
     { "kind": "shadow_zero_blur", "weight": 0.25 },
     { "kind": "low_saturation", "weight": 0.1 }
-  ]
+  ],
+  "best_for": ["qualitative research", "founder reflections", "longform brand stories", "hand-crafted decks", "literary brands"],
+  "avoid_for": ["digital-native polished", "rigorously data-driven", "corporate fintech", "high-energy launches"]
 }
 ```
 

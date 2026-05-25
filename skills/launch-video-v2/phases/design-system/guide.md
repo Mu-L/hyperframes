@@ -1,109 +1,125 @@
-# Design System（Phase 1b）
+# Design System (Phase 1b)
 
-把站点 brand DNA 和一个 style preset 合成为单一的 `design.html`，再切碎为下游 phase 可逐块加载的 `chunks/`。
+合成 `design.html` + 切碎为 `chunks/`。三步确定性脚本，preset 选择是 agent 唯一的决策点。
 
-本指南由 `agents/design-system.md` subagent 在 dispatch 时 Read。流程是三步确定性脚本，agent 只跑命令 / 读 stdout / 报告，不在中间做任何创意决策。
-
-## 流程一览
-
-1. `npx designlang <url>` 抓站点 DNA（写 ~30 个中间产物到 `design-system/`）
-2. `build-design.mjs` 合成 `design.html`（自动推断 preset；下游唯一的人类可读归档）
-3. `emit-chunks.mjs` 切碎为 `chunks/`（下游 phase 真正消费的真值入口）
-
----
-
-## 1. 执行
+## 1. 命令模板
 
 ```bash
 mkdir -p design-system
 
-# Step 1 — 抓站点 DNA（designlang 会写 ~30 个文件，build-design 只读其中 4 个 + brand.html）
-# --header 必带：很多 SaaS 站点按 GeoIP 切换语言，不加会抓回非英语版 hero copy
+# Step 1 — 抓站点 DNA
 npx designlang <url> --out ./design-system --header "Accept-Language:en-US,en;q=0.9,*;q=0.5"
 
-# Step 2 — 合成 design.html（自动推断 preset；可用 --style 强制覆盖）
-node <SKILL_DIR>/phases/design-system/scripts/build-design.mjs ./design-system
+# Step 2a — baseline 推断，写 inference.json，不落 design.html
+node <SKILL_DIR>/phases/design-system/scripts/build-design.mjs ./design-system --no-emit
 
-# Step 3 — 切碎 design.html 为 chunks/（确定性脚本，无 LLM）
+# Step 2b — 见 §3 决策规则
+
+# Step 2c — 用 chosen preset 落 design.html
+node <SKILL_DIR>/phases/design-system/scripts/build-design.mjs ./design-system --style <chosen>
+
+# Step 3 — 切碎为 chunks/
 node <SKILL_DIR>/phases/design-system/scripts/emit-chunks.mjs ./design-system
 ```
 
-异常时可用的 flags（默认不需要）：
+可选 flag：
 
-- **designlang**：`--wait 2000`（JS-heavy 页面，hero 文字还没注入就被截断）
-- **build-design**：`--style <name>`（强制 preset，跳过自动推断）；`--prefix <name>`（auto-detection 失败时）
-- **emit-chunks**：无 flag。失败 = build-design 没写 `<!-- ROOT-START -->` / `<!-- MOTION-START -->` / `<!-- VOICE-START -->` / `<!-- COMPONENT: <id> -->` 锚点，回头排查 build-design 而不是修 chunker。
+- `designlang --wait 2000` — JS-heavy 站点 hero 未注入时
+- `build-design --prefix <name>` — auto-detection 失败时
+- `build-design --out-scores <file>` — 改 inference.json 落盘路径（默认 `<dir>/inference.json`）
 
----
+## 2. inference.json 字段（agent 读这些）
 
-## 2. 产物
-
-```
-design-system/
-├── design.html              # 整体浏览 / 人类阅读 / 历史归档（~44 KB 量级）
-└── chunks/                  # 下游 phase 按文件粒度逐块加载（~10-15 KB）
-    ├── tokens.css           # :root { ... }  ← <!-- ROOT-START --> 块
-    ├── easings.js           # EASE / DUR const  ← <!-- MOTION-START --> 块
-    ├── voice.md             # DOM 文字 register  ← <!-- VOICE-START --> 块（Phase 4b 用）
-    ├── components/
-    │   ├── <id>.html        # 每个 <!-- COMPONENT: <id> --> 块一文件
-    │   └── ...
-    └── index.json           # manifest: preset / source / tokens_file / easings_file / voice_file / components[]
-```
-
----
-
-## 3. 硬契约
-
-1. **`chunks/` 与 `design.html` 同源** —— 每次 Step 2 重跑后必须重跑 Step 3，否则下游 phase 读到旧 chunk。
-2. **`chunks/index.json` 是下游真值入口** —— Phase 3（visual-design）/ Phase 4b（hyperframes-scene）只读 chunks，不再 grep design.html。
-3. **`design.html` 仅作人类归档** —— 下游 agent 不再 Read 它；它存在的意义是让本 phase 的 agent 一眼看出合成结果是否合理 + 给后续 PR review 留可读快照。
-
----
-
-## 4. 解读 stdout
-
-build-design 形如：
-
-```
-✓ design-system/design.html (XX KB)
-  source:   https://www.figma.com/
-  brand:    Figma · flat material · landing intent
-  palette:  #e4ff97 primary · #00b6ff secondary · #c4baff accent
-  fonts:    Instrument Serif display · Inter body · JetBrains Mono mono
-    ! display: 'figmaSans' not on Google Fonts → Instrument Serif
-  preset:   editorial (inferred)
-    scores: editorial=0.45 · neo-brutalism=0.10
-    matched signals: low_saturation, minimal_decoration
-  components: 8 paste-ready
-```
-
-emit-chunks 形如：
-
-```
-✓ design-system/chunks/
-  tokens.css         0.6 KB
-  easings.js         0.4 KB
-  voice.md           0.5 KB
-  components/        13 files
-    hero.html  (0.7 KB)
-    chip.html  (0.3 KB)
-    ...
-  index.json         lists 13 components (preset=neo-brutalism)
-  totals             chunks 11.4 KB vs design.html 44.7 KB (~26% of source)
+```jsonc
+{
+  "confidence": "high" | "medium" | "low" | "forced",
+  "baseline_winner": { "name": "...", "combined": 0.XX },
+  "top_candidates": [           // 已满足 capability 的候选，按 combined 降序
+    {
+      "name": "...",
+      "combined": 0.XX,
+      "delta_from_winner": 0.XX,
+      "matched_signals": [...],
+      "best_for": [...],
+      "avoid_for": [...],
+      "sectionA_excerpt": "..."
+    }
+  ],
+  "site_dna": {
+    "material": "flat|paper|glass|...",
+    "imagery": "photography|flat-illustration|...",
+    "page_intent": "landing|pricing|blog|...",
+    "section_role_counts": { "feature-grid": N, ... },
+    "voice_tone": "neutral|warm|formal|...",
+    "voice_heading_style": "Title Case|UPPERCASE|...",
+    "voice_heading_length": "tight|loose"
+  },
+  "capability_gated_presets": [ // 因 runtime / env 缺失被 0 分；可在装齐 capability 后升回 top_candidates
+    {
+      "name": "liquid-glass",
+      "combined_pre_capability": 0.42,
+      "capabilities_missing": [
+        {
+          "kind": "block_installed",
+          "auto_install": "npx hyperframes add liquid-glass-widgets" // 非 null 时 agent 可跑
+        },
+        {
+          "kind": "env_var_set",
+          "var": "PRODUCER_HEADLESS_SHELL_PATH",
+          "auto_install": null // null = 不能自动装
+        }
+      ]
+    }
+  ]
+}
 ```
 
-把两段 stdout 原样抄进 agent 的完成汇报。`totals` 这一行很有用 —— 它给的是 chunk 加载预算的上限，下游 phase 读单文件时的 token 成本就直接对应。
+## 3. 决策规则（Step 2b）
 
----
+按 `confidence` 决定：
 
-## 5. 失败模式与排查
+| confidence       | 动作                                 |
+| ---------------- | ------------------------------------ |
+| `high`           | 用 `baseline_winner.name` 跑 Step 2c |
+| `medium` / `low` | 进入下面的 override 判据             |
+| `forced`         | 已传 `--style`，跳过 review          |
 
-| 现象                                  | 根因                              | 修法                                                                                                                                      |
-| ------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Step 1 抓回的 hero copy 是非英语      | 站点按 GeoIP 切语言               | 加 `--header "Accept-Language:en-US,..."`（默认已加，自查命令拼写）                                                                       |
-| Step 1 抓回空 hero / 占位文字         | JS-heavy 站点未等内容注入         | 加 `--wait 2000`                                                                                                                          |
-| Step 2 preset 推断成 generic / 错的   | 自动推断 scores 接近              | `--style <name>` 强制指定（editorial / neo-brutalism / saas / …）                                                                         |
-| Step 2 字体名带空格 / 厂商私字体      | brand.html 抓到非 Google Fonts 名 | build-design 已自动 fallback（stdout 会打 `! display: 'X' not on Google Fonts → Y`），看汇报里的 fallback 是否合理                        |
-| Step 3 报缺锚点                       | Step 2 输出畸形                   | 重跑 Step 2，确认 design.html 里有 3 类 HTML 注释锚；**不要**改 emit-chunks                                                               |
-| `chunks/index.json` 缺 `components[]` | Step 2 没识别到任何 component     | 看 build-design stdout 的 `components: N paste-ready`；N=0 说明源站 component pattern 没匹配上，可接受（下游退化为只用 tokens + easings） |
+**override 判据**（按优先级）：
+
+1. **避坑**：top_candidates 中任一 preset 的 `avoid_for` 命中 `site_dna` 关键词 → 从候选剔除
+2. **best_for 命中**：剩下的里挑 `best_for` 与 `site_dna` 关键词重合最多的
+3. **capability_gated 选优**：如果某个 gated preset 的 `combined_pre_capability` 已能进 top-3 且 `site_dna` 明显契合（典型 `material: "glass"` → liquid-glass），处理 `capabilities_missing[]`：
+   - `auto_install` 非 null → 跑这条命令 → 重跑 `build-design.mjs --no-emit` 验证它已进 top_candidates → 用 `--style` 选它
+   - `auto_install: null` → 写进 anomaly 汇报，**改选别的 preset**
+4. **无明显赢家** → 保留 baseline_winner
+
+**禁止**：选择必须出自 `top_candidates[]` 或 `capability_gated_presets[]`，不能发明新名字。
+
+## 4. 汇报模板
+
+```
+preset review:
+  baseline: <name> (combined=<X>, confidence=<...>)
+  chosen:   <name>
+  reason:   <一句话，引用 site_dna / best_for / avoid_for 的具体关键词>
+  alternates_considered: [<name1>, <name2>]
+  capability_actions: [<装了什么 block / 哪个 env var 没设>]  # 没动作就写 none
+```
+
+外加 build-design 和 emit-chunks 两段 stdout 原样贴。
+
+## 5. 硬契约
+
+- **`chunks/` 与 `design.html` 同源** — Step 2c 重跑后必须重跑 Step 3，否则下游读旧 chunk
+- **Read 范围**：`./design-system/inference.json` + `./design-system/<prefix>-{intent,visual-dna,voice}.json` + 验合成结果时 `./design-system/design.html`。其他 designlang 中间产物（`brand.html` / `palette.json` / `gradients.json` 等）不读
+- **不要自己设计 palette / typography / 字体 / decoration** — 全部由 build-design 写定
+- `--style` 是 deliberate override，agent 必须在跑它之前满足 capability；build-design 在 forced mode 下不再 gate
+
+## 6. 排查
+
+| 现象                                  | 修法                                                                                                           |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 抓回非英语 hero                       | 自查 `--header` 拼写（默认已带 Accept-Language）                                                               |
+| 抓回空 hero / 占位文字                | 加 `designlang --wait 2000`                                                                                    |
+| Step 3 报缺锚点                       | 重跑 Step 2c，确认 design.html 含 ROOT-START / MOTION-START / VOICE-START / COMPONENT 注释；不要修 emit-chunks |
+| `chunks/index.json` 缺 `components[]` | 看 build-design stdout `components: N paste-ready`；N=0 可接受（下游退化为 tokens + easings）                  |

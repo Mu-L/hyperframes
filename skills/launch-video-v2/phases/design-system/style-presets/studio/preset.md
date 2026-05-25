@@ -15,7 +15,9 @@
     { "kind": "hairline_border", "weight": 0.2 },
     { "kind": "minimal_decoration", "weight": 0.2 },
     { "kind": "low_saturation", "weight": 0.05 }
-  ]
+  ],
+  "best_for": ["creative agencies", "fashion brands", "studios", "manifesto pages", "art-directed declarative product launches"],
+  "avoid_for": ["quiet institutional registers", "decoration-expecting contexts", "warm consumer", "soft lifestyle"]
 }
 ```
 

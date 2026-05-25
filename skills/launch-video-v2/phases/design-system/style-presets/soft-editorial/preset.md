@@ -17,7 +17,9 @@
     { "kind": "hairline_border",     "weight": 0.18 },
     { "kind": "low_saturation",      "weight": 0.22 },
     { "kind": "minimal_decoration",  "weight": 0.20 }
-  ]
+  ],
+  "best_for": ["founder essays", "gallery / museum", "advisory", "longform brand stories", "lifestyle media", "research notebooks"],
+  "avoid_for": ["visual heat", "declarative punch", "sales-urgent brands", "high-energy consumer hype"]
 }
 ```
 

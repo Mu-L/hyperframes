@@ -16,7 +16,9 @@
     { "kind": "high_sat_accent",     "weight": 0.15 },
     { "kind": "rotated_transform",   "weight": 0.10 },
     { "kind": "bouncy_easing",       "weight": 0.05 }
-  ]
+  ],
+  "best_for": ["manifesto brands", "indie SaaS", "declarative product launches", "agency talks", "design-led pitches"],
+  "avoid_for": ["corporate restraint", "quiet authority", "institutional finance", "healthcare", "regulated industries"]
 }
 ```
 

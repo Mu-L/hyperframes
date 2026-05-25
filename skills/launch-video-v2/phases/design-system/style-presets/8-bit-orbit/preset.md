@@ -10,7 +10,13 @@
     "contrast": "dark-neon",
     "palette-mode": "closed"
   },
-  "match_signals": []
+  "match_signals": [
+    { "kind": "high_sat_accent",   "weight": 0.40 },
+    { "kind": "shadow_zero_blur",  "weight": 0.25 },
+    { "kind": "condensed_display", "weight": 0.10 }
+  ],
+  "best_for": ["gaming", "cyberpunk", "web3", "indie tools", "high-saturation brands", "retro tech", "arcade"],
+  "avoid_for": ["light-canvas brands", "minimalist pastel", "low-saturation editorial"]
 }
 ```
 

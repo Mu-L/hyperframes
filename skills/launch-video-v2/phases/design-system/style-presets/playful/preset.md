@@ -14,7 +14,9 @@
     { "kind": "thick_solid_border", "weight": 0.3 },
     { "kind": "bouncy_easing", "weight": 0.2 },
     { "kind": "minimal_decoration", "weight": 0.1 }
-  ]
+  ],
+  "best_for": ["indie product launches", "creator portfolios", "lifestyle", "community brands", "friendly research / tech"],
+  "avoid_for": ["institutional credibility", "enterprise security", "formal corporate", "high-gravitas brands"]
 }
 ```
 

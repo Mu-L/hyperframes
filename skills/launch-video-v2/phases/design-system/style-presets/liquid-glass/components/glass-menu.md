@@ -15,17 +15,18 @@
     width: 390px;
     height: 506px;
     background: rgba(255, 255, 255, 0.15);
-    --lg-blur: 0.56;
-    --lg-refraction: 0.52;
-    --lg-corner-radius: 30;
-    --lg-z-radius: 48;
-    --lg-specular: 0.26;
-    --lg-fresnel: 1;
-    --lg-edge-highlight: 0.2;
-    --lg-chrom-aberration: 0.035;
-    --lg-tint: 0.88;
-    --lg-brightness: 0.54;
-    --lg-saturation: -0.24;
+    /* Menu archetype — see preset.md §B for tuning. */
+    --lg-blur: var(--lg-menu-blur);
+    --lg-refraction: var(--lg-menu-refraction);
+    --lg-corner-radius: var(--lg-menu-corner-radius);
+    --lg-z-radius: var(--lg-menu-z-radius);
+    --lg-specular: var(--lg-menu-specular);
+    --lg-fresnel: var(--lg-menu-fresnel);
+    --lg-edge-highlight: var(--lg-menu-edge-highlight);
+    --lg-chrom-aberration: var(--lg-menu-chrom-aberration);
+    --lg-tint: var(--lg-menu-tint);
+    --lg-brightness: var(--lg-menu-brightness);
+    --lg-saturation: var(--lg-menu-saturation);
   }
   .menu-text {
     width: 390px;

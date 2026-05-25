@@ -13,15 +13,18 @@
     width: 640px;
     height: 116px;
     background: rgba(255, 255, 255, 0.055);
+    /* Notification archetype base, with "punchy" overrides for the now-playing
+       register: higher blur/refraction/specular and high-saturation for the
+       album-art glow. The other notif-* values still inherit. */
     --lg-blur: 0.42;
     --lg-refraction: 0.92;
     --lg-corner-radius: 44;
     --lg-z-radius: 58;
     --lg-specular: 0.46;
-    --lg-fresnel: 1.15;
+    --lg-fresnel: var(--lg-notif-fresnel);
     --lg-edge-highlight: 0.34;
-    --lg-chrom-aberration: 0.08;
-    --lg-saturation: 1.1;
+    --lg-chrom-aberration: var(--lg-widget-chrom-aberration); /* 0.08 — widget's punchier value */
+    --lg-saturation: 1.1; /* override: punchy hue lift for album-art glow */
   }
   .media-text {
     width: 640px;

@@ -15,7 +15,9 @@
     { "kind": "condensed_display", "weight": 0.2 },
     { "kind": "high_sat_accent", "weight": 0.25 },
     { "kind": "minimal_decoration", "weight": 0.15 }
-  ]
+  ],
+  "best_for": ["design-led pitches", "brand decks", "founder talks", "stat-heavy slides", "comparison matrices"],
+  "avoid_for": ["warm traditional voices", "quiet brand registers", "soft consumer lifestyle", "storybook decoration"]
 }
 ```
 

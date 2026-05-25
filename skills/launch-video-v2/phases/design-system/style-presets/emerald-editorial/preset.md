@@ -16,7 +16,9 @@
     { "kind": "thick_solid_border", "weight": 0.22 },
     { "kind": "minimal_decoration", "weight": 0.18 },
     { "kind": "high_sat_accent", "weight": 0.12 }
-  ]
+  ],
+  "best_for": ["literary brands", "strategy", "planning", "leadership decks", "longform research", "authoritative editorial"],
+  "avoid_for": ["quiet institutional brands", "restrained corporate decks", "calm minimalist registers"]
 }
 ```
 

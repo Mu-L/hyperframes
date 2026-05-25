@@ -9,14 +9,41 @@
     "density": "low",
     "contrast": "high-on-aurora"
   },
-  "match_signals": []
+  "match_signals": [
+    { "kind": "hairline_border",    "weight": 0.20 },
+    { "kind": "minimal_decoration", "weight": 0.15 },
+    { "kind": "shadow_zero_blur",   "weight": 0.10 }
+  ],
+  "requires_capabilities": [
+    {
+      "kind": "block_installed",
+      "block": "liquid-glass-widgets",
+      "verify_file": "hyperframes/compositions/liquid-glass-widgets.html",
+      "verify_lib": "hyperframes/compositions/lib/liquid-glass.iife.js",
+      "auto_install": "npx hyperframes add liquid-glass-widgets",
+      "alternates": ["liquid-glass-notification", "liquid-glass-context-menu", "liquid-glass-media-controls", "ios26-liquid-glass", "macos-tahoe-liquid-glass", "vfx-liquid-glass"]
+    },
+    {
+      "kind": "env_var_set",
+      "var": "PRODUCER_HEADLESS_SHELL_PATH",
+      "reason": "WebGPU-capable browser (Brave / Chrome Canary). Cannot auto-install — varies by OS / user environment.",
+      "auto_install": null
+    }
+  ],
+  "best_for": ["premium SaaS", "AI products", "hardware launches", "futuristic tech", "consumer apps with depth"],
+  "avoid_for": ["print-feel brands", "low-power render targets", "warm hand-crafted registers"]
 }
 ```
 
-> `match_signals: []` is intentional — liquid-glass requires a WebGPU runtime
-> and the bundled `liquid-glass.iife.js` shipped by registry blocks. The
-> auto-inferencer in `build-design.mjs` will never pick it (every preset scores
-> 0 against an empty signal list). Select with `--style liquid-glass`.
+> Liquid-glass auto-infers normally now (its `match_signals` light up on
+> hairline-border + minimal-decoration sites), **but** `requires_capabilities`
+> in the preset-meta gates auto-selection: build-design.mjs sets `combined=0`
+>
+> - `capabilities_missing=[...]` when (a) `lib/liquid-glass.iife.js` is absent
+>   or (b) `$PRODUCER_HEADLESS_SHELL_PATH` is unset. The design-system subagent
+>   auto-runs `npx hyperframes add liquid-glass-widgets` when liquid-glass wins
+>   review and the block is missing; the env var is OS-specific and falls to
+>   the user — agent reports it as an anomaly in the completion summary.
 
 ## §A Director's intent
 
@@ -36,15 +63,27 @@ is tiny on purpose. Hard cuts and bouncy springs break the wetness.
 
 ## §B Decoration tokens (merge into design.html `:root`)
 
-These map 1:1 onto the `--lg-*` custom properties read by `liquid-glass.iife.js`.
-Three archetypes — pick the right one per panel by size/role:
+**Wiring contract.** The `liquid-glass.iife.js` shader reads exactly these
+raw `--lg-*` properties per panel: `--lg-blur`, `--lg-refraction`,
+`--lg-corner-radius`, `--lg-z-radius`, `--lg-specular`, `--lg-fresnel`,
+`--lg-edge-highlight`, `--lg-chrom-aberration`, `--lg-saturation`,
+`--lg-tint`, `--lg-brightness`, `--lg-shadow-opacity`, `--lg-shadow-spread`,
+`--lg-shadow-offset-y`, `--lg-opacity`, `--lg-distortion`, `--lg-bevel-mode`.
+
+Three archetypes are declared here with archetype-namespaced keys
+(`--lg-widget-*`, `--lg-notif-*`, `--lg-menu-*`). Each component selects
+its archetype by aliasing the raw keys, e.g. `--lg-blur: var(--lg-widget-blur)`.
+Tune a knob here → all panels of that archetype move together. Brand-DNA
+联动 (e.g. saturation tracking brand vibrancy) goes here too — anchored
+on `--brand-*` and resolved once, consumed by every component.
 
 ```css
 /* Aurora canvas — overwrites brutalism/editorial canvas. */
 --liquid-bg-deep: #0a0218; /* mandatory dark base — aurora needs blackpoint */
 --liquid-bg-fallback: linear-gradient(160deg, #0a0218 0%, #15082a 60%, #062035 100%);
 
-/* Glass archetype 1 — WIDGET (stat cards, showcase, pill chips) */
+/* ── Archetype 1: WIDGET ────────────────────────────────────────
+   ≤ 280px panels: stat cards, pill chips, small toggles. */
 --lg-widget-blur: 0.42;
 --lg-widget-refraction: 0.82;
 --lg-widget-specular: 0.34;
@@ -52,10 +91,12 @@ Three archetypes — pick the right one per panel by size/role:
 --lg-widget-edge-highlight: 0.26;
 --lg-widget-chrom-aberration: 0.08;
 --lg-widget-saturation: 0.38;
---lg-widget-corner: 28;
---lg-widget-z: 46;
+--lg-widget-corner-radius: 28;
+--lg-widget-z-radius: 46;
 
-/* Glass archetype 2 — NOTIFICATION / OVERLAY (toast, banner — needs cast shadow) */
+/* ── Archetype 2: NOTIFICATION / OVERLAY ────────────────────────
+   280-600px floating panels needing cast shadow: toasts, banners,
+   media bars, sliders. */
 --lg-notif-blur: 0.22;
 --lg-notif-refraction: 0.6;
 --lg-notif-specular: 0.2;
@@ -63,24 +104,26 @@ Three archetypes — pick the right one per panel by size/role:
 --lg-notif-edge-highlight: 0.1;
 --lg-notif-chrom-aberration: 0.05;
 --lg-notif-saturation: 0.25;
---lg-notif-corner: 36;
---lg-notif-z: 38;
+--lg-notif-corner-radius: 36;
+--lg-notif-z-radius: 38;
 --lg-notif-shadow-opacity: 0.35;
 --lg-notif-shadow-spread: 14;
 --lg-notif-shadow-offset-y: 4;
 
-/* Glass archetype 3 — MENU / DENSE CONTENT (context menu, popover with text) */
+/* ── Archetype 3: MENU / DENSE CONTENT ──────────────────────────
+   ≥ 350px panels with text rows / list / dense UI. Desaturate +
+   tint up so near-black ink stays legible on the lightened glass. */
 --lg-menu-blur: 0.56;
 --lg-menu-refraction: 0.52;
 --lg-menu-specular: 0.26;
 --lg-menu-fresnel: 1;
 --lg-menu-edge-highlight: 0.2;
 --lg-menu-chrom-aberration: 0.035;
---lg-menu-saturation: -0.24; /* desaturate so dark text on glass stays legible */
+--lg-menu-saturation: -0.24;
 --lg-menu-tint: 0.88;
 --lg-menu-brightness: 0.54;
---lg-menu-corner: 30;
---lg-menu-z: 48;
+--lg-menu-corner-radius: 30;
+--lg-menu-z-radius: 48;
 
 /* Type colors on glass */
 --ink-on-glass: rgba(255, 255, 255, 0.96);
@@ -91,9 +134,9 @@ Three archetypes — pick the right one per panel by size/role:
 
 **Picking the right archetype.** Panel diameter is the deciding factor, not content:
 
-- ≤ 280px (chip, button, small stat) → **widget**
-- 280-600px floating over content (toast, alert) → **notification** (needs shadow)
-- ≥ 350px containing text rows / list / dense UI → **menu** (desaturate + tint up)
+- ≤ 280px (chip, button, small stat, toggle) → **widget**
+- 280-600px floating over content (toast, alert, media-bar, slider) → **notification** (needs shadow)
+- ≥ 350px containing text rows / list / dense UI (menu, popover) → **menu** (desaturate + tint up)
 
 ## §D Font pairing fallback (if brand fonts not on Google Fonts)
 

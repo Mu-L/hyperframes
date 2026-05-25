@@ -15,7 +15,9 @@
     { "kind": "low_saturation",      "weight": 0.20 },
     { "kind": "generous_padding",    "weight": 0.15 },
     { "kind": "minimal_decoration",  "weight": 0.15 }
-  ]
+  ],
+  "best_for": ["longform essays", "research recaps", "restrained editorial", "swiss-style brand decks", "academic / advisory"],
+  "avoid_for": ["sales-driven punch", "expressive maximalism", "decoration-heavy briefs", "high-energy promo"]
 }
 ```
 

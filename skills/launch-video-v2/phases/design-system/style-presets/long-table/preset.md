@@ -15,7 +15,9 @@
     { "kind": "hairline_border", "weight": 0.25 },
     { "kind": "minimal_decoration", "weight": 0.2 },
     { "kind": "low_saturation", "weight": 0.05 }
-  ]
+  ],
+  "best_for": ["hospitality", "community brands", "lifestyle", "editorial", "magazine-friendly brands", "small-press / riso"],
+  "avoid_for": ["technical", "corporate", "cold-minimal sites", "enterprise SaaS"]
 }
 ```
 

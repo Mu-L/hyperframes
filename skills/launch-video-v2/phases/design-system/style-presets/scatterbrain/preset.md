@@ -14,7 +14,9 @@
     { "kind": "bouncy_easing", "weight": 0.25 },
     { "kind": "low_saturation", "weight": 0.15 },
     { "kind": "minimal_decoration", "weight": 0.05 }
-  ]
+  ],
+  "best_for": ["creative agencies", "education", "indie tools", "workshop products", "warm friendly brands", "workshop / brainstorm decks"],
+  "avoid_for": ["cold corporate", "formal enterprise", "regulated industries", "high-polish premium"]
 }
 ```
 

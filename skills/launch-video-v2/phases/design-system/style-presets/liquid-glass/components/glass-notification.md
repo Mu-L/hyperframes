@@ -12,18 +12,19 @@
   .notif-panel {
     width: 520px;
     height: 118px;
-    --lg-blur: 0.22;
-    --lg-refraction: 0.6;
-    --lg-corner-radius: 36;
-    --lg-z-radius: 38;
-    --lg-specular: 0.2;
-    --lg-fresnel: 0.9;
-    --lg-edge-highlight: 0.1;
-    --lg-chrom-aberration: 0.05;
-    --lg-shadow-opacity: 0.35;
-    --lg-shadow-spread: 14;
-    --lg-shadow-offset-y: 4;
-    --lg-saturation: 0.25;
+    /* Notification archetype — see preset.md §B for tuning. */
+    --lg-blur: var(--lg-notif-blur);
+    --lg-refraction: var(--lg-notif-refraction);
+    --lg-corner-radius: var(--lg-notif-corner-radius);
+    --lg-z-radius: var(--lg-notif-z-radius);
+    --lg-specular: var(--lg-notif-specular);
+    --lg-fresnel: var(--lg-notif-fresnel);
+    --lg-edge-highlight: var(--lg-notif-edge-highlight);
+    --lg-chrom-aberration: var(--lg-notif-chrom-aberration);
+    --lg-saturation: var(--lg-notif-saturation);
+    --lg-shadow-opacity: var(--lg-notif-shadow-opacity);
+    --lg-shadow-spread: var(--lg-notif-shadow-spread);
+    --lg-shadow-offset-y: var(--lg-notif-shadow-offset-y);
   }
   .notif-card {
     width: 520px;

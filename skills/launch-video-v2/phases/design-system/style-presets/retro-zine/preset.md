@@ -15,7 +15,9 @@
     { "kind": "thick_solid_border", "weight": 0.25 },
     { "kind": "minimal_decoration", "weight": 0.15 },
     { "kind": "low_saturation", "weight": 0.1 }
-  ]
+  ],
+  "best_for": ["publishers", "music + arts brands", "small-batch / craft launches", "creator portfolios", "community decks"],
+  "avoid_for": ["polished digital", "hi-tech neon palettes", "consumer SaaS hype", "fintech / enterprise"]
 }
 ```
 

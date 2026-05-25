@@ -9,16 +9,17 @@
   .widget-card {
     width: 220px;
     height: 220px;
-    --lg-blur: 0.42;
-    --lg-refraction: 0.82;
-    --lg-corner-radius: 28;
-    --lg-z-radius: 46;
-    --lg-specular: 0.34;
-    --lg-fresnel: 1.25;
-    --lg-edge-highlight: 0.26;
-    --lg-chrom-aberration: 0.08;
+    /* Widget archetype — see preset.md §B for tuning. */
+    --lg-blur: var(--lg-widget-blur);
+    --lg-refraction: var(--lg-widget-refraction);
+    --lg-corner-radius: var(--lg-widget-corner-radius);
+    --lg-z-radius: var(--lg-widget-z-radius);
+    --lg-specular: var(--lg-widget-specular);
+    --lg-fresnel: var(--lg-widget-fresnel);
+    --lg-edge-highlight: var(--lg-widget-edge-highlight);
+    --lg-chrom-aberration: var(--lg-widget-chrom-aberration);
+    --lg-saturation: var(--lg-widget-saturation);
     --lg-shadow-opacity: 0;
-    --lg-saturation: 0.38;
   }
   .stat-text {
     width: 220px;

@@ -15,7 +15,9 @@
     { "kind": "thick_solid_border", "weight": 0.25 },
     { "kind": "low_saturation", "weight": 0.2 },
     { "kind": "bouncy_easing", "weight": 0.1 }
-  ]
+  ],
+  "best_for": ["educational content", "wellness", "community workshops", "creator portfolios", "friendly internal kickoffs"],
+  "avoid_for": ["enterprise compliance", "financial precision", "security", "authority-first contexts"]
 }
 ```
 

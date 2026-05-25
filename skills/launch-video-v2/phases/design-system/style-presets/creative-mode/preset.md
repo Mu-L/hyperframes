@@ -14,7 +14,9 @@
     { "kind": "thick_solid_border", "weight": 0.28 },
     { "kind": "condensed_display", "weight": 0.20 },
     { "kind": "high_sat_accent", "weight": 0.15 }
-  ]
+  ],
+  "best_for": ["creative agency sites", "design studios", "brand-led launches", "editorial-confident product stories"],
+  "avoid_for": ["institutional restraint", "quiet authority", "formal corporate", "regulated industries"]
 }
 ```
 

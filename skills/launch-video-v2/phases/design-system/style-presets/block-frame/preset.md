@@ -14,7 +14,9 @@
     { "kind": "thick_solid_border", "weight": 0.3 },
     { "kind": "high_sat_accent", "weight": 0.15 },
     { "kind": "minimal_decoration", "weight": 0.05 }
-  ]
+  ],
+  "best_for": ["indie SaaS launches", "agency credentials", "creative reviews", "brand redesigns", "design-led product talks"],
+  "avoid_for": ["regulated disclosures", "formal legal briefs", "institutional restraint", "enterprise compliance"]
 }
 ```
 

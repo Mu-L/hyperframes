@@ -16,7 +16,9 @@
     { "kind": "thick_solid_border",  "weight": 0.20 },
     { "kind": "low_saturation",      "weight": 0.20 },
     { "kind": "minimal_decoration",  "weight": 0.10 }
-  ]
+  ],
+  "best_for": ["startup pitches", "accelerator demos", "indie launches", "brand decks", "creator portfolios", "scrappy-confident registers"],
+  "avoid_for": ["ultra-polished enterprise", "very dark brand palettes (vs white canvas default)", "luxury / premium"]
 }
 ```
 

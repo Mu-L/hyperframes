@@ -16,7 +16,9 @@
     { "kind": "minimal_decoration", "weight": 0.15 },
     { "kind": "high_sat_accent", "weight": 0.2 },
     { "kind": "hairline_border", "weight": 0.1 }
-  ]
+  ],
+  "best_for": ["museum / cultural-institution decks", "art / architecture brands", "longform research", "heritage and craft brands", "manifestos"],
+  "avoid_for": ["digital-native polished", "playful pop", "soft consumer SaaS", "fintech / enterprise"]
 }
 ```
 

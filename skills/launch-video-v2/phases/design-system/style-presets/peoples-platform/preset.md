@@ -14,7 +14,9 @@
     { "kind": "thick_solid_border", "weight": 0.25 },
     { "kind": "high_sat_accent", "weight": 0.2 },
     { "kind": "condensed_display", "weight": 0.1 }
-  ]
+  ],
+  "best_for": ["manifestos", "founder visions", "mission statements", "civic / campaign decks", "design talks"],
+  "avoid_for": ["institutional restraint", "finance", "healthcare", "corporate compliance", "regulated disclosures"]
 }
 ```
 

@@ -15,7 +15,9 @@
     { "kind": "medium_solid_border", "weight": 0.2 },
     { "kind": "condensed_display", "weight": 0.25 },
     { "kind": "high_sat_accent", "weight": 0.15 }
-  ]
+  ],
+  "best_for": ["indie hardware", "music labels", "creative studios", "kawaii-tech", "magazine / zine launches", "analog product catalogues"],
+  "avoid_for": ["restrained corporate", "quiet monochrome palettes", "institutional finance", "regulated industries"]
 }
 ```
 

@@ -12,7 +12,9 @@
     { "kind": "shadow_zero_blur", "weight": 0.3 },
     { "kind": "serif_display", "weight": 0.25 },
     { "kind": "medium_solid_border", "weight": 0.15 }
-  ]
+  ],
+  "best_for": ["lifestyle brands", "creator portfolios", "DTC product launches", "beauty", "wellness", "playful tech demos"],
+  "avoid_for": ["institutional gravitas", "enterprise security", "edge-and-weight registers", "industrial / hardware"]
 }
 ```
 

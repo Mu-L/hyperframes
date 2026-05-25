@@ -115,11 +115,22 @@ category: visual-design
 
 ### 与预设规范的关系
 
-本项目级决策**显式覆盖** editorial / Swiss 预设 §H 的三条纪律（"canvas is the hero"、"accent ≤ 5%"、"primary 不做背景填充"）。这是**项目美学方向选择**——把 editorial 的印刷克制感往"品牌化 marketing 视频"方向偏移一档。
+本项目级 mesh 默认**覆盖以下 preset 的 §H 背景纪律**（"canvas is the hero"、"accent ≤ 5%"、"primary 不做背景填充"等），把它们的印刷克制感偏向品牌化 marketing 视频方向：
 
-> 若未来要回归严格 editorial：把 mesh 仅保留给 1-2 个高潮节拍、其他场景换回纯 canvas + hairline + 12-col 网格暗示、前景 accent ≤ 5%。**当前默认是放开的。**
+**走 mesh 默认（D 类，9 个）**：
+`editorial` · `capsule` · `soft-editorial` · `daisy-days` · `block-frame` · `playful` · `studio` · `neo-grid-bold` · `emerald-editorial`
 
-其他预设（neo-brutalism 等）若 §A 明确反对软光晕背景（brutalism 要硬边缘），plan 可个例覆盖回硬边缘背景；但**默认仍是 mesh**。
+> 命中以上 preset 时，plan agent **必须**在每个 scene 散文里写出 mesh 句式（见下方"Plan 引用样例"），不要因为 preset §H 写了 "canvas is the hero" 就退回纯 canvas。
+
+**不走 mesh 默认（保留 preset 自带背景设计）**：
+
+- 显式反对渐变 / 网格 / 软光晕：`long-table` · `neo-brutalism` · `editorial-forest` · `raw-grid`
+- 自带核心背景介质：`liquid-glass`（aurora 着色器）· `8-bit-orbit`（CRT 显象管）· `sakura-chroma`（半色调暖纸）· `scatterbrain`（cork / paper / warm 三变体）
+- Paper-grain 系（mesh 与 grain 美学冲突）：`pin-and-paper` · `retro-zine` · `peoples-platform` · `creative-mode` · `stencil-tablet`
+
+以上 14 个 preset 命中时，plan agent **保留 preset 自己的背景设计**——按 preset §H 写。
+
+> 若未来要回归严格 editorial：把 mesh 仅保留给 1-2 个高潮节拍、其他场景换回纯 canvas + hairline + 12-col 网格暗示、前景 accent ≤ 5%。**当前 D 类默认是放开的。**
 
 ### 例外场景
 
@@ -142,7 +153,7 @@ Plan 写："默认 brand-color mesh 背景（veil 重，brand-primary + secondar
 
 ## Plan 引用样例
 
-**标准场景（mesh 默认背景）**：
+**标准场景（mesh 默认背景，适用于 D 类全部 9 个 preset：editorial / capsule / soft-editorial / daisy-days / block-frame / playful / studio / neo-grid-bold / emerald-editorial）**：
 
 > "Background: brand-color mesh 默认（veil 重，brand-primary + secondary + accent 三 blob 作为隐约氛围，远观仍读作克制底盘）。Palette 60-30-10：60% canvas（mesh veil 之上仍读作 canvas）+ 30% hairline + chapter-label rule 分层（无 surface token）+ 10% accent 用在 hero 词与 CTA underline。`--ink` 纯黑保留作为印刷感墨色。"
 

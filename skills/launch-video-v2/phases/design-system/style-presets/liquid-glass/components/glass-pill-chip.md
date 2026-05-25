@@ -9,14 +9,15 @@
   .pill-chip {
     width: 130px;
     height: 36px;
-    --lg-blur: 0.42;
-    --lg-refraction: 0.82;
-    --lg-corner-radius: 40;
-    --lg-z-radius: 46;
-    --lg-specular: 0.34;
-    --lg-fresnel: 1.25;
-    --lg-edge-highlight: 0.26;
-    --lg-saturation: 0.38;
+    /* Widget archetype, pill-shape override on corner-radius. */
+    --lg-blur: var(--lg-widget-blur);
+    --lg-refraction: var(--lg-widget-refraction);
+    --lg-corner-radius: 40; /* override: pill shape, not the 28px widget default */
+    --lg-z-radius: var(--lg-widget-z-radius);
+    --lg-specular: var(--lg-widget-specular);
+    --lg-fresnel: var(--lg-widget-fresnel);
+    --lg-edge-highlight: var(--lg-widget-edge-highlight);
+    --lg-saturation: var(--lg-widget-saturation);
   }
   .pill-text {
     width: 130px;
