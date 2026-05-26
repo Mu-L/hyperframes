@@ -10,6 +10,7 @@ import { defineCommand } from "citty";
 import {
   AuthClient,
   isAuthError,
+  refreshTokens,
   tryResolveCredential,
   type ResolvedCredential,
   type UserInfo,
@@ -76,7 +77,12 @@ function handleResolveError(err: unknown, asJson: boolean): never {
 }
 
 async function verify(credential: ResolvedCredential): Promise<VerifiedStatus> {
-  const client = new AuthClient();
+  const client = new AuthClient({
+    onUnauthenticatedRefresh: async (rt) => {
+      const tokens = await refreshTokens(rt);
+      return tokens.access_token;
+    },
+  });
   try {
     const user = await client.getCurrentUser(credential);
     return { credential, user, apiError: null };

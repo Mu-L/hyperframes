@@ -1,37 +1,22 @@
 import { promises as fs } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { setupTempAuthEnv } from "./_test-utils.js";
 import { isAuthError } from "./errors.js";
 import { resolveCredential, tryResolveCredential } from "./resolver.js";
 import { writeStore } from "./store.js";
 
-async function makeTmpDir(): Promise<string> {
-  return fs.mkdtemp(join(tmpdir(), "hf-auth-resolve-"));
-}
-
-const ENV_KEYS = ["HEYGEN_API_KEY", "HYPERFRAMES_API_KEY", "HEYGEN_CONFIG_DIR"] as const;
-
 describe("auth/resolver", () => {
+  let fixture: Awaited<ReturnType<typeof setupTempAuthEnv>>;
   let dir: string;
-  const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
   beforeEach(async () => {
-    dir = await makeTmpDir();
-    for (const k of ENV_KEYS) {
-      saved[k] = process.env[k];
-      delete process.env[k];
-    }
-    process.env["HEYGEN_CONFIG_DIR"] = dir;
+    fixture = await setupTempAuthEnv("hf-auth-resolve-");
+    dir = fixture.dir;
   });
 
   afterEach(async () => {
-    for (const k of ENV_KEYS) {
-      const v = saved[k];
-      if (v === undefined) delete process.env[k];
-      else process.env[k] = v;
-    }
-    await fs.rm(dir, { recursive: true, force: true });
+    await fixture.restore();
   });
 
   it("prefers HEYGEN_API_KEY over everything else", async () => {

@@ -151,6 +151,79 @@ describe("auth/client", () => {
     throw new Error("expected rejection");
   });
 
+  it("getCurrentUser retries once on 401 when refresh hook is configured for OAuth", async () => {
+    let callCount = 0;
+    const observed: string[] = [];
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      callCount++;
+      const headers = (init?.headers as Record<string, string>) ?? {};
+      observed.push(headers["authorization"] ?? "");
+      if (callCount === 1) return new Response("expired", { status: 401 });
+      return new Response(JSON.stringify({ email: "a@b" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    const client = new AuthClient({
+      baseUrl: "https://api.test.example",
+      fetchImpl,
+      onUnauthenticatedRefresh: async () => "fresh_at",
+    });
+    const user = await client.getCurrentUser({
+      type: "oauth",
+      access_token: "stale_at",
+      refresh_token: "rt",
+      source: "file_json",
+      refreshable: true,
+    });
+    expect(user.email).toBe("a@b");
+    expect(observed[0]).toBe("Bearer stale_at");
+    expect(observed[1]).toBe("Bearer fresh_at");
+    expect(callCount).toBe(2);
+  });
+
+  it("getCurrentUser does NOT retry on 401 for api_key credentials", async () => {
+    let callCount = 0;
+    const fetchImpl = (async () => {
+      callCount++;
+      return new Response("invalid", { status: 401 });
+    }) as unknown as typeof fetch;
+    const client = new AuthClient({
+      baseUrl: "https://api.test.example",
+      fetchImpl,
+      onUnauthenticatedRefresh: async () => "fresh",
+    });
+    await expect(client.getCurrentUser(apiKeyCred())).rejects.toSatisfy((err) => {
+      return isAuthError(err) && (err as { code: string }).code === "UNAUTHENTICATED";
+    });
+    expect(callCount).toBe(1);
+  });
+
+  it("getCurrentUser surfaces 401 when refresh hook returns null (refresh failed)", async () => {
+    const fetchImpl = (async () =>
+      new Response("nope", { status: 401 })) as unknown as typeof fetch;
+    const { ErrRefreshFailed } = await import("./errors.js");
+    const client = new AuthClient({
+      baseUrl: "https://api.test.example",
+      fetchImpl,
+      onUnauthenticatedRefresh: async () => {
+        throw ErrRefreshFailed("invalid_grant");
+      },
+    });
+    await expect(
+      client.getCurrentUser({
+        type: "oauth",
+        access_token: "stale",
+        refresh_token: "rt",
+        source: "file_json",
+        refreshable: true,
+      }),
+    ).rejects.toSatisfy((err) => {
+      return isAuthError(err) && (err as { code: string }).code === "UNAUTHENTICATED";
+    });
+  });
+
   it("getCurrentUser sends the right header for oauth credentials", async () => {
     let captured: Record<string, string> = {};
     const fetchImpl = (async (_url: string, init?: RequestInit) => {

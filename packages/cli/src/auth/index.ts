@@ -15,3 +15,10 @@ export type { ResolvedCredential } from "./resolver.js";
 
 export { AuthClient } from "./client.js";
 export type { UserInfo } from "./client.js";
+
+export {
+  assertOAuthConfiguredOrExit,
+  refreshTokens,
+  revokeTokens,
+  startAuthorizationCodeFlow,
+} from "./oauth.js";

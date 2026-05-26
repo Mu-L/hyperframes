@@ -8,7 +8,14 @@
  */
 
 import { defineCommand } from "citty";
-import { clearOAuth, configDir, credentialPath, deleteStore } from "../../auth/index.js";
+import {
+  clearOAuth,
+  configDir,
+  credentialPath,
+  deleteStore,
+  readStore,
+  revokeTokens,
+} from "../../auth/index.js";
 import { c } from "../../ui/colors.js";
 
 export default defineCommand({
@@ -33,6 +40,10 @@ export default defineCommand({
       console.log("Aborted.");
       process.exit(1);
     }
+
+    // Best-effort revoke before we wipe local state. RFC 7009 says
+    // success is empty 200 — we ignore failure either way.
+    await bestEffortRevoke();
 
     if (keepApiKey) {
       await clearOAuth();
@@ -60,6 +71,26 @@ async function ensureConfirmed(yes: boolean, keepApiKey: boolean): Promise<boole
     ? `This will sign out of any active OAuth session on this machine (~/.heygen lives at ${configDir()}). Continue? [y/N] `
     : `This will sign out of HeyGen on this machine (~/.heygen lives at ${configDir()}). Continue? [y/N] `;
   return confirmInteractive(prompt);
+}
+
+// fallow-ignore-next-line complexity
+async function bestEffortRevoke(): Promise<void> {
+  try {
+    const { credentials, source } = await readStore();
+    if (source === "absent" || !credentials.oauth) return;
+    const { access_token, refresh_token } = credentials.oauth;
+    // Revoke the refresh_token first (per RFC 7009, that typically
+    // invalidates all derived access tokens), but also revoke the
+    // access_token explicitly to cover servers that don't cascade.
+    if (refresh_token) {
+      await revokeTokens(refresh_token, { token_type_hint: "refresh_token" });
+    }
+    if (access_token) {
+      await revokeTokens(access_token, { token_type_hint: "access_token" });
+    }
+  } catch {
+    /* Best-effort — never block local wipe on a network/IdP issue. */
+  }
 }
 
 async function confirmInteractive(prompt: string): Promise<boolean> {

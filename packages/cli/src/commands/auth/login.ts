@@ -1,36 +1,34 @@
 /**
- * `hyperframes auth login` — write a HeyGen credential to
- * `~/.heygen/credentials`.
+ * `hyperframes auth login` — sign in to HeyGen.
  *
- * This first cut ships the `--api-key` path only. Running `auth login`
- * without `--api-key` prints a pointer at the OAuth PKCE work that
- * lands in a follow-up.
+ * Default: OAuth 2.0 + PKCE via a loopback callback. The CLI opens
+ * the user's browser, captures the authorization code on an
+ * ephemeral 127.0.0.1 port, exchanges it for tokens, and persists
+ * them to `~/.heygen/credentials`.
  *
- * Inputs:
- *   - `--api-key=<value>` — take the value inline (note: may leak into
- *     shell history).
- *   - `--api-key` with stdin piped — read one line from stdin.
- *   - `--api-key` interactive — `@clack/prompts` password input.
+ * `--api-key`: opts into the legacy long-lived API-key path.
  *
  * Write semantics:
- *   - Read the existing credential file first; preserve any `oauth`
- *     block so saving a new API key doesn't wipe an OAuth session.
- *   - Validate the new key looks like a HeyGen API key (`hg_…`) before
- *     touching disk. Garbage never lands in the store.
- *   - Verify via `GET /v3/users/me`. On 401, roll back to the previous
- *     state — leaving a confirmed-invalid key on disk would silently
- *     break subsequent commands. On other errors (network blip, 5xx)
- *     keep the new key so retries don't require re-typing.
+ *   - Snapshot existing credentials first; merge so a new
+ *     OAuth session preserves an existing API key (and vice versa).
+ *   - Validate the new API key looks like `hg_…` before writing.
+ *   - Verify via `GET /v3/users/me`. On 401, roll back. Network/5xx
+ *     errors keep the new credential in place per the transient-blip
+ *     rationale.
  */
 
 import { defineCommand } from "citty";
 import { stdin as input } from "node:process";
 import {
   AuthClient,
+  assertOAuthConfiguredOrExit,
   deleteStore,
   isAuthError,
   isHeaderSafe,
   readStore,
+  refreshTokens,
+  startAuthorizationCodeFlow,
+  tryResolveCredential,
   writeStore,
   type Credentials,
 } from "../../auth/index.js";
@@ -42,54 +40,90 @@ const STDIN_TIMEOUT_MS = 30_000;
 export default defineCommand({
   meta: {
     name: "login",
-    description: "Sign in to HeyGen by saving an API key (OAuth coming soon)",
+    description: "Sign in to HeyGen (OAuth by default; --api-key for long-lived keys)",
   },
   args: {
     "api-key": {
       type: "string",
-      description:
-        "API key value. Pass `--api-key` with no value to read from stdin or interactively.",
+      description: "API key value, or pass `--api-key` with no value to read from stdin / prompt.",
     },
   },
   // fallow-ignore-next-line complexity
   async run({ args }) {
     const inlineKey = args["api-key"];
-    if (inlineKey === undefined) {
-      printOAuthPlaceholder();
-      process.exit(1);
+    if (inlineKey !== undefined) {
+      await runApiKeyLogin(inlineKey);
+      return;
     }
-
-    const key = await collectApiKey(inlineKey);
-    if (!key) {
-      console.error(c.error("No API key provided."));
-      process.exit(1);
-    }
-    if (!API_KEY_SHAPE.test(key) || !isHeaderSafe(key)) {
-      console.error(
-        c.error("That doesn't look like a HeyGen API key — expected `hg_…` (URL-safe chars only)."),
-      );
-      process.exit(1);
-    }
-
-    const previous = await snapshotStore();
-    const next: Credentials = { ...previous, api_key: key };
-    await writeStore(next);
-
-    const verifyOk = await verifyAndReport(key);
-    if (!verifyOk) {
-      await rollback(previous);
-      process.exit(1);
-    }
+    await runOAuthLogin();
   },
 });
 
-function printOAuthPlaceholder(): void {
-  console.error(
-    `${c.warn("Browser-based login isn't ready yet.")} ` +
-      `Re-run with ${c.accent("--api-key")} to save an API key, ` +
-      `or pipe one in:\n` +
-      `  ${c.accent("echo $HEYGEN_API_KEY | hyperframes auth login --api-key")}`,
-  );
+// fallow-ignore-next-line complexity
+async function runOAuthLogin(): Promise<void> {
+  assertOAuthConfiguredOrExit();
+
+  try {
+    await startAuthorizationCodeFlow();
+  } catch (err) {
+    console.error(c.error(`Sign-in failed: ${(err as Error).message}`));
+    process.exit(1);
+  }
+
+  await reportIdentity();
+}
+
+// fallow-ignore-next-line complexity
+async function reportIdentity(): Promise<void> {
+  const credential = await tryResolveCredential();
+  if (!credential) {
+    console.error(c.warn("Sign-in completed but no credential was persisted."));
+    process.exit(1);
+  }
+  // Wire the refresh hook here too — a freshly-minted token shouldn't
+  // need it, but a fast IdP-side rotation (or a misconfigured short
+  // TTL) shouldn't punish the user with a hard failure when the
+  // refresh_token would have transparently fixed it.
+  const client = new AuthClient({
+    onUnauthenticatedRefresh: async (rt) => (await refreshTokens(rt)).access_token,
+  });
+  try {
+    const user = await client.getCurrentUser(credential);
+    const identity = user.email ?? user.username ?? "(unknown user)";
+    console.log(c.success(`✓ Signed in as ${identity}.`));
+  } catch (err) {
+    // Don't roll back — the OAuth tokens are valid on disk; this is a
+    // transient verify-side issue. Surface as a warning so the user
+    // can re-check with `auth status` rather than re-running login.
+    console.error(
+      c.warn(`Signed in. Identity check failed (transient): ${(err as Error).message}`),
+    );
+  }
+}
+
+// fallow-ignore-next-line complexity
+async function runApiKeyLogin(inlineKey: string): Promise<void> {
+  const key = await collectApiKey(inlineKey);
+  if (!key) {
+    console.error(c.error("No API key provided."));
+    process.exit(1);
+  }
+  if (!API_KEY_SHAPE.test(key) || !isHeaderSafe(key)) {
+    console.error(
+      c.error("That doesn't look like a HeyGen API key — expected `hg_…` (URL-safe chars only)."),
+    );
+    process.exit(1);
+  }
+
+  const previous = await snapshotStore();
+  const next: Credentials = { ...previous, api_key: key };
+  await writeStore(next);
+
+  const verifyOk = await verifyAndReport(key);
+  if (!verifyOk) {
+    await rollback(previous);
+    process.exit(1);
+  }
 }
 
 async function snapshotStore(): Promise<Credentials> {
@@ -97,8 +131,6 @@ async function snapshotStore(): Promise<Credentials> {
     const { credentials } = await readStore();
     return { ...credentials };
   } catch {
-    // Existing file is unreadable; treat as empty so the new key still
-    // lands cleanly. The previous bytes are lost either way.
     return {};
   }
 }
@@ -120,11 +152,6 @@ async function rollback(previous: Credentials): Promise<void> {
   }
 }
 
-/**
- * Returns `true` on successful verify, `false` on a 401. Other errors
- * (network blip, 5xx) bubble out — the caller leaves the new key in
- * place since the issue is transient.
- */
 // fallow-ignore-next-line complexity
 async function verifyAndReport(key: string): Promise<boolean> {
   const client = new AuthClient();
@@ -146,12 +173,6 @@ async function verifyAndReport(key: string): Promise<boolean> {
   }
 }
 
-/**
- * Citty's arg type for `--api-key` is `string`, so:
- *   - `--api-key=hg_x` → `"hg_x"`
- *   - `--api-key ""` / `--api-key` with no value → `""` → fall through
- *     to stdin/prompt.
- */
 async function collectApiKey(inline: string): Promise<string> {
   if (inline.length > 0) return inline.trim();
   if (!input.isTTY) {
@@ -160,11 +181,6 @@ async function collectApiKey(inline: string): Promise<string> {
   return await promptForKey();
 }
 
-/**
- * Read all of stdin, or bail with an empty string after `timeoutMs`.
- * Hanging forever when stdin is non-TTY but unattached (Docker `-d`,
- * some CI shells) is worse than a clear timeout.
- */
 async function readAllWithTimeout(
   stream: NodeJS.ReadableStream,
   timeoutMs: number,

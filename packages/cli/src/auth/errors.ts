@@ -3,7 +3,13 @@
  * can map specific failures to friendly UX without parsing messages.
  */
 
-export type AuthErrorCode = "NOT_CONFIGURED" | "INVALID_STORE" | "API_ERROR" | "UNAUTHENTICATED";
+export type AuthErrorCode =
+  | "NOT_CONFIGURED"
+  | "INVALID_STORE"
+  | "API_ERROR"
+  | "UNAUTHENTICATED"
+  | "OAUTH_NOT_CONFIGURED"
+  | "REFRESH_FAILED";
 
 export class AuthError extends Error {
   readonly code: AuthErrorCode;
@@ -40,6 +46,20 @@ export const ErrUnauthenticated = (detail?: string) =>
 
 export const ErrApi = (status: number, detail: string) =>
   new AuthError("API_ERROR", `HeyGen API error (${status}): ${detail}`);
+
+export const ErrOAuthNotConfigured = () =>
+  new AuthError(
+    "OAUTH_NOT_CONFIGURED",
+    "OAuth client is not configured",
+    "Set HYPERFRAMES_OAUTH_CLIENT_ID, or run `hyperframes auth login --api-key`.",
+  );
+
+export const ErrRefreshFailed = (detail?: string) =>
+  new AuthError(
+    "REFRESH_FAILED",
+    detail ? `Failed to refresh OAuth tokens: ${detail}` : "Failed to refresh OAuth tokens",
+    "Run `hyperframes auth login` to re-authenticate.",
+  );
 
 export function isAuthError(err: unknown): err is AuthError {
   return err instanceof AuthError;
