@@ -75,6 +75,37 @@ async function seekTo(page: import("puppeteer-core").Page, time: number): Promis
 }
 
 /**
+ * Race a media element's `loadedmetadata`/`error` event against a deadline,
+ * whichever comes first. Already-ready elements resolve immediately.
+ *
+ * This is the same wiring as the inline copy inside `auditClipDurations`'s
+ * `page.evaluate()` below — duplicated, not imported, because Puppeteer
+ * serializes that closure's source and re-runs it in an isolated browser
+ * realm with no access to this module's scope. Kept here (duck-typed on
+ * `EventTarget`-shaped objects, not `HTMLMediaElement`) so the actual
+ * race/cleanup logic has a real, deterministic unit test — Node's built-in
+ * `EventTarget` satisfies the same shape without a browser or DOM library.
+ * If you change one copy, change both.
+ */
+export function raceMediaReady(
+  el: EventTarget & { duration: number },
+  deadlineMs: number,
+): Promise<void> {
+  if (Number.isFinite(el.duration) && el.duration > 0) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const onReady = () => {
+      el.removeEventListener("loadedmetadata", onReady);
+      el.removeEventListener("error", onReady);
+      clearTimeout(timer);
+      resolve();
+    };
+    el.addEventListener("loadedmetadata", onReady, { once: true });
+    el.addEventListener("error", onReady, { once: true });
+    const timer = setTimeout(onReady, Math.max(0, deadlineMs - Date.now()));
+  });
+}
+
+/**
  * Flag `<video>`/`<audio>` clips whose source is meaningfully shorter than their
  * `data-duration` slot (the slot gets silently shortened in renders). Runs in
  * the live page to read each element's intrinsic `.duration`, which static lint
@@ -83,8 +114,46 @@ async function seekTo(page: import("puppeteer-core").Page, time: number): Promis
 async function auditClipDurations(
   page: import("puppeteer-core").Page,
   analyzeClipMediaFit: typeof import("@hyperframes/engine").analyzeClipMediaFit,
+  extraWaitMs: number,
 ): Promise<ConsoleEntry[]> {
-  const clips = await page.evaluate(() => {
+  // fallow-ignore-next-line complexity
+  const clips = await page.evaluate(async (maxWaitMs: number) => {
+    const nodes = Array.from(
+      document.querySelectorAll("video[data-duration], audio[data-duration]"),
+    ) as HTMLMediaElement[];
+
+    // The caller's page-settle sleep is a flat, unconditional wait shared with
+    // other audits — it isn't aware of how long any given media element takes
+    // to load metadata. A slow-loading audio file (large narration WAV, remote
+    // source) can still be mid-fetch when that sleep elapses, which read as
+    // el.duration === NaN and was misreported as "could not read the duration"
+    // even though the render pipeline (which properly awaits media readiness)
+    // handles the same file fine. Give still-loading elements one more real
+    // chance via loadedmetadata before giving up, instead of a single fixed-time
+    // snapshot. Elements that already have a duration resolve immediately, so
+    // this adds no latency in the common case.
+    const deadline = Date.now() + maxWaitMs;
+    await Promise.all(
+      nodes.map((el) => {
+        if (Number.isFinite(el.duration) && el.duration > 0) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          // fallow-ignore-next-line code-duplication
+          const cleanup = () => {
+            el.removeEventListener("loadedmetadata", onReady);
+            el.removeEventListener("error", onReady);
+            clearTimeout(timer);
+          };
+          const onReady = () => {
+            cleanup();
+            resolve();
+          };
+          el.addEventListener("loadedmetadata", onReady, { once: true });
+          el.addEventListener("error", onReady, { once: true });
+          const timer = setTimeout(onReady, Math.max(0, deadline - Date.now()));
+        });
+      }),
+    );
+
     const rows: Array<{
       id: string;
       kind: string;
@@ -93,10 +162,9 @@ async function auditClipDurations(
       duration: number;
       loop: boolean;
     }> = [];
-    document.querySelectorAll("video[data-duration], audio[data-duration]").forEach((node) => {
-      const el = node as HTMLMediaElement;
+    for (const el of nodes) {
       const slot = parseFloat(el.getAttribute("data-duration") ?? "");
-      if (!(slot > 0)) return;
+      if (!(slot > 0)) continue;
       rows.push({
         id: el.id || el.getAttribute("src") || `(${el.tagName.toLowerCase()})`,
         kind: el.tagName === "AUDIO" ? "Audio" : "Video",
@@ -105,9 +173,9 @@ async function auditClipDurations(
         duration: el.duration,
         loop: el.loop || el.getAttribute("data-loop") === "true",
       });
-    });
+    }
     return rows;
-  });
+  }, extraWaitMs);
 
   const warnings: ConsoleEntry[] = [];
   const unreadable: string[] = [];
@@ -288,7 +356,7 @@ async function validateInBrowser(
     await page.goto(server.url, { waitUntil: "domcontentloaded", timeout: 10000 });
     await new Promise((r) => setTimeout(r, opts.timeout ?? 3000));
 
-    for (const w of await auditClipDurations(page, analyzeClipMediaFit)) {
+    for (const w of await auditClipDurations(page, analyzeClipMediaFit, opts.timeout ?? 3000)) {
       warnings.push(w);
     }
 

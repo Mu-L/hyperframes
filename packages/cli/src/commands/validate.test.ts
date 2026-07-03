@@ -1,6 +1,59 @@
 import { describe, expect, it } from "vitest";
-import { extractCompositionErrorsFromLint, shouldIgnoreRequestFailure } from "./validate.js";
+import {
+  extractCompositionErrorsFromLint,
+  raceMediaReady,
+  shouldIgnoreRequestFailure,
+} from "./validate.js";
 import type { ProjectLintResult } from "../utils/lintProject.js";
+
+// Regression for the validate audio-duration-probe timeout: a slow-loading
+// media element's duration was snapshotted once, at a fixed point in time,
+// and any element still mid-load was permanently misreported as unreadable.
+// raceMediaReady is the extracted wiring auditClipDurations now uses to wait
+// for `loadedmetadata` up to a deadline instead. Node's built-in EventTarget
+// satisfies the same duck-typed shape as a real HTMLMediaElement here, so
+// this is a real test of the race/cleanup logic, not a browser mock.
+describe("raceMediaReady", () => {
+  class FakeMediaElement extends EventTarget {
+    duration = NaN;
+  }
+
+  it("resolves immediately when duration is already available", async () => {
+    const el = new FakeMediaElement();
+    el.duration = 12.5;
+    const start = Date.now();
+    await raceMediaReady(el, Date.now() + 5000);
+    expect(Date.now() - start).toBeLessThan(50);
+  });
+
+  it("resolves as soon as loadedmetadata fires, before the deadline", async () => {
+    const el = new FakeMediaElement();
+    const promise = raceMediaReady(el, Date.now() + 5000);
+    setTimeout(() => {
+      el.duration = 8;
+      el.dispatchEvent(new Event("loadedmetadata"));
+    }, 20);
+    const start = Date.now();
+    await promise;
+    expect(Date.now() - start).toBeLessThan(200);
+  });
+
+  it("resolves on error without hanging until the deadline", async () => {
+    const el = new FakeMediaElement();
+    const promise = raceMediaReady(el, Date.now() + 5000);
+    setTimeout(() => el.dispatchEvent(new Event("error")), 20);
+    const start = Date.now();
+    await promise;
+    expect(Date.now() - start).toBeLessThan(200);
+  });
+
+  it("falls back to the deadline when no event ever fires", async () => {
+    const el = new FakeMediaElement();
+    const start = Date.now();
+    await raceMediaReady(el, Date.now() + 50);
+    expect(Date.now() - start).toBeGreaterThanOrEqual(40);
+  });
+});
 
 describe("shouldIgnoreRequestFailure", () => {
   it("ignores aborted media preload requests", () => {
