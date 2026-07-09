@@ -754,20 +754,35 @@ class IframePreviewAdapter implements PreviewAdapter {
 
     const doc = this.iframe.contentDocument;
     if (doc) {
-      applyOverrideSet({ document: doc, wrapped: false, stamped: "" }, comp.getOverrides());
+      try {
+        applyOverrideSet({ document: doc, wrapped: false, stamped: "" }, comp.getOverrides());
+      } catch (err) {
+        // Don't let a bad initial snapshot prevent the ongoing subscription
+        // below from attaching — future patches should still mirror even if
+        // this composition's current overrides couldn't be applied.
+        console.warn("[hyperframes] attachSync: initial override sync failed:", err);
+      }
     }
 
-    const unsubscribe = comp.on("patch", ({ patches }) => {
+    const rawUnsubscribe = comp.on("patch", ({ patches }) => {
       const liveDoc = this.iframe.contentDocument;
       if (!liveDoc) return;
       applyPatchesToDocument(
         { document: liveDoc, wrapped: false, stamped: "" },
-        patches.filter((p) => p.path !== "/script/gsap"),
+        // "Never mirror script-tag rewrites" is the documented contract, not
+        // just today's one known path — startsWith so a future script kind
+        // (e.g. "/script/label") is covered by the same intent, not just an
+        // exact string this filter happens to know about today.
+        patches.filter((p) => !p.path.startsWith("/script/")),
       );
     });
 
-    this._syncDetach = unsubscribe;
-    return unsubscribe;
+    const detach = (): void => {
+      rawUnsubscribe();
+      if (this._syncDetach === detach) this._syncDetach = null;
+    };
+    this._syncDetach = detach;
+    return detach;
   }
 }
 

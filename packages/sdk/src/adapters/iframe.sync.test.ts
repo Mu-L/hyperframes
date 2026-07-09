@@ -219,6 +219,21 @@ window.__timelines = { t: tl };</script>
     expect(liveRoot.style.getPropertyValue("--accent")).toBe("#0f0");
   });
 
+  it("mirrors declareVariable/removeVariable onto the live document's schema attribute", async () => {
+    const iframe = mountIframe(BASE_HTML); // no data-composition-variables at all
+    const comp = await openComposition(BASE_HTML);
+    const adapter = createIframePreviewAdapter(iframe);
+    adapter.attachSync(comp);
+
+    comp.declareVariable({ id: "accent", type: "string", label: "Accent", default: "#fff" });
+
+    const liveDocEl = iframe.contentDocument!.documentElement;
+    expect(liveDocEl.getAttribute("data-composition-variables")).toContain("accent");
+
+    comp.removeVariable("accent");
+    expect(liveDocEl.getAttribute("data-composition-variables")).not.toContain("accent");
+  });
+
   it("mirrors setTiming onto the live element's data-start/data-end attributes", async () => {
     const iframe = mountIframe(BASE_HTML);
     const comp = await openComposition(BASE_HTML);
