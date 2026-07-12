@@ -1,4 +1,4 @@
-import { isSafeVersion } from "./updateCheck.js";
+import { isSafeVersion } from "./safeVersion.js";
 
 // Matches `hyperframes@<semver>` as a whole token inside a script string. The
 // version class mirrors isSafeVersion's semver shape; capturing group 1 is the
