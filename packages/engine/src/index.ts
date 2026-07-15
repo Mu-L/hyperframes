@@ -83,6 +83,11 @@ export {
   augmentProtocolTimeoutError,
   isProtocolTimeoutError,
 } from "./services/protocolTimeoutErrorHint.js";
+export {
+  augmentPageNavigationTimeoutError,
+  isPageNavigationTimeoutError,
+  type NavigationTimeoutHintContext,
+} from "./services/pageNavigationTimeoutErrorHint.js";
 
 // ── Frame capture pipeline ──────────────────────────────────────────────────────
 export {
