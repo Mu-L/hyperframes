@@ -240,11 +240,11 @@ describe("runCaptureStreamingStage", () => {
     process.env.HF_DE_STALL_MS = "50";
     const { runCaptureStreamingStage } = await import("./captureStreamingStage.js");
     const cfg = { forceScreenshot: false, ffmpegStreamingTimeout: 3_600_000 };
+    const baseInput = createInput(cfg);
     const input = {
-      ...createInput(cfg),
+      ...baseInput,
       totalFrames: 100,
-      workerCount: 2,
-      forceParallelStream: true,
+      plan: { ...baseInput.plan, workerCount: 2, forceParallelStream: true },
     };
 
     let caught: unknown;
@@ -274,11 +274,11 @@ describe("runCaptureStreamingStage", () => {
     const controller = new AbortController();
     const { runCaptureStreamingStage } = await import("./captureStreamingStage.js");
     const cfg = { forceScreenshot: false, ffmpegStreamingTimeout: 3_600_000 };
+    const baseInput = createInput(cfg);
     const input = {
-      ...createInput(cfg),
+      ...baseInput,
       totalFrames: 100,
-      workerCount: 2,
-      forceParallelStream: true,
+      plan: { ...baseInput.plan, workerCount: 2, forceParallelStream: true },
       abortSignal: controller.signal,
     };
 
