@@ -241,7 +241,10 @@ function formatResidualSuffix(residualRmsDb: number | null, error: string | unde
   return `, residualRMS: ${residualRmsDb.toFixed(2)} dBFS`;
 }
 
-function parseArgs(argv: string[]): CliOptions {
+// Exported for unit testing (pinning `--exclude-tags` comma-parsing so the
+// values baked into `Dockerfile.test` and `packages/producer/package.json`
+// scripts keep matching the parser's contract).
+export function parseArgs(argv: string[]): CliOptions {
   const testNames: string[] = [];
   const excludeTags: string[] = [];
   let update = false;
