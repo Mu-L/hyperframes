@@ -12,6 +12,7 @@ import { buildIssueUrl, HYPERFRAMES_REPO_URL } from "../utils/feedbackIssue.js";
 import { VERSION } from "../version.js";
 import { c } from "../ui/colors.js";
 import { parseFeedbackRating } from "../utils/feedbackRating.js";
+import { lintFeedbackComment } from "../utils/feedbackLint.js";
 
 export const examples: Example[] = [
   ["Submit render feedback", 'hyperframes feedback --rating 8 --comment "fast but font missing"'],
@@ -155,6 +156,13 @@ export default defineCommand({
 
     const comment = normalizeComment(args.comment);
     const doctorSummary = await getDoctorSummary();
+
+    // Soft-warn (never blocks) when the comment for a non-clean report is
+    // missing the mandated reproduction-packet markers. Prints before the
+    // submission ack so the reporter sees the nudge while their run is fresh.
+    for (const warning of lintFeedbackComment({ rating, comment })) {
+      console.log(c.warn(`⚠ ${warning.message}`));
+    }
 
     // The standalone command runs separately from `render`, so it has no real
     // elapsed time to report. Omit it rather than recording a fake duration.
