@@ -47,10 +47,21 @@ import { resolveCompositionDuration } from "@hyperframes/parsers/composition-dur
 import { createRuntimeStartTimeResolver } from "./startResolver";
 import { createClipTree } from "./clipTree";
 import { loadExternalCompositions, loadInlineTemplateCompositions } from "./compositionLoader";
-import { applyCaptionOverrides } from "./captionOverrides";
+import {
+  applyCaptionOverrides,
+  applyFetchedCaptionOverrides,
+  fetchCaptionOverrides,
+} from "./captionOverrides";
+import {
+  SCENE_NO_SWAP_ATTR,
+  SCENE_PART_ATTR,
+  SCENE_PARTS_META,
+  type SceneParts,
+} from "../sceneParts";
 import { applyPositionEdits, installPositionEditsSeekReapply } from "./positionEdits";
-import { applyVariableBindings } from "./applyVariableBindings";
+import { applyVariableBindings, unproxiedMediaSrc } from "./applyVariableBindings";
 import { createColorGradingRuntime, type RuntimeColorGradingApi } from "./colorGrading";
+import { COLOR_GRADING_AUTHORED_OPACITY_ATTR } from "../colorGrading";
 import { initVfx, paintVfx } from "./vfx";
 import { TransportClock } from "./clock";
 import { WebAudioTransport } from "./webAudioTransport";
@@ -202,10 +213,41 @@ function createSettledTracker(
   };
 }
 
+function readSceneParts(doc: Document): SceneParts | null {
+  const content = doc.querySelector(`meta[name="${SCENE_PARTS_META}"]`)?.getAttribute("content");
+  if (!content) return null;
+  try {
+    return JSON.parse(content) as SceneParts;
+  } catch {
+    return null;
+  }
+}
+
+// A media element's attributes and content, less the grading capture stamped on it at parse time.
+const authoredShape = (el: Element): string =>
+  JSON.stringify([
+    Array.from(el.attributes, (a) => [a.name, a.value]).filter(
+      ([name]) => name !== COLOR_GRADING_AUTHORED_OPACITY_ATTR,
+    ),
+    el.innerHTML,
+  ]);
+
+// URL attributes a scene swap checks besides src, poster and srcset, by tag.
+const MEDIA_URL_ATTRS = new Map([
+  ["image", ["href", "xlink:href"]],
+  ["object", ["data"]],
+]);
+
 const SLOW_IDLE_HEARTBEAT_MS = 1000;
 
 export function initSandboxRuntimeModular(): void {
   const state = createRuntimeState();
+  // Each video and audio as written, captured before the runtime writes to it; a swap keeps only these.
+  const authoredMedia = new WeakMap<Element, string>();
+  if (readSceneParts(document)) {
+    for (const el of document.querySelectorAll("video, audio"))
+      authoredMedia.set(el, authoredShape(el));
+  }
   // Runtime-data handlers may replace the timeline object they mutate. Keep the
   // reconciliation callback late-bound because the reporter is installed before
   // the timeline resolver/binder is declared below. Delivery cannot complete
@@ -2039,11 +2081,14 @@ export function initSandboxRuntimeModular(): void {
     window.addEventListener("unhandledrejection", runtimeUnhandledRejectionListener);
   };
 
+  const assetNodesWithDiagnostics = new WeakSet<Element>();
   const installAssetFailureDiagnostics = () => {
     const assetNodes = Array.from(
       document.querySelectorAll("img, video, audio, source, link[rel='stylesheet']"),
     );
     for (const node of assetNodes) {
+      if (assetNodesWithDiagnostics.has(node)) continue;
+      assetNodesWithDiagnostics.add(node);
       const onError = () => {
         if (!isElementNode(node)) {
           return;
@@ -2258,15 +2303,27 @@ export function initSandboxRuntimeModular(): void {
     if (isMediaElement(target)) reportWebAudioRoute(target);
   };
 
+  const unbindMedia = (mediaEl: HTMLMediaElement) => {
+    mediaEl.removeEventListener("loadedmetadata", scheduleMetadataDurationHydration);
+    mediaEl.removeEventListener("durationchange", scheduleMetadataDurationHydration);
+    mediaEl.removeEventListener("loadedmetadata", onMediaLoadedMetadataForProxy);
+    mediaEl.removeEventListener("loadedmetadata", onMediaLoadedMetadataForRoute);
+    mediaEl.removeEventListener("error", onMediaErrorForProxy);
+    metadataBoundMedia.delete(mediaEl);
+  };
   const unbindMediaMetadataListeners = () => {
+    for (const mediaEl of metadataBoundMedia) unbindMedia(mediaEl);
+  };
+  // A swapped-out scene's media is detached but still buffering: stop it and drop its sources.
+  const releaseDetachedMedia = () => {
     for (const mediaEl of metadataBoundMedia) {
-      mediaEl.removeEventListener("loadedmetadata", scheduleMetadataDurationHydration);
-      mediaEl.removeEventListener("durationchange", scheduleMetadataDurationHydration);
-      mediaEl.removeEventListener("loadedmetadata", onMediaLoadedMetadataForProxy);
-      mediaEl.removeEventListener("loadedmetadata", onMediaLoadedMetadataForRoute);
-      mediaEl.removeEventListener("error", onMediaErrorForProxy);
+      if (mediaEl.isConnected) continue;
+      unbindMedia(mediaEl);
+      mediaEl.pause();
+      for (const source of mediaEl.querySelectorAll("source")) source.remove();
+      mediaEl.removeAttribute("src");
+      mediaEl.load();
     }
-    metadataBoundMedia.clear();
   };
 
   const bindMediaMetadataListeners = () => {
@@ -3007,6 +3064,18 @@ export function initSandboxRuntimeModular(): void {
     (err) => swallow("runtime.init.buildReady", err),
   );
 
+  // Passes that must see scene DOM, which arrives after init: when scenes mount, or when one is
+  // swapped. Resolves when caption overrides have landed.
+  const settleSceneDom = (): Promise<void> => {
+    bindMediaMetadataListeners();
+    installAssetFailureDiagnostics();
+    const captionsApplied = applyCaptionOverrides();
+    // Per-instance scoped values: data-var-* / --{id} bindings inside scenes. Idempotent.
+    applyVariableBindings(document);
+    // An unregistered vfx chain paints nothing and logs nothing, so re-scan the new DOM.
+    initVfx(document.body, state.canonicalFps);
+    return captionsApplied;
+  };
   if (!externalCompositionsReady) {
     const compositionLoaderParams = {
       injectedStyles: state.injectedCompStyles,
@@ -3032,22 +3101,201 @@ export function initSandboxRuntimeModular(): void {
       .then(() => loadInlineTemplateCompositions(compositionLoaderParams))
       .finally(() => {
         externalCompositionsReady = true;
-        bindMediaMetadataListeners();
-        installAssetFailureDiagnostics();
-        applyCaptionOverrides();
-        // Runtime-loaded sub-compositions (and their per-instance scoped
-        // values) don't exist at the init-time binding pass — re-apply so
-        // data-var-* / --{id} bindings inside them resolve. Idempotent.
-        applyVariableBindings(document);
-        // A vfx host inside a sub-composition enters the DOM only now, so the
-        // init-time pass below never saw it. Re-scan before readiness is
-        // published: an unregistered chain paints nothing and logs nothing.
-        initVfx(document.body, state.canonicalFps);
+        void settleSceneDom();
         maybePublishRenderReady();
       });
   } else {
     // No external/inline compositions to load — apply caption overrides immediately
-    applyCaptionOverrides();
+    void applyCaptionOverrides();
+  }
+
+  const sceneUrls = (parts: Element[]): Set<string> => {
+    const urls = new Set<string>();
+    const addCssUrls = (css: string | null) => {
+      for (const m of (css ?? "").matchAll(/url\(\s*(['"]?)(.*?)\1\s*\)|@import\s+(['"])(.*?)\3/gi))
+        urls.add(m[2] ?? m[4]!);
+      for (const set of (css ?? "").matchAll(/image-set\((?:[^()]|\([^()]*\))*\)/gi))
+        for (const m of set[0].matchAll(/(['"])(.*?)\1/g)) urls.add(m[2]!);
+    };
+    for (const part of parts) {
+      if (part.tagName === "STYLE") addCssUrls(part.textContent);
+      if (part.tagName === "STYLE" || part.tagName === "SCRIPT") continue;
+      for (const el of [part, ...part.querySelectorAll("*")]) {
+        const attrs = MEDIA_URL_ATTRS.get(el.localName) ?? [];
+        const values = [
+          unproxiedMediaSrc(el),
+          ...[...attrs, "poster", "srcset"].map((a) => el.getAttribute(a)),
+        ];
+        for (const value of values) if (value) urls.add(value);
+        addCssUrls(el.getAttribute("style"));
+      }
+    }
+    return urls;
+  };
+  let sceneSwapGeneration = 0;
+  // A video or audio the edit left as written keeps playing: the old element takes its copy's place.
+  const keepUnchangedMedia = (oldHost: Element, host: Element) => {
+    const byShape = new Map<string, Element[]>();
+    for (const el of oldHost.querySelectorAll("video, audio")) {
+      const shape = authoredMedia.get(el);
+      // Its grading canvas sits beside it in the old scene and cannot follow it.
+      if (!shape || colorGradingRuntime?.isGraded(el)) continue;
+      byShape.set(shape, [...(byShape.get(shape) ?? []), el]);
+    }
+    for (const el of host.querySelectorAll("video, audio")) {
+      const kept = byShape.get(authoredShape(el))?.shift();
+      if (kept) el.replaceWith(kept);
+    }
+  };
+  // Swap edited scenes in place from a rebuilt preview document. Refuses before changing anything unless
+  // the documents differ only inside existing scenes; a later failure is left to the caller's reload.
+  const swapScenes = async (html: string): Promise<void> => {
+    const generation = sceneSwapGeneration;
+    const next = new DOMParser().parseFromString(html, "text/html");
+    const liveParts = readSceneParts(document);
+    const nextParts = readSceneParts(next);
+    if (!liveParts || !nextParts) throw new Error("no scene manifest");
+    if (liveParts.shared !== nextParts.shared)
+      throw new Error("the film changed outside its scenes");
+    const names = Object.keys(nextParts.scenes);
+    if (
+      names.length !== Object.keys(liveParts.scenes).length ||
+      names.some((name) => !(name in liveParts.scenes))
+    ) {
+      throw new Error("scenes were added or removed");
+    }
+    const changed = names.filter((name) => nextParts.scenes[name] !== liveParts.scenes[name]);
+    if (changed.length === 0) throw new Error("no scene changed");
+    const swaps = changed.map((name) => {
+      const partsIn = (doc: Document) =>
+        Array.from(doc.querySelectorAll(`[${SCENE_PART_ATTR}="${CSS.escape(name)}"]`));
+      const isHost = (el: Element) => el.tagName !== "STYLE" && el.tagName !== "SCRIPT";
+      const oldParts = partsIn(document);
+      const newParts = partsIn(next);
+      const oldHosts = oldParts.filter(isHost);
+      const newHosts = newParts.filter(isHost);
+      const oldHost = oldHosts[0];
+      const newHost = newHosts[0];
+      if (!oldHost || !newHost || oldHosts.length > 1 || newHosts.length > 1) {
+        throw new Error(`scene ${name} cannot be swapped: it has no single host`);
+      }
+      // A duplicated scene's script also registers under its shared original id.
+      if (oldHost.hasAttribute("data-hf-original-composition-id")) {
+        throw new Error(`scene ${name} cannot be swapped: it is a duplicated instance`);
+      }
+      const refusal =
+        oldHost.getAttribute(SCENE_NO_SWAP_ATTR) ?? newHost.getAttribute(SCENE_NO_SWAP_ATTR);
+      if (refusal !== null) throw new Error(`scene ${name} cannot be swapped: ${refusal}`);
+      const loaded = sceneUrls(oldParts);
+      if ([...sceneUrls(newParts)].some((url) => !loaded.has(url))) {
+        throw new Error(
+          `scene ${name} cannot be swapped: it loads media this scene has not loaded`,
+        );
+      }
+      const styleCount = (parts: Element[]) => parts.filter((el) => el.tagName === "STYLE").length;
+      if (styleCount(oldParts) !== styleCount(newParts)) {
+        throw new Error(`scene ${name} cannot be swapped: its styles moved`);
+      }
+      return { oldParts, newParts, oldHost, newHost };
+    });
+    // Fetched before the first write, so a stalled or failed request leaves the page as it was.
+    const captionOverrides = swaps.some(({ newHost }) => newHost.querySelector(".caption-group"))
+      ? await fetchCaptionOverrides()
+      : [];
+    if (state.tornDown) throw new Error("the preview was torn down during the swap");
+    if (generation !== sceneSwapGeneration) {
+      throw new Error("the preview changed while this swap waited");
+    }
+    sceneSwapGeneration += 1;
+    const timelines = (window.__timelines ??= {}) as Record<
+      string,
+      RuntimeTimelineLike | undefined
+    >;
+    const root = state.capturedTimeline as
+      | (RuntimeTimelineLike & { remove?: (child: unknown) => unknown })
+      | null;
+    // Overrides re-dim every word they touch, so only the swapped scenes' captions get them.
+    const captionHosts: Element[] = [];
+    const swappedHosts: Element[] = [];
+    for (const { oldParts, newParts, oldHost, newHost } of swaps) {
+      for (const el of [oldHost, ...oldHost.querySelectorAll("[data-composition-id]")]) {
+        const id = el.getAttribute("data-composition-id");
+        const previous = id ? timelines[id] : undefined;
+        if (!id || !previous) continue;
+        const old = previous as { revert?: () => void; kill?: () => void };
+        if (old.revert) old.revert();
+        else previous.totalTime?.(0, true);
+        root?.remove?.(previous);
+        // revert() has already killed it; a second kill() fires onInterrupt again.
+        if (!old.revert) old.kill?.();
+        delete timelines[id];
+      }
+      // Each new style takes its own old one's place: same-named @keyframes resolve by order.
+      const newStyles = newParts.filter((el) => el.tagName === "STYLE");
+      oldParts
+        .filter((el) => el.tagName === "STYLE")
+        .forEach((el, i) => el.replaceWith(document.importNode(newStyles[i]!, true)));
+      for (const el of oldParts) if (el !== oldHost) el.remove();
+      const host = document.importNode(newHost, true);
+      keepUnchangedMedia(oldHost, host);
+      oldHost.replaceWith(host);
+      swappedHosts.push(host);
+      if (host.querySelector(".caption-group")) captionHosts.push(host);
+      for (const el of newParts) {
+        if (el.tagName !== "SCRIPT") continue;
+        // An imported <script> never runs; a created one does.
+        const script = document.createElement("script");
+        for (const attr of Array.from(el.attributes)) script.setAttribute(attr.name, attr.value);
+        script.textContent = el.textContent;
+        document.body.appendChild(script);
+      }
+      for (const el of host.querySelectorAll("video, audio"))
+        if (!authoredMedia.has(el)) authoredMedia.set(el, authoredShape(el));
+    }
+    document
+      .querySelector(`meta[name="${SCENE_PARTS_META}"]`)
+      ?.setAttribute("content", JSON.stringify(nextParts));
+    // Boot's order: bindings settle each src before media binding proxies and loads it.
+    for (const host of swappedHosts) applyVariableBindings(document, host);
+    bindMediaMetadataListeners();
+    // Rewound before the rewrite, so each rewritten tween re-reads its start from the reset word.
+    const rewindCaptionTimelines = () => {
+      for (const host of captionHosts) {
+        for (const el of [host, ...host.querySelectorAll("[data-composition-id]")]) {
+          const id = el.getAttribute("data-composition-id");
+          if (id) timelines[id]?.totalTime?.(0, true);
+        }
+      }
+    };
+    initVfx(document.body, state.canonicalFps);
+    applyFetchedCaptionOverrides(captionOverrides, captionHosts, rewindCaptionTimelines);
+    releaseDetachedMedia();
+    childrenBound = false;
+    bindRootTimelineIfAvailable();
+    // Probed before the scene was nested, so the new media found no volume envelope.
+    for (const host of swappedHosts) {
+      for (const el of host.querySelectorAll<HTMLMediaElement>("video, audio")) {
+        volumeKeyframeCache.delete(el);
+        probeAndCacheVolumeKeyframes(el);
+      }
+    }
+    const duration = getSafeTimelineDurationSeconds(state.capturedTimeline, 0);
+    if (duration > 0) clock.setDuration(duration);
+    // Adapters drive only the elements they found at discover time; the new scene's are new.
+    runAdapters("discover", state.currentTime);
+    // The rebind above skips these when the root timeline object did not change.
+    applyPositionEdits(document);
+    // Redraw the current frame as a seek does, forcing a render at an unchanged time.
+    transport.seek(state.currentTime, { keepPlaying: true });
+    syncTimedElementVisibility(state.currentTime);
+    postTimeline();
+  };
+  // Only a preview served with a scene manifest can swap; elsewhere the caller reloads directly.
+  if (readSceneParts(document)) {
+    window.__hfSwapScenes = swapScenes;
+    registerRuntimeCleanup(() => {
+      delete window.__hfSwapScenes;
+    });
   }
 
   const picker = createPickerModule({
