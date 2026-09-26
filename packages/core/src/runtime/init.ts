@@ -4366,7 +4366,7 @@ export function initSandboxRuntimeModular(): void {
             buffer,
             compStart,
             mediaStart,
-            clock.now(),
+            () => clock.now(),
             vol,
             gen,
             state.playbackRate,

@@ -4311,6 +4311,9 @@ describe("initSandboxRuntimeModular", () => {
       resume() {
         return Promise.resolve();
       }
+      suspend() {
+        return Promise.resolve();
+      }
       createGain() {
         return { gain: { value: 1 }, connect() {}, disconnect() {} };
       }
