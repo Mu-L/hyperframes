@@ -200,6 +200,33 @@ describe("parked transport loop", () => {
     expect(states.at(-1)).toMatchObject({ isPlaying: false, ended: true, frame: 149 });
   });
 
+  // The render stops at the root's declared length too; a longer animation is cut off.
+  it.each([
+    ["3 s, shorter than its animation", "3", 90],
+    ["under a second", "0.2", 6],
+    ["one 60 fps frame", String(1 / 60), 1],
+  ])("stops a film declared %s at that length, and says so", (_label, declared, frame) => {
+    const seconds = Number(declared);
+    let nowMs = 1000;
+    vi.spyOn(performance, "now").mockImplementation(() => nowMs);
+    document.body.innerHTML = `<div id="root" data-composition-id="main" data-root="true" data-start="0" data-duration="${declared}"></div>`;
+    window.__timelines = { main: createMockTimeline(5) };
+    initSandboxRuntimeModular();
+    quiesce();
+
+    window.__player!.play();
+    for (let step = 0; step < 400 && window.__player!.isPlaying(); step += 1) {
+      nowMs += 10;
+      raf.step(10);
+    }
+
+    const states = posted.filter((m) => m["type"] === "state");
+    expect(states.at(-1)).toMatchObject({ isPlaying: false, ended: true, frame });
+    expect(window.__player!.getDuration()).toBeCloseTo(seconds, 9);
+    const timeline = posted.filter((m) => m["type"] === "timeline").at(-1);
+    expect(timeline?.["durationSeconds"]).toBeCloseTo(seconds, 9);
+  });
+
   it("keeps asking for animation frames while playing", () => {
     mount();
     initSandboxRuntimeModular();
@@ -330,6 +357,8 @@ describe("parked transport loop", () => {
 
   it("delivers media metadata that arrives after the loop parked", async () => {
     mount(`<video id="v" data-start="0" src="a.mp4"></video>`);
+    // A declared length would hold the film at 5 s; only an inferred one can grow.
+    document.getElementById("root")!.removeAttribute("data-duration");
     initSandboxRuntimeModular();
     quiesce();
 
@@ -513,6 +542,7 @@ describe("parked transport loop", () => {
 
   it("delivers an adapter duration that grows while parked, with no DOM mutation and no event", () => {
     mount();
+    document.getElementById("root")!.removeAttribute("data-duration");
     initSandboxRuntimeModular();
     quiesce();
     const before = window.__player!.getDuration();
