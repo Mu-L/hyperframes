@@ -1,4 +1,5 @@
 // @vitest-environment node
+// fallow-ignore-file code-duplication
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -109,7 +110,7 @@ describe("history routes", () => {
     });
   });
 
-  it("name the step the engine takes when it steps past an entry whose file moved on", async () => {
+  it("name the person's own newest change, not an agent's later write", async () => {
     const { projectDir, history, call } = await demoProject();
     const write = (text: string) => writeFileSync(join(projectDir, "index.html"), text);
     const agent = { kind: "agent" as const, name: "Agent" };
@@ -126,7 +127,7 @@ describe("history routes", () => {
     write("D");
     await window.close();
     await history.flush();
-    expect((await (await call("")).json()).back).toMatchObject({ label: "Agent turn" });
+    expect((await (await call("")).json()).back).toMatchObject({ label: "Dragged Title" });
   });
 
   it("label an undo's writes with Studio's write token, so their echo reads as Studio's own", async () => {
