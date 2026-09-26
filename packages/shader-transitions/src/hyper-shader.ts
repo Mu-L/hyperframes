@@ -143,7 +143,6 @@ interface SnapshotCacheEntry {
 interface SceneStyleState {
   scene: HTMLElement | null;
   opacity: string;
-  visibility: string;
   pointerEvents: string;
 }
 
@@ -990,12 +989,16 @@ export function init(config: HyperShaderConfig): GsapTimeline {
     }
   };
 
-  const setScenePlaybackState = (scene: HTMLElement, visible: boolean, opacity: string): void => {
+  const setSceneLayer = (scene: HTMLElement, shown: boolean, opacity: string): void => {
     rememberScenePointerEvents(scene);
     markRuntimeSceneMutation();
     scene.style.opacity = opacity;
+    scene.style.pointerEvents = shown ? (scenePointerEvents.get(scene) ?? "") : "none";
+  };
+
+  const setScenePlaybackState = (scene: HTMLElement, visible: boolean, opacity: string): void => {
+    setSceneLayer(scene, visible, opacity);
     scene.style.visibility = visible ? "visible" : "hidden";
-    scene.style.pointerEvents = visible ? (scenePointerEvents.get(scene) ?? "") : "none";
   };
 
   const paintScenePairState = (
@@ -1012,7 +1015,7 @@ export function init(config: HyperShaderConfig): GsapTimeline {
       } else if (sceneId === toId) {
         setScenePlaybackState(scene, true, toOpacity);
       } else {
-        setScenePlaybackState(scene, false, "0");
+        setSceneLayer(scene, false, "0");
       }
     });
   };
@@ -1107,8 +1110,8 @@ export function init(config: HyperShaderConfig): GsapTimeline {
     scenes.forEach((sceneId, index) => {
       const scene = document.getElementById(sceneId);
       if (!scene) return;
-      const visible = index === visibleIndex;
-      setScenePlaybackState(scene, visible, visible ? "1" : "0");
+      const settled = index === visibleIndex;
+      setSceneLayer(scene, settled, settled ? "1" : "0");
     });
   };
 
@@ -1365,6 +1368,7 @@ export function init(config: HyperShaderConfig): GsapTimeline {
 
     tl.call(
       () => {
+        if (prewarming) return;
         suppressSceneMutationTracking(() => {
           const fromScene = document.getElementById(fromId);
           const toScene = document.getElementById(toId);
@@ -1380,7 +1384,7 @@ export function init(config: HyperShaderConfig): GsapTimeline {
             return;
           }
           canvasEl.style.display =
-            !prewarming && cache?.ready && !cache.dirty && cache.textureReady ? "block" : "none";
+            cache?.ready && !cache.dirty && cache.textureReady ? "block" : "none";
           paintScenePairState(fromId, toId, "1", "1");
         });
       },
@@ -2011,7 +2015,6 @@ export function init(config: HyperShaderConfig): GsapTimeline {
         return {
           scene,
           opacity: scene?.style.opacity ?? "",
-          visibility: scene?.style.visibility ?? "",
           pointerEvents: scene?.style.pointerEvents ?? "",
         };
       });
@@ -2157,18 +2160,21 @@ export function init(config: HyperShaderConfig): GsapTimeline {
         if (shouldResume && resumeTime !== hydratedTextureTime) {
           await ensurePlaybackTextureWindow(resumeTime);
         }
-        prewarming = false;
         state.active = false;
         state.transitionIndex = -1;
         canvasEl.style.display = "none";
-        suppressSceneMutationTracking(() => {
-          setActualTimelineTime(restoreTimelineTime, false);
-        });
+        try {
+          suppressSceneMutationTracking(() => {
+            setActualTimelineTime(restoreTimelineTime, false);
+          });
+        } catch (e) {
+          console.warn("[HyperShader] A timeline callback failed while restoring the playhead:", e);
+        }
+        prewarming = false;
         publicTimelineTime = restoreTimelineTime;
         for (const item of originalSceneStyles) {
           if (!item.scene) continue;
           item.scene.style.opacity = item.opacity;
-          item.scene.style.visibility = item.visibility;
           item.scene.style.pointerEvents = item.pointerEvents;
         }
         tickShader();
