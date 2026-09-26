@@ -2822,6 +2822,8 @@ export function initSandboxRuntimeModular(): void {
       source: "hf-preview",
       type: "state",
       frame,
+      currentTime: state.currentTime || 0,
+      ended: clock.reachedEnd(),
       isPlaying: state.isPlaying,
       muted: state.bridgeMuted,
       playbackRate: state.playbackRate,

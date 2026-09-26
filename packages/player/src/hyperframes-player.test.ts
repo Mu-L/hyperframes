@@ -1354,6 +1354,7 @@ describe("HyperframesPlayer loop end-state handling", () => {
   type PlayerInternal = HTMLElement & {
     iframe: HTMLIFrameElement;
     play: () => void;
+    pause: () => void;
     seek: (timeInSeconds: number) => void;
     loop: boolean;
     _duration: number;
@@ -1434,6 +1435,123 @@ describe("HyperframesPlayer loop end-state handling", () => {
     expect(play).not.toHaveBeenCalled();
     expect(ended).toHaveBeenCalledTimes(1);
     expect(player._paused).toBe(true);
+  });
+
+  function postState(frame: number, isPlaying: boolean, currentTime?: number, ended = false) {
+    player._onMessage(
+      new MessageEvent("message", {
+        source: frameWindow,
+        data: { source: "hf-preview", type: "state", frame, currentTime, ended, isPlaying },
+      }),
+    );
+  }
+
+  // 4.97 s at 30 fps is 149.1 frames: the runtime posts frame 149 both at its end and
+  // on a pause just before it. Its `ended` flag tells the two apart, and the player's
+  // length can sit a float step past the runtime's end (0.48 + 4.49 here).
+  it("ends a film when the runtime reports its end, even a float step short of the length", () => {
+    const ended = vi.fn();
+    player.addEventListener("ended", ended);
+    player.loop = false;
+    player._duration = 0.48 + 4.49;
+    player._paused = false;
+
+    postState(149, true, 4.96);
+    expect(ended).not.toHaveBeenCalled();
+
+    postState(149, false, 4.97, true);
+    expect(ended).toHaveBeenCalledTimes(1);
+    expect(player._currentTime).toBe(player._duration);
+  });
+
+  it("loops a film whose length falls between two frames", () => {
+    const seek = vi.spyOn(player, "seek");
+    player.loop = true;
+    player._duration = 4.97;
+    player._paused = false;
+
+    postState(149, false, 4.97, true);
+
+    expect(seek).toHaveBeenCalledWith(0);
+    expect(player._paused).toBe(false);
+  });
+
+  it("keeps a pause the runtime marks as not ended, even at exactly the length", () => {
+    const ended = vi.fn();
+    const seek = vi.spyOn(player, "seek");
+    player.addEventListener("ended", ended);
+    player._duration = 4.97;
+
+    for (const loop of [false, true]) {
+      player.loop = loop;
+      player._paused = false;
+      postState(149, false, 4.97, false);
+
+      expect(ended).not.toHaveBeenCalled();
+      expect(seek).not.toHaveBeenCalled();
+      expect(player._paused).toBe(true);
+    }
+  });
+
+  it("ends or loops a film the runtime plays past the length without ever reporting its end", () => {
+    const ended = vi.fn();
+    const seek = vi.spyOn(player, "seek");
+    player.addEventListener("ended", ended);
+    player._duration = 1;
+
+    player.loop = true;
+    player._paused = false;
+    postState(31, true, 1.02, false);
+    expect(seek).toHaveBeenCalledWith(0);
+
+    player.loop = false;
+    player._paused = false;
+    postState(31, true, 1.02, false);
+    expect(ended).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a film paused at its end alone when the runtime keeps reporting the end", () => {
+    const ended = vi.fn();
+    const seek = vi.spyOn(player, "seek");
+    player.addEventListener("ended", ended);
+    player.loop = true;
+    player._duration = 4.97;
+    player._paused = true;
+
+    postState(149, false, 4.97, true);
+
+    expect(ended).not.toHaveBeenCalled();
+    expect(seek).not.toHaveBeenCalled();
+    expect(player._paused).toBe(true);
+  });
+
+  it("keeps a pause from inside the composition on the last frame", () => {
+    const ended = vi.fn();
+    const seek = vi.spyOn(player, "seek");
+    player.addEventListener("ended", ended);
+    player.loop = true;
+    player._duration = 4.97;
+    player._paused = false;
+
+    postState(149, false, 4.95);
+
+    expect(ended).not.toHaveBeenCalled();
+    expect(seek).not.toHaveBeenCalled();
+    expect(player._paused).toBe(true);
+    expect(player._currentTime).toBe(4.95);
+  });
+
+  it("resumes where a host pause on the last frame left it", () => {
+    player._duration = 4.97;
+    player._paused = false;
+    player.pause();
+    postState(149, false, 4.95);
+    const seek = vi.spyOn(player, "seek");
+
+    player.play();
+
+    expect(seek).not.toHaveBeenCalled();
+    expect(player._currentTime).toBe(4.95);
   });
 
   it("play() seeks to 0 and replays when called after the video has ended", () => {
