@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readdir, rm, rmdir } from "node:fs/promises";
+import { readdir, rm, rmdir, writeFile } from "node:fs/promises";
 import {
   type Dirent,
   type Stats,
@@ -15,7 +15,10 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { replaceFileAtomically } from "../helpers/atomicFile.js";
 import {
+  bytesOverwrittenBy,
   DELETED_VERSION,
+  fileContentVersion,
+  forgetOverwrittenBytes,
   hashOfVersion,
   hashVersion,
   recordFileWriteReceipt,
@@ -439,7 +442,7 @@ class Engine {
     { coalesceKey, idleMs, overwrote = {} }: ClaimOptions,
   ): Promise<{ id: string } | null> {
     await this.sweep();
-    const taken = this.takeClaimed(who, paths, overwrote);
+    const taken = await this.takeClaimed(who, paths, overwrote);
     if (!taken.length) return this.claimNothing(coalesceKey);
     const held = this.heldFor(coalesceKey, taken);
     if (!held) await this.commitClaim();
@@ -493,11 +496,11 @@ class Engine {
   }
 
   /** Takes `paths`' uncommitted changes from others, cut at what `who` overwrote. */
-  takeClaimed(
+  async takeClaimed(
     who: HistoryWho,
     paths: readonly string[],
     overwrote: Readonly<Record<string, string>>,
-  ): HistoryFileChange[] {
+  ): Promise<HistoryFileChange[]> {
     const wanted = new Set(paths.map((path) => this.logPath(path)));
     const at = new Map(
       Object.entries(overwrote).map(([path, version]) => [
@@ -507,15 +510,48 @@ class Engine {
     );
     const others = this.windows.filter((open) => !sameWho(open.who, who));
     const groups = this.outside ? [this.outside, ...others] : others;
-    const taken: HistoryFileChange[] = [];
-    for (const group of groups) {
-      for (const change of [...group.changes.values()]) {
-        if (!wanted.has(change.path)) continue;
-        const claimed = this.cutOut(group, change, at.get(change.path));
-        if (claimed) taken.push(claimed);
-      }
+    const hits = groups.flatMap((group) =>
+      [...group.changes.values()]
+        .filter((change) => wanted.has(change.path))
+        .map((change) => ({ group, change })),
+    );
+    const cuts: Array<string | undefined> = [];
+    const walked = hits.map(() => new Set<string>());
+    for (const [i, { change }] of hits.entries()) {
+      const told = at.get(change.path);
+      cuts.push((await this.overwrittenBy(change, told, walked[i]!)) ?? told);
     }
-    return taken;
+    hits.forEach(({ change }, i) =>
+      forgetOverwrittenBytes(
+        join(this.dir, change.path),
+        new Set([...walked[i]!].map(hashVersion)),
+      ),
+    );
+    return hits.flatMap(({ group, change }, i) => this.cutOut(group, change, cuts[i]) ?? []);
+  }
+
+  /** Walks the server's writes back from `change.after` to the bytes they replaced, stored so an undo restores them. */
+  async overwrittenBy(change: HistoryFileChange, told: string | undefined, seen: Set<string>) {
+    const absPath = join(this.dir, change.path);
+    let bytes: string | Uint8Array | undefined;
+    for (let hash = change.after; hash; ) {
+      // A loop (X, Y, back to X) says nothing about what was there first: the client's word stands.
+      if (seen.has(hash)) return undefined;
+      seen.add(hash);
+      const replaced = bytesOverwrittenBy(absPath, hashVersion(hash));
+      if (replaced === undefined) break;
+      bytes = replaced;
+      hash = hashOfVersion(fileContentVersion(replaced))!;
+      if (hash === change.before || hash === told) return hash;
+    }
+    if (bytes === undefined) return undefined;
+    const staged = join(this.home, `overwrote-${randomUUID()}`);
+    await writeFile(staged, bytes);
+    try {
+      return await this.blobs.put(staged);
+    } finally {
+      await rm(staged, { force: true });
+    }
   }
 
   cutOut(group: Group, change: HistoryFileChange, cut: string | undefined) {
@@ -615,9 +651,21 @@ class Engine {
     let folded = false;
     while (this.historyBytes() > budget && foldOldest(this.log)) {
       folded = true;
-      await this.blobs.prune(referencedHashes(this.log, this.manifest()));
+      await this.blobs.prune(
+        new Set([...referencedHashes(this.log, this.manifest()), ...this.pendingHashes()]),
+      );
     }
     if (folded) writeLog(this.logFile, this.log);
+  }
+
+  /** Hashes only pending changes point at yet, such as a claim's stored cut. */
+  pendingHashes(): string[] {
+    const changes = [...this.windows, this.outside, this.claimed?.group].flatMap((group) => [
+      ...(group?.changes.values() ?? []),
+    ]);
+    return changes
+      .flatMap((change) => [change.before, change.after])
+      .filter((hash): hash is string => hash !== null);
   }
 
   /** Before an operation or a window: every write is filed and every pending change committed, in write order. */

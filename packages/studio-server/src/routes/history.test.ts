@@ -130,6 +130,66 @@ describe("history routes", () => {
     expect((await (await call("")).json()).back).toMatchObject({ label: "Dragged Title" });
   });
 
+  it.each([
+    ["a save that landed between Studio's read and its write", ["save B", "patch"], "B"],
+    ["its start, when Studio wrote the edit as two patches", ["patch", "patch"], "A"],
+    ["a save before Studio's patch and its whole-file follow-up", ["save B", "patch", "put"], "B"],
+    [
+      "its start, when Studio's patches came back to earlier bytes",
+      ["patch", "patch", "unpatch"],
+      "A",
+    ],
+  ])("undo Studio's element edit back to %s", async (_, steps, undoneTo) => {
+    const { projectDir, history } = await demoProject();
+    const index = join(projectDir, "index.html");
+    const saved = (text: string) => `<h1 id="title">${text}</h1>`;
+    writeFileSync(index, saved("A"));
+    await history.flush();
+    const api = createStudioApi({
+      listProjects: () => [],
+      resolveProject: (id: string) => (id === "demo" ? { id, dir: projectDir } : null),
+      history: () => history,
+    } as unknown as StudioApiAdapter);
+    const post = (path: string, body: object) =>
+      api.request(`/projects/demo${path}`, { method: "POST", body: JSON.stringify(body) });
+
+    let zIndex = 1;
+    for (const step of steps) {
+      if (step === "save B") writeFileSync(index, saved("B"));
+      const current = readFileSync(index, "utf-8");
+      const written =
+        step === "patch" || step === "unpatch"
+          ? await post("/file-mutations/patch-element/index.html", {
+              target: { id: "title" },
+              operations: [
+                {
+                  type: "inline-style",
+                  property: "z-index",
+                  value: String(step === "patch" ? ++zIndex : --zIndex),
+                },
+              ],
+            })
+          : step === "put"
+            ? await api.request("/projects/demo/files/index.html", {
+                method: "PUT",
+                headers: { "If-Match": fileContentVersion(current) },
+                body: `${current}<style>@font-face{}</style>`,
+              })
+            : null;
+      expect(written?.status ?? 200).toBe(200);
+    }
+    await post("/history/claim", {
+      label: "Moved Title",
+      paths: ["index.html"],
+      overwrote: { "index.html": fileContentVersion(saved("A")) },
+    });
+    expect(await (await post("/history/step", { direction: "back" })).json()).toMatchObject({
+      ok: true,
+      entry: { label: "Undid: Moved Title" },
+    });
+    expect(readFileSync(index, "utf-8")).toBe(saved(undoneTo));
+  });
+
   it("label an undo's writes with Studio's write token, so their echo reads as Studio's own", async () => {
     const { projectDir, call } = await demoProject();
     writeFileSync(join(projectDir, "index.html"), "B");
