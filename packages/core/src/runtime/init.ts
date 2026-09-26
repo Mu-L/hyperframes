@@ -60,6 +60,7 @@ import {
   reportWebAudioMediaRoute,
 } from "./webAudioRoute.js";
 import {
+  audioGroupOf,
   ensureAudioGroupInertStyle,
   HF_AUDIO_GROUP_TAG,
   isMemberGroupHidden,
@@ -2427,19 +2428,30 @@ export function initSandboxRuntimeModular(): void {
   // export time, per B4); this just keeps the live WebAudio group bus in
   // sync with a `data-hidden` toggle made mid-playback.
   const groupHiddenLast = new WeakMap<Element, boolean>();
-  /** Set when a `data-hidden` mutation could have touched a BUS, so the sweep
-   *  below is not a whole-document query on every visibility pass. Same
-   *  dirty-flag shape as `hiddenAudioDirty` right above it. */
-  let groupMuteDirty = true;
-  const syncAudioGroupMute = () => {
-    if (!groupMuteDirty) return;
-    groupMuteDirty = false;
+  const groupHasUncapturedMember = (groupId: string, currentTime: number): boolean => {
+    for (const el of document.querySelectorAll("audio[data-start]")) {
+      if (!isMediaElement(el) || audioGroupOf(el) !== groupId) continue;
+      if (webAudio.routesElement(el) || isSilencedByHidden(el)) continue;
+      const start = resolveAbsoluteMediaStartSeconds(el);
+      const duration = parseStrictFiniteTimingNumber(el.dataset.duration);
+      const end = duration != null && duration > 0 ? start + duration : Infinity;
+      if (Number.isFinite(start) && currentTime < end) return true;
+    }
+    return false;
+  };
+  /** The bus gain owns a group's mute; true when an unmute leaves a member still to play outside the graph. */
+  const syncAudioGroupMute = (currentTime: number): boolean => {
+    let needsCapture = false;
     for (const groupEl of document.querySelectorAll(HF_AUDIO_GROUP_TAG)) {
       const hidden = groupEl.hasAttribute("data-hidden");
-      if (groupHiddenLast.get(groupEl) === hidden) continue;
+      const last = groupHiddenLast.get(groupEl);
+      if (last === hidden) continue;
       groupHiddenLast.set(groupEl, hidden);
-      if (groupEl.id) webAudio.setGroupMuted(groupEl.id, hidden);
+      if (!groupEl.id) continue;
+      webAudio.setGroupMuted(groupEl.id, hidden);
+      if (last && !hidden && groupHasUncapturedMember(groupEl.id, currentTime)) needsCapture = true;
     }
+    return needsCapture;
   };
 
   const applyTimedElementVisibility = (
@@ -2461,7 +2473,6 @@ export function initSandboxRuntimeModular(): void {
         if (!dataHiddenDisplayNodes.has(rawNode)) {
           dataHiddenDisplayNodes.add(rawNode);
           if (nodeAffectsAudio(rawNode)) hiddenAudioDirty = true;
-          groupMuteDirty = true;
         }
         hideByDisplay(rawNode, false);
         if (isVideoElement(rawNode) || isImageElement(rawNode)) {
@@ -2474,7 +2485,6 @@ export function initSandboxRuntimeModular(): void {
         restoreDisplay(rawNode);
         dataHiddenDisplayNodes.delete(rawNode);
         if (nodeAffectsAudio(rawNode)) hiddenAudioDirty = true;
-        groupMuteDirty = true;
       }
 
       let isVisibleNow = isRuntimeElementVisibleAt(rawNode, {
@@ -2526,7 +2536,8 @@ export function initSandboxRuntimeModular(): void {
     // this reschedule exists to re-run are what change the active set, so
     // firing it otherwise was an audible stop-and-restart across the whole mix
     // that rebuilt an identical set.
-    if (hiddenAudioDirty && clock.isPlaying()) {
+    const groupNeedsCapture = syncAudioGroupMute(currentTime);
+    if ((hiddenAudioDirty || groupNeedsCapture) && clock.isPlaying()) {
       webAudio.stopAll();
       for (const el of document.querySelectorAll("audio[data-start]")) {
         if (isMediaElement(el) && isSilencedByHidden(el)) el.volume = 0;
@@ -2534,7 +2545,6 @@ export function initSandboxRuntimeModular(): void {
       scheduleWebAudioForActiveClips();
     }
     hiddenAudioDirty = false;
-    syncAudioGroupMute();
   };
 
   // Scope 2 of 3 (see `withTimingResolver`). One resolver for the whole

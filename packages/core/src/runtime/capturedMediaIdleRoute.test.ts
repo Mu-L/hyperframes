@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { initSandboxRuntimeModular } from "./init";
 import type { RuntimeTimelineLike } from "./types";
+import { WebAudioTransport } from "./webAudioTransport";
 
 type GraphNode = {
   kind: string;
@@ -214,5 +215,158 @@ describe("an element Web Audio captured, outside a play", () => {
 
     expect(vo.muted).toBe(false);
     expect(audible(sources.get(vo))).toBe(true);
+  });
+});
+
+/** On its idle route an element's own volume applies; inside a play only the graph's gains do. */
+function heard(el: HTMLMediaElement): boolean {
+  const source = sources.get(el);
+  if (!source) return !el.muted && el.volume > 0;
+  if (source.outputs.has(destination)) return el.volume > 0;
+  return audible(source);
+}
+
+describe("an audio group muted or unmuted while playing", () => {
+  const groupHtml =
+    `<hf-audio-group id="music"></hf-audio-group>` +
+    `<audio id="bed" data-start="0" data-duration="10" data-audio-group="music" src="/assets/music.mp3"></audio>`;
+
+  it("silences its members at once", async () => {
+    mount(groupHtml);
+    const bed = document.getElementById("bed") as HTMLAudioElement;
+    initSandboxRuntimeModular();
+    await flush();
+    window.__player?.play();
+    await flush();
+    expect(heard(bed)).toBe(true);
+
+    document.getElementById("music")!.setAttribute("data-hidden", "");
+    stepFrames(1);
+    await flush();
+
+    expect(heard(bed)).toBe(false);
+  });
+
+  it("brings its members back through the group", async () => {
+    mount(groupHtml);
+    const bed = document.getElementById("bed") as HTMLAudioElement;
+    const group = document.getElementById("music")!;
+    initSandboxRuntimeModular();
+    await flush();
+    window.__player?.play();
+    await flush();
+    window.__player?.pause();
+    group.setAttribute("data-hidden", "");
+    stepFrames(1);
+    window.__player?.play();
+    await flush();
+    expect(heard(bed)).toBe(false);
+
+    group.removeAttribute("data-hidden");
+    stepFrames(1);
+    await flush();
+
+    expect(heard(bed)).toBe(true);
+    expect(sources.get(bed)!.outputs.has(destination)).toBe(false);
+  });
+
+  it("does not restart the rest of the mix to mute it", async () => {
+    mount(
+      groupHtml + `<audio id="vo" data-start="0" data-duration="10" src="/assets/vo.mp3"></audio>`,
+    );
+    initSandboxRuntimeModular();
+    await flush();
+    window.__player?.play();
+    await flush();
+    const stopAll = vi.spyOn(WebAudioTransport.prototype, "stopAll");
+
+    document.getElementById("music")!.setAttribute("data-hidden", "");
+    stepFrames(1);
+    await flush();
+
+    expect(heard(document.getElementById("bed") as HTMLAudioElement)).toBe(false);
+    expect(heard(document.getElementById("vo") as HTMLAudioElement)).toBe(true);
+    expect(stopAll).not.toHaveBeenCalled();
+  });
+
+  it("does not restart the mix to unmute it right after muting it", async () => {
+    mount(
+      groupHtml + `<audio id="vo" data-start="0" data-duration="10" src="/assets/vo.mp3"></audio>`,
+    );
+    const bed = document.getElementById("bed") as HTMLAudioElement;
+    const group = document.getElementById("music")!;
+    initSandboxRuntimeModular();
+    await flush();
+    window.__player?.play();
+    await flush();
+    group.setAttribute("data-hidden", "");
+    stepFrames(1);
+    const stopAll = vi.spyOn(WebAudioTransport.prototype, "stopAll");
+
+    group.removeAttribute("data-hidden");
+    stepFrames(1);
+    await flush();
+
+    expect(heard(bed)).toBe(true);
+    expect(stopAll).not.toHaveBeenCalled();
+  });
+
+  it("does not restart the mix to unmute a group whose members have all finished", async () => {
+    mount(
+      `<hf-audio-group id="music" data-hidden=""></hf-audio-group>` +
+        `<audio id="bed" data-start="0" data-duration="2" data-audio-group="music" src="/assets/music.mp3"></audio>` +
+        `<audio id="vo" data-start="0" data-duration="10" src="/assets/vo.mp3"></audio>`,
+    );
+    initSandboxRuntimeModular();
+    await flush();
+    window.__player?.seek(3);
+    window.__player?.play();
+    await flush();
+    const stopAll = vi.spyOn(WebAudioTransport.prototype, "stopAll");
+
+    document.getElementById("music")!.removeAttribute("data-hidden");
+    stepFrames(1);
+    await flush();
+
+    expect(stopAll).not.toHaveBeenCalled();
+  });
+
+  it("does not restart the mix to unmute a group whose unfinished member is muted itself", async () => {
+    mount(
+      `<hf-audio-group id="music" data-hidden=""></hf-audio-group>` +
+        `<audio id="bed" data-start="0" data-duration="10" data-audio-group="music" data-hidden="" src="/assets/music.mp3"></audio>` +
+        `<audio id="vo" data-start="0" data-duration="10" src="/assets/vo.mp3"></audio>`,
+    );
+    initSandboxRuntimeModular();
+    await flush();
+    window.__player?.play();
+    await flush();
+    const stopAll = vi.spyOn(WebAudioTransport.prototype, "stopAll");
+
+    document.getElementById("music")!.removeAttribute("data-hidden");
+    stepFrames(1);
+    await flush();
+
+    expect(stopAll).not.toHaveBeenCalled();
+  });
+
+  it("brings a member that starts after the unmute in through the group", async () => {
+    mount(
+      `<hf-audio-group id="music" data-hidden=""></hf-audio-group>` +
+        `<audio id="bed" data-start="5" data-duration="4" data-audio-group="music" src="/assets/music.mp3"></audio>`,
+    );
+    const bed = document.getElementById("bed") as HTMLAudioElement;
+    initSandboxRuntimeModular();
+    await flush();
+    window.__player?.play();
+    await flush();
+    expect(sources.get(bed)).toBeUndefined();
+
+    document.getElementById("music")!.removeAttribute("data-hidden");
+    stepFrames(1);
+    await flush();
+
+    expect(audible(sources.get(bed))).toBe(true);
+    expect(sources.get(bed)!.outputs.has(destination)).toBe(false);
   });
 });
