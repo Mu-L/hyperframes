@@ -35,6 +35,10 @@ interface GsapTimeline {
     (value: number, suppressEvents?: boolean): GsapTimeline;
   };
   seek?: (position: number | string, suppressEvents?: boolean) => GsapTimeline;
+  totalTime?: {
+    (): number;
+    (value: number, suppressEvents?: boolean): GsapTimeline;
+  };
   call: (fn: () => void, args: null, position: number) => GsapTimeline;
   to: (
     target: Record<string, unknown>,
@@ -1219,13 +1223,36 @@ export function init(config: HyperShaderConfig): GsapTimeline {
     tl = gsap.timeline({ paused: true, onUpdate: tickShader });
   }
 
-  const originalPlay = tl.play.bind(tl) as (...args: unknown[]) => GsapTimeline;
-  const originalPause = tl.pause.bind(tl) as (...args: unknown[]) => GsapTimeline;
-  const originalTime = tl.time.bind(tl) as (...args: unknown[]) => GsapTimeline | number;
+  let ownSeekDepth = 0;
+  const asOwnSeek =
+    <R>(fn: (...args: unknown[]) => R) =>
+    (...args: unknown[]): R => {
+      ownSeekDepth += 1;
+      try {
+        return fn(...args);
+      } finally {
+        ownSeekDepth -= 1;
+      }
+    };
+  const originalPlay = asOwnSeek(tl.play.bind(tl) as (...args: unknown[]) => GsapTimeline);
+  const originalPause = asOwnSeek(tl.pause.bind(tl) as (...args: unknown[]) => GsapTimeline);
+  const originalTime = asOwnSeek(tl.time.bind(tl) as (...args: unknown[]) => GsapTimeline | number);
   const originalSeek =
     typeof tl.seek === "function"
-      ? (tl.seek.bind(tl) as (...args: unknown[]) => GsapTimeline)
+      ? asOwnSeek(tl.seek.bind(tl) as (...args: unknown[]) => GsapTimeline)
       : null;
+  const originalTotalTime =
+    typeof tl.totalTime === "function"
+      ? (tl.totalTime.bind(tl) as (...args: unknown[]) => GsapTimeline | number)
+      : null;
+  // GSAP re-renders in place through totalTime from these; that is not a seek to record.
+  const reRendersInPlace = tl as unknown as Record<string, unknown>;
+  for (const method of ["timeScale", "paused", "reversed"]) {
+    const original = reRendersInPlace[method];
+    if (typeof original === "function") {
+      reRendersInPlace[method] = asOwnSeek(original.bind(tl) as (...args: unknown[]) => unknown);
+    }
+  }
   const readActualTimelineTime = (): number => {
     const value = originalTime();
     return typeof value === "number" && Number.isFinite(value) ? value : 0;
@@ -1318,6 +1345,15 @@ export function init(config: HyperShaderConfig): GsapTimeline {
       tickShader();
       return result;
     }) as NonNullable<GsapTimeline["seek"]>;
+  }
+
+  if (originalTotalTime) {
+    tl.totalTime = ((...args: unknown[]) => {
+      if (ownSeekDepth > 0) return originalTotalTime(...args);
+      if (args.length === 0) return prewarming ? publicTimelineTime : originalTotalTime();
+      updatePublicTimelineTime(args[0]);
+      return originalTotalTime(...args);
+    }) as NonNullable<GsapTimeline["totalTime"]>;
   }
 
   initCapture();
@@ -1904,11 +1940,14 @@ export function init(config: HyperShaderConfig): GsapTimeline {
     disposeCachedTransition(cache);
     let allPersisted = true;
     for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
-      const progress = sampleIndex / (sampleCount - 1);
+      const sampleTime = cache.time + (cache.duration * sampleIndex) / (sampleCount - 1);
       suppressSceneMutationTracking(() => {
-        originalTime(cache.time + cache.duration * progress, false);
+        originalTime(sampleTime, false);
       });
       await waitForPaint();
+      suppressSceneMutationTracking(() => {
+        originalTime(sampleTime, true);
+      });
 
       const fromScene = document.getElementById(cache.fromId);
       const toScene = document.getElementById(cache.toId);

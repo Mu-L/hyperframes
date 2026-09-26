@@ -10,10 +10,14 @@ function stubGsap() {
   let paused = true;
   const calls: { fn: () => void; at: number }[] = [];
   const tl = {
-    paused: () => paused,
+    paused: (value?: boolean) =>
+      value === undefined ? paused : ((paused = value), tl.totalTime(now, true), tl),
     play: () => ((paused = false), tl),
     pause: () => ((paused = true), tl),
-    time: (t?: number, suppressEvents = false) => {
+    // Like GSAP, time() and seek() move the playhead through totalTime().
+    time: (t?: number, suppressEvents = false) =>
+      t === undefined ? now : tl.totalTime(t, suppressEvents),
+    totalTime: (t?: number, suppressEvents = false) => {
       if (t === undefined) return now;
       const from = now;
       now = t;
@@ -26,6 +30,7 @@ function stubGsap() {
       return tl;
     },
     seek: (t: number) => tl.time(t),
+    timeScale: (scale?: number) => (scale === undefined ? 1 : (tl.totalTime(now, true), tl)),
     call: (fn: () => void, _args: null, at: number) => (calls.push({ fn, at }), tl),
     set: () => tl,
     to: () => tl,
@@ -33,6 +38,7 @@ function stubGsap() {
   };
   const timeline = (opts: { onUpdate?: () => void }) => ((onUpdate = opts.onUpdate), tl);
   vi.stubGlobal("gsap", { timeline, set: () => {}, to: () => {}, fromTo: () => {} });
+  return { now: () => now };
 }
 
 function stubWebGl() {
@@ -153,5 +159,159 @@ describe("preview outside a transition", () => {
       expect.stringContaining("restoring the playhead"),
       expect.objectContaining({ message: "author callback" }),
     );
+  });
+});
+
+type SpeedTimeline = ShaderTimeline & {
+  timeScale: (scale?: number) => unknown;
+  totalTime: (t?: number) => unknown;
+};
+
+describe("a runtime seek while the prewarm runs", () => {
+  it("is where the prewarm leaves the playhead", async () => {
+    stubGsap();
+    stubWebGl();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    mountScenes(["s4", "s5"]);
+    const tl = init({
+      bgColor: "#000",
+      scenes: ["s4", "s5"],
+      transitions: [{ time: 4.4, duration: 0.8, shader: "domain-warp" }],
+    }) as ShaderTimeline & { totalTime: (t?: number) => unknown };
+    let crossings = 0;
+    tl.call(() => (crossings += 1), null, 0.5);
+    await Promise.resolve();
+    tl.totalTime(1);
+    await prewarmDone();
+    crossings = 0;
+
+    expect(tl.totalTime()).toBe(1);
+    tl.time(0.2);
+    expect(crossings).toBe(1);
+  });
+
+  it("is not moved by a speed change while the prewarm sits on a capture frame", async () => {
+    stubGsap();
+    stubWebGl();
+    let tl: SpeedTimeline | undefined;
+    let changedSpeed = false;
+    vi.spyOn(console, "warn").mockImplementation((message: unknown) => {
+      if (!changedSpeed && String(message).includes("Transition capture failed")) {
+        changedSpeed = true;
+        tl?.timeScale(2);
+      }
+    });
+    mountScenes(["s4", "s5"]);
+    tl = init({
+      bgColor: "#000",
+      scenes: ["s4", "s5"],
+      transitions: [{ time: 4.4, duration: 0.8, shader: "domain-warp" }],
+    }) as unknown as SpeedTimeline;
+    await prewarmDone();
+
+    expect(changedSpeed).toBe(true);
+    expect(tl?.totalTime()).toBe(0);
+  });
+
+  function initDuringCapture(onCaptureFrame: (tl: SpeedTimeline) => void): SpeedTimeline {
+    stubGsap();
+    stubWebGl();
+    let tl: SpeedTimeline | undefined;
+    let fired = false;
+    vi.spyOn(console, "warn").mockImplementation((message: unknown) => {
+      if (!fired && tl && String(message).includes("Transition capture failed")) {
+        fired = true;
+        onCaptureFrame(tl);
+      }
+    });
+    mountScenes(["s4", "s5"]);
+    tl = init({
+      bgColor: "#000",
+      scenes: ["s4", "s5"],
+      transitions: [{ time: 4.4, duration: 0.8, shader: "domain-warp" }],
+    }) as unknown as SpeedTimeline;
+    return tl;
+  }
+
+  it("applies it, reads back the recorded playhead, and restores to it", async () => {
+    let readBeforeSeek: unknown;
+    let crossedTwo = 0;
+    let appliedAtOnce = false;
+    const tl = initDuringCapture((timeline) => {
+      readBeforeSeek = timeline.totalTime();
+      crossedTwo = 0;
+      timeline.totalTime(1);
+      appliedAtOnce = crossedTwo === 1;
+    });
+    tl.call(() => (crossedTwo += 1), null, 2);
+    await prewarmDone();
+
+    expect(readBeforeSeek).toBe(0);
+    expect(appliedAtOnce).toBe(true);
+    expect(tl.totalTime()).toBe(1);
+  });
+
+  it("is not moved by paused(false) while the prewarm sits on a capture frame", async () => {
+    const tl = initDuringCapture((timeline) => {
+      (timeline as unknown as { paused: (value: boolean) => unknown }).paused(false);
+    });
+    await prewarmDone();
+
+    expect(tl.totalTime()).toBe(0);
+  });
+
+  it("passes a seek after the prewarm straight through", async () => {
+    const tl = initDuringCapture(() => {});
+    let crossedThree = 0;
+    tl.call(() => (crossedThree += 1), null, 3);
+    await prewarmDone();
+    crossedThree = 0;
+
+    tl.totalTime(3.5);
+    expect(crossedThree).toBe(1);
+  });
+
+  it("does not reach the capture when it lands while the capture frame paints", async () => {
+    const clock = stubGsap();
+    stubWebGl();
+    let tl: SpeedTimeline | undefined;
+    let capturedAt: number | undefined;
+    vi.spyOn(console, "warn").mockImplementation((message: unknown) => {
+      if (capturedAt === undefined && String(message).includes("Transition capture failed")) {
+        capturedAt = clock.now();
+      }
+    });
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      tl?.totalTime(0.3);
+      return setTimeout(() => callback(performance.now()), 0) as unknown as number;
+    });
+    mountScenes(["s4", "s5"]);
+    tl = init({
+      bgColor: "#000",
+      scenes: ["s4", "s5"],
+      transitions: [{ time: 4.4, duration: 0.8, shader: "domain-warp" }],
+    }) as unknown as SpeedTimeline;
+    await prewarmDone();
+
+    expect(capturedAt).toBe(4.4);
+  });
+
+  it("still records outside seeks after a callback throws inside a capture seek", async () => {
+    let thrown = false;
+    const tl = initDuringCapture((timeline) => timeline.totalTime(1));
+    tl.call(
+      () => {
+        if (!thrown) {
+          thrown = true;
+          throw new Error("author callback");
+        }
+      },
+      null,
+      2,
+    );
+    await prewarmDone();
+
+    expect(thrown).toBe(true);
+    expect(tl.totalTime()).toBe(1);
   });
 });
